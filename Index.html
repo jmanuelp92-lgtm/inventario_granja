@@ -2,66 +2,48 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Granja Manager 🐷</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Granja Pro 📸</title>
     <style>
-        /* ESTILOS DE LA APP (CSS) */
+        /* ESTILOS GENERALES */
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
             background-color: #f0f2f5; 
             margin: 0; 
-            padding-bottom: 80px; /* Espacio para el menú de abajo */
+            padding-bottom: 90px; /* Espacio para el menú inferior */
         }
         
-        /* HEADER */
+        /* HEADER FIJO */
         header { 
             background-color: #2c3e50; 
             color: white; 
             padding: 15px; 
             text-align: center; 
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2); 
-            position: sticky;
-            top: 0;
-            z-index: 10;
+            position: sticky; 
+            top: 0; 
+            z-index: 100; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
-        h2 { margin: 0; font-size: 1.2rem; }
+        h2 { margin: 0; font-size: 1.2rem; letter-spacing: 0.5px; }
 
         /* PESTAÑAS */
         .tab-content { display: none; padding: 15px; animation: fadeIn 0.3s; }
         .tab-content.active { display: block; }
         
-        /* DASHBOARD - TARJETAS */
-        .grid-dashboard { 
-            display: grid; 
-            grid-template-columns: 1fr 1fr; 
-            gap: 15px; 
-            margin-top: 15px; 
-        }
-        .card-dash { 
+        /* FORMULARIO */
+        .card-form { 
             background: white; 
             padding: 20px; 
-            border-radius: 15px; 
-            text-align: center; 
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
-            cursor: pointer; 
-            transition: transform 0.1s;
+            border-radius: 12px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05); 
         }
-        .card-dash:active { transform: scale(0.95); background-color: #e8f6f3; }
-        .card-dash h3 { margin: 0; font-size: 0.9rem; color: #7f8c8d; text-transform: uppercase; letter-spacing: 1px;}
-        .card-dash .number { font-size: 2.2rem; font-weight: 800; color: #27ae60; margin: 10px 0; }
-        
-        /* TARJETA TOTAL (VERDE) */
-        .card-dash.total { 
-            grid-column: span 2; 
-            background: linear-gradient(135deg, #2ecc71, #27ae60); 
-            color: white; 
+        label { 
+            display: block; 
+            font-weight: 600; 
+            margin-top: 15px; 
+            color: #34495e; 
+            font-size: 0.95rem;
         }
-        .card-dash.total h3 { color: #e9f7ef; }
-        .card-dash.total .number { color: white; text-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-
-        /* FORMULARIO */
-        .card-form { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-        label { display: block; font-weight: 600; margin-top: 15px; color: #34495e; font-size: 0.9rem; }
         input, select { 
             width: 100%; 
             padding: 12px; 
@@ -69,10 +51,28 @@
             border: 1px solid #bdc3c7; 
             border-radius: 8px; 
             box-sizing: border-box; 
-            font-size: 16px; 
-            background-color: #fdfdfd; 
+            background: #fff; 
+            font-size: 16px; /* Evita zoom en iPhone */
         }
         
+        /* BOTÓN FOTO */
+        .file-upload-wrapper { 
+            margin-top: 15px; 
+            border: 2px dashed #bdc3c7; 
+            padding: 20px; 
+            text-align: center; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            background: #f9f9f9; 
+            transition: all 0.3s;
+        }
+        .file-upload-wrapper.has-file { 
+            border-color: #27ae60; 
+            background: #e9f7ef; 
+        }
+        input[type="file"] { display: none; }
+        
+        /* BOTÓN PRINCIPAL */
         button.btn-primary { 
             width: 100%; 
             padding: 15px; 
@@ -82,69 +82,61 @@
             border-radius: 8px; 
             font-size: 18px; 
             font-weight: bold; 
-            cursor: pointer; 
             margin-top: 25px; 
+            cursor: pointer;
             box-shadow: 0 4px 6px rgba(41, 128, 185, 0.3);
         }
-        button.btn-primary:active { background-color: #1f618d; }
-        
-        /* MODAL (LISTA DE CERDOS) */
-        .modal { 
-            display: none; 
-            position: fixed; top: 0; left: 0; 
-            width: 100%; height: 100%; 
-            background: rgba(0,0,0,0.6); 
-            z-index: 100; 
-            justify-content: center; align-items: center; 
-            backdrop-filter: blur(3px);
-        }
-        .modal-content { 
-            background: white; 
-            width: 85%; 
-            max-height: 70%; 
-            border-radius: 15px; 
-            padding: 20px; 
-            overflow-y: auto; 
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-        }
-        .list-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; margin-bottom: 10px; }
-        .list-item { 
-            padding: 12px; 
-            border-bottom: 1px solid #eee; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center;
-        }
-        .list-item:last-child { border-bottom: none; }
-        .tag-id { background: #e8f8f5; color: #16a085; padding: 5px 10px; border-radius: 20px; font-weight: bold; }
-        .close-btn { background: #e74c3c; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        button:disabled { background-color: #95a5a6; box-shadow: none; }
 
-        /* MENU INFERIOR */
-        .nav-bar { 
-            position: fixed; bottom: 0; width: 100%; 
+        /* DASHBOARD */
+        .grid-dashboard { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 15px; 
+        }
+        .card-dash { 
             background: white; 
-            display: flex; justify-content: space-around; 
-            padding: 10px 0; 
-            box-shadow: 0 -2px 10px rgba(0,0,0,0.05); 
-            z-index: 50;
+            padding: 15px; 
+            border-radius: 12px; 
+            text-align: center; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
+        }
+        .card-dash h3 { margin: 0; font-size: 0.8rem; color: #7f8c8d; text-transform: uppercase; }
+        .card-dash h2 { margin: 10px 0 0 0; font-size: 2rem; color: #2c3e50; }
+
+        /* MENÚ INFERIOR */
+        .nav-bar { 
+            position: fixed; 
+            bottom: 0; 
+            width: 100%; 
+            background: white; 
+            display: flex; 
+            justify-content: space-around; 
+            padding: 12px 0; 
+            border-top: 1px solid #eee; 
+            z-index: 90; 
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
         }
         .nav-btn { 
-            background: none; border: none; 
-            color: #95a5a6; 
-            font-size: 0.9rem; 
-            display: flex; flex-direction: column; align-items: center; 
-            gap: 5px;
+            background: none; 
+            border: none; 
+            font-size: 1.5rem; 
+            color: #bdc3c7;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
-        .nav-btn.active { color: #2980b9; font-weight: 800; }
-        .nav-icon { font-size: 1.5rem; }
+        .nav-btn span { font-size: 0.7rem; margin-top: 2px; font-weight: bold; }
+        .nav-btn.active { color: #2980b9; }
 
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .loader { text-align: center; margin-top: 30px; color: #7f8c8d; font-style: italic; }
-        
+        /* UTILIDADES */
+        .loader { text-align: center; padding: 20px; display: none; color: #7f8c8d; }
+        #preview-img { max-width: 100%; height: auto; border-radius: 8px; margin-top: 10px; display: none; border: 1px solid #ddd; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
         /* Checkbox grande */
-        .checkbox-wrapper { display: flex; align-items: center; background: #ebf5fb; padding: 10px; border-radius: 8px; margin-top: 15px; border: 1px solid #d6eaf8; }
-        .checkbox-wrapper input { width: 25px; height: 25px; margin-right: 15px; margin-top:0; }
-
+        .checkbox-row { display: flex; align-items: center; margin-top: 15px; background: #fff; padding: 10px; border-radius: 8px; border: 1px solid #e0e0e0; }
+        .checkbox-row input { width: 25px; height: 25px; margin: 0 10px 0 0; }
     </style>
 </head>
 <body>
@@ -154,51 +146,46 @@
 </header>
 
 <div id="tab-dashboard" class="tab-content active">
+    <div class="loader" id="loader-dash">⏳ Sincronizando datos...</div>
     
-    <div id="loading-dash" class="loader">
-        <p>⏳ Conectando con la granja...</p>
-    </div>
-    
-    <div id="dashboard-content" style="display:none;">
+    <div id="dash-view" style="display:none;">
         <div class="grid-dashboard">
-            <div class="card-dash total">
-                <h3>Total Animales</h3>
-                <div class="number" id="total-count">0</div>
+            <div class="card-dash" style="grid-column: span 2; background: linear-gradient(135deg, #2ecc71, #27ae60); color: white;">
+                <h3 style="color: #e9f7ef;">Total Animales</h3>
+                <h2 id="total" style="color: white; font-size: 3rem;">0</h2>
             </div>
-
-            <div class="card-dash" onclick="abrirDetalle('PARIDERA')">
+            
+            <div class="card-dash">
                 <h3>Paridera</h3>
-                <div class="number" id="count-paridera">0</div>
+                <h2 id="c-paridera">0</h2>
             </div>
-            <div class="card-dash" onclick="abrirDetalle('PRECEBO')">
+            <div class="card-dash">
                 <h3>Precebo</h3>
-                <div class="number" id="count-precebo">0</div>
+                <h2 id="c-precebo">0</h2>
             </div>
-            <div class="card-dash" onclick="abrirDetalle('LEVANTE')">
+            <div class="card-dash">
                 <h3>Levante</h3>
-                <div class="number" id="count-levante">0</div>
+                <h2 id="c-levante">0</h2>
             </div>
-            <div class="card-dash" onclick="abrirDetalle('ENGORDE')">
+            <div class="card-dash">
                 <h3>Engorde</h3>
-                <div class="number" id="count-engorde">0</div>
+                <h2 id="c-engorde">0</h2>
             </div>
         </div>
         
-        <p style="text-align:center; color:#95a5a6; font-size:0.8rem; margin-top:30px;">
-            ℹ️ Toca una tarjeta para ver la lista de animales.
-        </p>
-
-        <button onclick="cargarDatos()" style="background:none; border:none; color:#2980b9; text-decoration:underline; width:100%; margin-top:10px; cursor:pointer;">
-            🔄 Actualizar Datos Ahora
-        </button>
+        <div style="text-align:center; margin-top: 30px;">
+            <button onclick="location.reload()" style="background:none; border:none; color:#2980b9; font-weight:bold; cursor:pointer; padding:10px;">
+                🔄 Actualizar ahora
+            </button>
+        </div>
     </div>
 </div>
 
 <div id="tab-registro" class="tab-content">
     <div class="card-form">
         <h3 style="margin-top:0; color:#2c3e50;">Nuevo Movimiento</h3>
-        
-        <label>Chapeta (ID del Animal):</label>
+
+        <label>Chapeta (ID):</label>
         <input type="number" id="chapeta" placeholder="Ej. 504" inputmode="numeric">
 
         <label>Acción:</label>
@@ -209,20 +196,7 @@
             <option value="MUERTE">🔴 Muerte / Baja</option>
         </select>
 
-        <div style="display:flex; gap:10px;">
-            <div style="flex:1">
-                <label>Madre:</label>
-                <select id="madre">
-                    <option value="">Cargando...</option>
-                </select>
-            </div>
-            <div style="flex:1">
-                <label>Padre (ID):</label>
-                <input type="text" id="padre" placeholder="Opcional">
-            </div>
-        </div>
-
-        <label>Nueva Fase / Ubicación:</label>
+        <label>Ubicación / Fase Nueva:</label>
         <select id="fase">
             <option value="PARIDERA">Paridera</option>
             <option value="PRECEBO">Precebo</option>
@@ -230,12 +204,34 @@
             <option value="ENGORDE">Engorde</option>
             <option value="FUERA">Fuera de Granja</option>
         </select>
-
-        <div class="checkbox-wrapper">
-            <input type="checkbox" id="esReproductora">
-            <label style="margin:0; width:auto; font-weight:normal;">Marcar como <strong>Futura Madre</strong></label>
-        </div>
         
+        <label>Genealogía (Opcional):</label>
+        <div style="display:flex; gap:10px;">
+             <div style="flex:1">
+                 <select id="madre">
+                     <option value="">Cargando...</option>
+                 </select>
+             </div>
+             <div style="flex:1">
+                 <input type="text" id="padre" placeholder="Padre (ID)">
+             </div>
+        </div>
+
+        <div class="checkbox-row">
+             <input type="checkbox" id="esReproductora">
+             <label style="margin:0; width:auto; font-weight:normal;">Marcar como <strong>Futura Madre</strong></label>
+        </div>
+
+        <label>Evidencia / Foto (Opcional):</label>
+        <div class="file-upload-wrapper" id="drop-zone" onclick="document.getElementById('fotoInput').click()">
+            <div id="text-foto">
+                <span style="font-size:2rem;">📸</span><br>
+                Toca para tomar foto
+            </div>
+            <input type="file" id="fotoInput" accept="image/*" capture="environment" onchange="procesarFoto()">
+            <img id="preview-img" src="">
+        </div>
+
         <label>Notas:</label>
         <input type="text" id="notas" placeholder="Peso, observaciones...">
 
@@ -243,184 +239,158 @@
     </div>
 </div>
 
-<div id="modal-detalle" class="modal">
-    <div class="modal-content">
-        <div class="list-header">
-            <h3 id="modal-titulo" style="margin:0;">Lista</h3>
-            <button class="close-btn" onclick="cerrarModal()">X</button>
-        </div>
-        <div id="modal-lista">
-            </div>
-    </div>
-</div>
-
 <div class="nav-bar">
-    <button class="nav-btn active" onclick="cambiarTab('dashboard', this)">
-        <span class="nav-icon">📊</span>
+    <button class="nav-btn active" onclick="verTab('dashboard', this)">
+        <span>📊</span>
         <span>Tablero</span>
     </button>
-    <button class="nav-btn" onclick="cambiarTab('registro', this)">
-        <span class="nav-icon">➕</span>
+    <button class="nav-btn" onclick="verTab('registro', this)">
+        <span>➕</span>
         <span>Registrar</span>
     </button>
 </div>
 
 <script>
-    // --- TU URL ACTUALIZADA ---
-    const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbxgq1MQpSCsdCYgd1MQPyiNvoRycAipytxxOgrDSb5OcSuzNxUD6UMFup3Shu7ho312SQ/exec"; 
-    
-    // Variables para guardar la memoria de la granja
-    let inventarioProcesado = {}; 
-    let datosCrudos = [];
+    // --- TU NUEVA URL ---
+    const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbxeIx7qOJyFYEF1k2jggGll1ha-RC_HZVkB2BNW27w4cBe6Mg8LsEJJOWXaWueDpuD7qw/exec";
 
-    // Al iniciar, cargar datos automáticamente
-    window.onload = function() {
-        cargarDatos();
-    };
+    let imagenBase64 = ""; 
+    let inventario = {}; 
 
-    // --- 1. LÓGICA DE CARGA Y CÁLCULO (CEREBRO) ---
+    // Iniciar app
+    window.onload = cargarDatos;
+
+    function verTab(tabId, btn) {
+        // Cambiar contenido
+        document.querySelectorAll('.tab-content').forEach(d => d.style.display='none');
+        document.getElementById('tab-'+tabId).style.display='block';
+        
+        // Cambiar botones activos
+        if(btn) {
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        }
+    }
+
+    // --- CARGAR DATOS DEL SCRIPT ---
     function cargarDatos() {
-        document.getElementById('loading-dash').style.display = 'block';
-        document.getElementById('dashboard-content').style.display = 'none';
-
+        document.getElementById('loader-dash').style.display='block';
+        
         fetch(URL_SCRIPT)
-        .then(res => res.json())
-        .then(data => {
-            datosCrudos = data; // Guardamos copia
-            procesarInventario(data); // Calculamos quién está dónde
-            actualizarDashboard(); // Pintamos los números
-            llenarSelectMadres(data); // Llenamos la lista de madres
-            
-            document.getElementById('loading-dash').style.display = 'none';
-            document.getElementById('dashboard-content').style.display = 'block';
-        })
-        .catch(err => {
-            alert("⚠️ Error de conexión. Verifica tu internet.");
-            console.error(err);
-            document.getElementById('loading-dash').innerHTML = "<p style='color:red'>Error de conexión ❌<br><button onclick='location.reload()'>Reintentar</button></p>";
-        });
+            .then(r => r.json())
+            .then(data => {
+                procesarDashboard(data);
+                llenarMadres(data);
+                document.getElementById('loader-dash').style.display='none';
+                document.getElementById('dash-view').style.display='block';
+            })
+            .catch(error => {
+                console.error(error);
+                document.getElementById('loader-dash').innerHTML = "⚠️ Error de conexión<br><small>Verifica tu internet</small>";
+            });
     }
 
-    function procesarInventario(data) {
-        // Reiniciamos la memoria
-        inventarioProcesado = {}; 
+    // --- PROCESAR INVENTARIO ---
+    function procesarDashboard(data) {
+        let counts = {PARIDERA:0, PRECEBO:0, LEVANTE:0, ENGORDE:0, TOTAL:0};
+        let estados = {};
         
-        // Recorremos CADA fila del Excel histórico
-        // Estructura esperada: [Fecha, Chapeta, Accion, Fase, Ubicacion, Notas, Padre, Madre, EsRepro]
-        
+        // Recorremos historial
         data.forEach(fila => {
-            // Validamos que la fila tenga datos
-            if(!fila || fila.length < 2) return;
-
-            const chapeta = fila[1];
-            const accion = fila[2];
-            const fase = fila[3];
+            // fila = [Fecha, Chapeta, Accion, Fase, Ubicacion, Notas, Padre, Madre, EsRepro, Foto]
+            let id = fila[1], acc = fila[2], fase = fila[3];
             
-            // Si el cerdo no existe en memoria, lo creamos
-            if (!inventarioProcesado[chapeta]) {
-                inventarioProcesado[chapeta] = { estado: 'DESCONOCIDO', fase: '', ultimo_movimiento: '' };
-            }
-
-            // Actualizamos su estado basado en lo último que pasó
-            if (accion === 'VENTA' || accion === 'MUERTE') {
-                inventarioProcesado[chapeta].estado = 'INACTIVO';
-                inventarioProcesado[chapeta].fase = 'FUERA';
+            if(!estados[id]) estados[id] = {st:'?', fs:''};
+            
+            if(acc === 'VENTA' || acc === 'MUERTE') {
+                estados[id].st = 'OFF';
+                estados[id].fs = 'FUERA';
             } else {
-                inventarioProcesado[chapeta].estado = 'ACTIVO';
-                inventarioProcesado[chapeta].fase = fase;
+                estados[id].st = 'ON';
+                estados[id].fs = fase;
             }
-            inventarioProcesado[chapeta].ultimo_movimiento = accion;
+        });
+
+        // Contar activos
+        for(let id in estados) {
+            if(estados[id].st === 'ON') {
+                counts.TOTAL++;
+                // Normalizar texto por si viene en minúsculas
+                let faseKey = estados[id].fs ? estados[id].fs.toUpperCase() : "DESCONOCIDO";
+                if(counts[faseKey] !== undefined) counts[faseKey]++;
+            }
+        }
+
+        // Pintar números
+        document.getElementById('total').innerText = counts.TOTAL;
+        document.getElementById('c-paridera').innerText = counts.PARIDERA;
+        document.getElementById('c-precebo').innerText = counts.PRECEBO;
+        document.getElementById('c-levante').innerText = counts.LEVANTE;
+        document.getElementById('c-engorde').innerText = counts.ENGORDE;
+    }
+
+    // --- LLENAR SELECT DE MADRES ---
+    function llenarMadres(data) {
+        let sel = document.getElementById('madre');
+        sel.innerHTML = '<option value="">-- Sel --</option><option value="NA">N/A</option><option value="COMPRA">Externa</option>';
+        
+        let madres = new Set();
+        data.forEach(r => { 
+            // Si columna EsReproductora (index 8) es SI
+            if(r[8] === 'SI') madres.add(r[1]); 
+        });
+        
+        madres.forEach(m => {
+            let o = document.createElement('option'); 
+            o.value=m; 
+            o.text="Madre " + m; 
+            sel.add(o);
         });
     }
 
-    function actualizarDashboard() {
-        let contadores = { PARIDERA: 0, PRECEBO: 0, LEVANTE: 0, ENGORDE: 0, TOTAL: 0 };
-        
-        // Contamos solo los cerdos que siguen ACTIVOS
-        for (const [id, info] of Object.entries(inventarioProcesado)) {
-            if (info.estado === 'ACTIVO') {
-                // Normalizamos el texto (mayúsculas) para evitar errores
-                let faseLimpia = info.fase ? info.fase.toUpperCase().trim() : "DESCONOCIDO";
+    // --- COMPRESIÓN DE FOTO ---
+    function procesarFoto() {
+        const file = document.getElementById('fotoInput').files[0];
+        if (!file) return;
+
+        document.getElementById('text-foto').innerHTML = "⏳ Procesando...";
+
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = function(event) {
+            const imgElement = document.createElement("img");
+            imgElement.src = event.target.result;
+            
+            imgElement.onload = function() {
+                // Redimensionar a max 800px para que suba rápido
+                const canvas = document.createElement("canvas");
+                const MAX_WIDTH = 800;
+                const scaleSize = MAX_WIDTH / imgElement.width;
+                canvas.width = MAX_WIDTH;
+                canvas.height = imgElement.height * scaleSize;
+
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(imgElement, 0, 0, canvas.width, canvas.height);
+
+                // Comprimir a JPG calidad 60%
+                imagenBase64 = canvas.toDataURL("image/jpeg", 0.6).split(",")[1]; 
+
+                // Mostrar preview
+                const preview = document.getElementById('preview-img');
+                preview.src = canvas.toDataURL("image/jpeg", 0.6);
+                preview.style.display = 'block';
                 
-                if (contadores.hasOwnProperty(faseLimpia)) {
-                    contadores[faseLimpia]++;
-                    contadores.TOTAL++;
-                }
+                document.getElementById('text-foto').innerHTML = "✅ Foto Lista";
+                document.getElementById('drop-zone').classList.add('has-file');
             }
         }
-
-        // Pintamos en pantalla
-        document.getElementById('count-paridera').innerText = contadores.PARIDERA;
-        document.getElementById('count-precebo').innerText = contadores.PRECEBO;
-        document.getElementById('count-levante').innerText = contadores.LEVANTE;
-        document.getElementById('count-engorde').innerText = contadores.ENGORDE;
-        document.getElementById('total-count').innerText = contadores.TOTAL;
     }
 
-    // --- 2. DETALLES (MODAL) ---
-    function abrirDetalle(fase) {
-        const modal = document.getElementById('modal-detalle');
-        const lista = document.getElementById('modal-lista');
-        const titulo = document.getElementById('modal-titulo');
-        
-        titulo.innerText = "Corral: " + fase;
-        lista.innerHTML = "";
-
-        let encontrados = 0;
-
-        for (const [id, info] of Object.entries(inventarioProcesado)) {
-            if (info.estado === 'ACTIVO' && info.fase === fase) {
-                encontrados++;
-                lista.innerHTML += `
-                    <div class="list-item">
-                        <span class="tag-id"># ${id}</span>
-                        <span style="color:#7f8c8d; font-size:0.9rem;">Activo</span>
-                    </div>
-                `;
-            }
-        }
-
-        if (encontrados === 0) lista.innerHTML = "<p style='text-align:center; padding:20px; color:#999'>El corral está vacío 🍂</p>";
-        
-        modal.style.display = 'flex';
-    }
-
-    function cerrarModal() {
-        document.getElementById('modal-detalle').style.display = 'none';
-    }
-
-    // --- 3. REGISTRO Y ENVÍO ---
-    function llenarSelectMadres(data) {
-        const select = document.getElementById('madre');
-        select.innerHTML = '<option value="">-- Seleccionar --</option><option value="DESCONOCIDA">Desconocida</option><option value="COMPRA">Externa</option>';
-        
-        let madresCandidatas = new Set();
-        
-        // Buscamos en el historial cualquiera que haya sido marcada como REPRODUCTORA
-        // Columna index 8 es EsReproductora
-        data.forEach(fila => {
-            if (fila[8] === 'SI') {
-                const id = fila[1];
-                // Solo la mostramos si sigue activa en la granja
-                if (inventarioProcesado[id] && inventarioProcesado[id].estado === 'ACTIVO') {
-                    madresCandidatas.add(id);
-                }
-            }
-        });
-
-        madresCandidatas.forEach(id => {
-            let opt = document.createElement('option');
-            opt.value = id;
-            opt.text = "Madre #" + id;
-            select.add(opt);
-        });
-    }
-
+    // --- ENVÍO DE DATOS ---
     function verificarAccion() {
         const accion = document.getElementById('accion').value;
-        const fase = document.getElementById('fase');
-        if (accion === 'VENTA' || accion === 'MUERTE') {
-            fase.value = 'FUERA';
+        if(accion === 'MUERTE' || accion === 'VENTA') {
+            document.getElementById('fase').value = 'FUERA';
         }
     }
 
@@ -435,58 +405,29 @@
             notas: document.getElementById('notas').value,
             madre: document.getElementById('madre').value,
             padre: document.getElementById('padre').value,
-            esReproductora: document.getElementById('esReproductora').checked ? "SI" : "NO"
+            esReproductora: document.getElementById('esReproductora').checked ? "SI" : "NO",
+            imagenBase64: imagenBase64,
+            mimeType: "image/jpeg"
         };
 
-        if (!datos.chapeta) { alert("⚠️ Falta el número de Chapeta"); return; }
+        if(!datos.chapeta) { alert("⚠️ Falta el número de Chapeta"); return; }
         
-        // Animación de carga
         btn.disabled = true;
-        btn.innerText = "Guardando en la nube... ☁️";
+        btn.innerText = "Subiendo a la nube... ☁️";
 
         fetch(URL_SCRIPT, {
-            method: 'POST',
-            mode: 'no-cors', // Modo silencioso para GAS
-            headers: { 'Content-Type': 'application/json' },
+            method: 'POST', 
+            mode: 'no-cors',
+            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(datos)
         }).then(() => {
-            alert("✅ ¡Registro Guardado con Éxito!");
-            
-            // Limpiar
-            document.getElementById('chapeta').value = '';
-            document.getElementById('notas').value = '';
-            document.getElementById('chapeta').focus();
-            
-            // Restaurar botón
-            btn.disabled = false;
-            btn.innerText = "Guardar Registro 💾";
-            
-            // Recargar datos para actualizar el dashboard
-            setTimeout(cargarDatos, 1500); 
-            cambiarTab('dashboard', document.querySelectorAll('.nav-btn')[0]);
-        })
-        .catch(error => {
-            alert("❌ Error al guardar. Intenta de nuevo.");
+            alert("✅ ¡Guardado Exitosamente!");
+            location.reload(); // Recargar para actualizar dashboard
+        }).catch(e => {
+            alert("❌ Error al subir. Intenta de nuevo.");
             btn.disabled = false;
             btn.innerText = "Reintentar";
         });
-    }
-
-    // --- NAVEGACIÓN ---
-    function cambiarTab(tabId, btn) {
-        // Ocultar todas las pestañas
-        document.querySelectorAll('.tab-content').forEach(div => div.classList.remove('active'));
-        // Quitar activo de botones
-        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-        
-        // Activar la seleccionada
-        document.getElementById('tab-' + tabId).classList.add('active');
-        btn.classList.add('active');
-        
-        // Si vamos al dashboard, aprovechamos para recargar datos si está vacío
-        if(tabId === 'dashboard' && datosCrudos.length === 0) {
-            cargarDatos();
-        }
     }
 </script>
 
