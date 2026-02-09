@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Granja Manager 🐷</title>
+    <style>
+        /* ESTILOS DE LA APP (CSS) */
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background-color: #f0f2f5; 
+            margin: 0; 
+            padding-bottom: 80px; /* Espacio para el menú de abajo */
+        }
+        
+        /* HEADER */
+        header { 
+            background-color: #2c3e50; 
+            color: white; 
+            padding: 15px; 
+            text-align: center; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2); 
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        h2 { margin: 0; font-size: 1.2rem; }
+
+        /* PESTAÑAS */
+        .tab-content { display: none; padding: 15px; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        
+        /* DASHBOARD - TARJETAS */
+        .grid-dashboard { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 15px; 
+            margin-top: 15px; 
+        }
+        .card-dash { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 15px; 
+            text-align: center; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+            cursor: pointer; 
+            transition: transform 0.1s;
+        }
+        .card-dash:active { transform: scale(0.95); background-color: #e8f6f3; }
+        .card-dash h3 { margin: 0; font-size: 0.9rem; color: #7f8c8d; text-transform: uppercase; letter-spacing: 1px;}
+        .card-dash .number { font-size: 2.2rem; font-weight: 800; color: #27ae60; margin: 10px 0; }
+        
+        /* TARJETA TOTAL (VERDE) */
+        .card-dash.total { 
+            grid-column: span 2; 
+            background: linear-gradient(135deg, #2ecc71, #27ae60); 
+            color: white; 
+        }
+        .card-dash.total h3 { color: #e9f7ef; }
+        .card-dash.total .number { color: white; text-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+
+        /* FORMULARIO */
+        .card-form { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        label { display: block; font-weight: 600; margin-top: 15px; color: #34495e; font-size: 0.9rem; }
+        input, select { 
+            width: 100%; 
+            padding: 12px; 
+            margin-top: 5px; 
+            border: 1px solid #bdc3c7; 
+            border-radius: 8px; 
+            box-sizing: border-box; 
+            font-size: 16px; 
+            background-color: #fdfdfd; 
+        }
+        
+        button.btn-primary { 
+            width: 100%; 
+            padding: 15px; 
+            background-color: #2980b9; 
+            color: white; 
+            border: none; 
+            border-radius: 8px; 
+            font-size: 18px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            margin-top: 25px; 
+            box-shadow: 0 4px 6px rgba(41, 128, 185, 0.3);
+        }
+        button.btn-primary:active { background-color: #1f618d; }
+        
+        /* MODAL (LISTA DE CERDOS) */
+        .modal { 
+            display: none; 
+            position: fixed; top: 0; left: 0; 
+            width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.6); 
+            z-index: 100; 
+            justify-content: center; align-items: center; 
+            backdrop-filter: blur(3px);
+        }
+        .modal-content { 
+            background: white; 
+            width: 85%; 
+            max-height: 70%; 
+            border-radius: 15px; 
+            padding: 20px; 
+            overflow-y: auto; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+        .list-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; margin-bottom: 10px; }
+        .list-item { 
+            padding: 12px; 
+            border-bottom: 1px solid #eee; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+        }
+        .list-item:last-child { border-bottom: none; }
+        .tag-id { background: #e8f8f5; color: #16a085; padding: 5px 10px; border-radius: 20px; font-weight: bold; }
+        .close-btn { background: #e74c3c; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+
+        /* MENU INFERIOR */
+        .nav-bar { 
+            position: fixed; bottom: 0; width: 100%; 
+            background: white; 
+            display: flex; justify-content: space-around; 
+            padding: 10px 0; 
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.05); 
+            z-index: 50;
+        }
+        .nav-btn { 
+            background: none; border: none; 
+            color: #95a5a6; 
+            font-size: 0.9rem; 
+            display: flex; flex-direction: column; align-items: center; 
+            gap: 5px;
+        }
+        .nav-btn.active { color: #2980b9; font-weight: 800; }
+        .nav-icon { font-size: 1.5rem; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .loader { text-align: center; margin-top: 30px; color: #7f8c8d; font-style: italic; }
+        
+        /* Checkbox grande */
+        .checkbox-wrapper { display: flex; align-items: center; background: #ebf5fb; padding: 10px; border-radius: 8px; margin-top: 15px; border: 1px solid #d6eaf8; }
+        .checkbox-wrapper input { width: 25px; height: 25px; margin-right: 15px; margin-top:0; }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h2>🐷 Granja Manager</h2>
+</header>
+
+<div id="tab-dashboard" class="tab-content active">
+    
+    <div id="loading-dash" class="loader">
+        <p>⏳ Conectando con la granja...</p>
+    </div>
+    
+    <div id="dashboard-content" style="display:none;">
+        <div class="grid-dashboard">
+            <div class="card-dash total">
+                <h3>Total Animales</h3>
+                <div class="number" id="total-count">0</div>
+            </div>
+
+            <div class="card-dash" onclick="abrirDetalle('PARIDERA')">
+                <h3>Paridera</h3>
+                <div class="number" id="count-paridera">0</div>
+            </div>
+            <div class="card-dash" onclick="abrirDetalle('PRECEBO')">
+                <h3>Precebo</h3>
+                <div class="number" id="count-precebo">0</div>
+            </div>
+            <div class="card-dash" onclick="abrirDetalle('LEVANTE')">
+                <h3>Levante</h3>
+                <div class="number" id="count-levante">0</div>
+            </div>
+            <div class="card-dash" onclick="abrirDetalle('ENGORDE')">
+                <h3>Engorde</h3>
+                <div class="number" id="count-engorde">0</div>
+            </div>
+        </div>
+        
+        <p style="text-align:center; color:#95a5a6; font-size:0.8rem; margin-top:30px;">
+            ℹ️ Toca una tarjeta para ver la lista de animales.
+        </p>
+
+        <button onclick="cargarDatos()" style="background:none; border:none; color:#2980b9; text-decoration:underline; width:100%; margin-top:10px; cursor:pointer;">
+            🔄 Actualizar Datos Ahora
+        </button>
+    </div>
+</div>
+
+<div id="tab-registro" class="tab-content">
+    <div class="card-form">
+        <h3 style="margin-top:0; color:#2c3e50;">Nuevo Movimiento</h3>
+        
+        <label>Chapeta (ID del Animal):</label>
+        <input type="number" id="chapeta" placeholder="Ej. 504" inputmode="numeric">
+
+        <label>Acción:</label>
+        <select id="accion" onchange="verificarAccion()">
+            <option value="INGRESO">🟢 Nacimiento / Compra</option>
+            <option value="TRASLADO">🔵 Cambio de Corral</option>
+            <option value="VENTA">💰 Venta</option>
+            <option value="MUERTE">🔴 Muerte / Baja</option>
+        </select>
+
+        <div style="display:flex; gap:10px;">
+            <div style="flex:1">
+                <label>Madre:</label>
+                <select id="madre">
+                    <option value="">Cargando...</option>
+                </select>
+            </div>
+            <div style="flex:1">
+                <label>Padre (ID):</label>
+                <input type="text" id="padre" placeholder="Opcional">
+            </div>
+        </div>
+
+        <label>Nueva Fase / Ubicación:</label>
+        <select id="fase">
+            <option value="PARIDERA">Paridera</option>
+            <option value="PRECEBO">Precebo</option>
+            <option value="LEVANTE">Levante</option>
+            <option value="ENGORDE">Engorde</option>
+            <option value="FUERA">Fuera de Granja</option>
+        </select>
+
+        <div class="checkbox-wrapper">
+            <input type="checkbox" id="esReproductora">
+            <label style="margin:0; width:auto; font-weight:normal;">Marcar como <strong>Futura Madre</strong></label>
+        </div>
+        
+        <label>Notas:</label>
+        <input type="text" id="notas" placeholder="Peso, observaciones...">
+
+        <button id="btnEnviar" class="btn-primary" onclick="enviarDatos()">Guardar Registro 💾</button>
+    </div>
+</div>
+
+<div id="modal-detalle" class="modal">
+    <div class="modal-content">
+        <div class="list-header">
+            <h3 id="modal-titulo" style="margin:0;">Lista</h3>
+            <button class="close-btn" onclick="cerrarModal()">X</button>
+        </div>
+        <div id="modal-lista">
+            </div>
+    </div>
+</div>
+
+<div class="nav-bar">
+    <button class="nav-btn active" onclick="cambiarTab('dashboard', this)">
+        <span class="nav-icon">📊</span>
+        <span>Tablero</span>
+    </button>
+    <button class="nav-btn" onclick="cambiarTab('registro', this)">
+        <span class="nav-icon">➕</span>
+        <span>Registrar</span>
+    </button>
+</div>
+
+<script>
+    // --- TU URL ACTUALIZADA ---
+    const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbxgq1MQpSCsdCYgd1MQPyiNvoRycAipytxxOgrDSb5OcSuzNxUD6UMFup3Shu7ho312SQ/exec"; 
+    
+    // Variables para guardar la memoria de la granja
+    let inventarioProcesado = {}; 
+    let datosCrudos = [];
+
+    // Al iniciar, cargar datos automáticamente
+    window.onload = function() {
+        cargarDatos();
+    };
+
+    // --- 1. LÓGICA DE CARGA Y CÁLCULO (CEREBRO) ---
+    function cargarDatos() {
+        document.getElementById('loading-dash').style.display = 'block';
+        document.getElementById('dashboard-content').style.display = 'none';
+
+        fetch(URL_SCRIPT)
+        .then(res => res.json())
+        .then(data => {
+            datosCrudos = data; // Guardamos copia
+            procesarInventario(data); // Calculamos quién está dónde
+            actualizarDashboard(); // Pintamos los números
+            llenarSelectMadres(data); // Llenamos la lista de madres
+            
+            document.getElementById('loading-dash').style.display = 'none';
+            document.getElementById('dashboard-content').style.display = 'block';
+        })
+        .catch(err => {
+            alert("⚠️ Error de conexión. Verifica tu internet.");
+            console.error(err);
+            document.getElementById('loading-dash').innerHTML = "<p style='color:red'>Error de conexión ❌<br><button onclick='location.reload()'>Reintentar</button></p>";
+        });
+    }
+
+    function procesarInventario(data) {
+        // Reiniciamos la memoria
+        inventarioProcesado = {}; 
+        
+        // Recorremos CADA fila del Excel histórico
+        // Estructura esperada: [Fecha, Chapeta, Accion, Fase, Ubicacion, Notas, Padre, Madre, EsRepro]
+        
+        data.forEach(fila => {
+            // Validamos que la fila tenga datos
+            if(!fila || fila.length < 2) return;
+
+            const chapeta = fila[1];
+            const accion = fila[2];
+            const fase = fila[3];
+            
+            // Si el cerdo no existe en memoria, lo creamos
+            if (!inventarioProcesado[chapeta]) {
+                inventarioProcesado[chapeta] = { estado: 'DESCONOCIDO', fase: '', ultimo_movimiento: '' };
+            }
+
+            // Actualizamos su estado basado en lo último que pasó
+            if (accion === 'VENTA' || accion === 'MUERTE') {
+                inventarioProcesado[chapeta].estado = 'INACTIVO';
+                inventarioProcesado[chapeta].fase = 'FUERA';
+            } else {
+                inventarioProcesado[chapeta].estado = 'ACTIVO';
+                inventarioProcesado[chapeta].fase = fase;
+            }
+            inventarioProcesado[chapeta].ultimo_movimiento = accion;
+        });
+    }
+
+    function actualizarDashboard() {
+        let contadores = { PARIDERA: 0, PRECEBO: 0, LEVANTE: 0, ENGORDE: 0, TOTAL: 0 };
+        
+        // Contamos solo los cerdos que siguen ACTIVOS
+        for (const [id, info] of Object.entries(inventarioProcesado)) {
+            if (info.estado === 'ACTIVO') {
+                // Normalizamos el texto (mayúsculas) para evitar errores
+                let faseLimpia = info.fase ? info.fase.toUpperCase().trim() : "DESCONOCIDO";
+                
+                if (contadores.hasOwnProperty(faseLimpia)) {
+                    contadores[faseLimpia]++;
+                    contadores.TOTAL++;
+                }
+            }
+        }
+
+        // Pintamos en pantalla
+        document.getElementById('count-paridera').innerText = contadores.PARIDERA;
+        document.getElementById('count-precebo').innerText = contadores.PRECEBO;
+        document.getElementById('count-levante').innerText = contadores.LEVANTE;
+        document.getElementById('count-engorde').innerText = contadores.ENGORDE;
+        document.getElementById('total-count').innerText = contadores.TOTAL;
+    }
+
+    // --- 2. DETALLES (MODAL) ---
+    function abrirDetalle(fase) {
+        const modal = document.getElementById('modal-detalle');
+        const lista = document.getElementById('modal-lista');
+        const titulo = document.getElementById('modal-titulo');
+        
+        titulo.innerText = "Corral: " + fase;
+        lista.innerHTML = "";
+
+        let encontrados = 0;
+
+        for (const [id, info] of Object.entries(inventarioProcesado)) {
+            if (info.estado === 'ACTIVO' && info.fase === fase) {
+                encontrados++;
+                lista.innerHTML += `
+                    <div class="list-item">
+                        <span class="tag-id"># ${id}</span>
+                        <span style="color:#7f8c8d; font-size:0.9rem;">Activo</span>
+                    </div>
+                `;
+            }
+        }
+
+        if (encontrados === 0) lista.innerHTML = "<p style='text-align:center; padding:20px; color:#999'>El corral está vacío 🍂</p>";
+        
+        modal.style.display = 'flex';
+    }
+
+    function cerrarModal() {
+        document.getElementById('modal-detalle').style.display = 'none';
+    }
+
+    // --- 3. REGISTRO Y ENVÍO ---
+    function llenarSelectMadres(data) {
+        const select = document.getElementById('madre');
+        select.innerHTML = '<option value="">-- Seleccionar --</option><option value="DESCONOCIDA">Desconocida</option><option value="COMPRA">Externa</option>';
+        
+        let madresCandidatas = new Set();
+        
+        // Buscamos en el historial cualquiera que haya sido marcada como REPRODUCTORA
+        // Columna index 8 es EsReproductora
+        data.forEach(fila => {
+            if (fila[8] === 'SI') {
+                const id = fila[1];
+                // Solo la mostramos si sigue activa en la granja
+                if (inventarioProcesado[id] && inventarioProcesado[id].estado === 'ACTIVO') {
+                    madresCandidatas.add(id);
+                }
+            }
+        });
+
+        madresCandidatas.forEach(id => {
+            let opt = document.createElement('option');
+            opt.value = id;
+            opt.text = "Madre #" + id;
+            select.add(opt);
+        });
+    }
+
+    function verificarAccion() {
+        const accion = document.getElementById('accion').value;
+        const fase = document.getElementById('fase');
+        if (accion === 'VENTA' || accion === 'MUERTE') {
+            fase.value = 'FUERA';
+        }
+    }
+
+    function enviarDatos() {
+        const btn = document.getElementById('btnEnviar');
+        
+        const datos = {
+            chapeta: document.getElementById('chapeta').value,
+            accion: document.getElementById('accion').value,
+            fase: document.getElementById('fase').value,
+            ubicacion: document.getElementById('fase').value,
+            notas: document.getElementById('notas').value,
+            madre: document.getElementById('madre').value,
+            padre: document.getElementById('padre').value,
+            esReproductora: document.getElementById('esReproductora').checked ? "SI" : "NO"
+        };
+
+        if (!datos.chapeta) { alert("⚠️ Falta el número de Chapeta"); return; }
+        
+        // Animación de carga
+        btn.disabled = true;
+        btn.innerText = "Guardando en la nube... ☁️";
+
+        fetch(URL_SCRIPT, {
+            method: 'POST',
+            mode: 'no-cors', // Modo silencioso para GAS
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(datos)
+        }).then(() => {
+            alert("✅ ¡Registro Guardado con Éxito!");
+            
+            // Limpiar
+            document.getElementById('chapeta').value = '';
+            document.getElementById('notas').value = '';
+            document.getElementById('chapeta').focus();
+            
+            // Restaurar botón
+            btn.disabled = false;
+            btn.innerText = "Guardar Registro 💾";
+            
+            // Recargar datos para actualizar el dashboard
+            setTimeout(cargarDatos, 1500); 
+            cambiarTab('dashboard', document.querySelectorAll('.nav-btn')[0]);
+        })
+        .catch(error => {
+            alert("❌ Error al guardar. Intenta de nuevo.");
+            btn.disabled = false;
+            btn.innerText = "Reintentar";
+        });
+    }
+
+    // --- NAVEGACIÓN ---
+    function cambiarTab(tabId, btn) {
+        // Ocultar todas las pestañas
+        document.querySelectorAll('.tab-content').forEach(div => div.classList.remove('active'));
+        // Quitar activo de botones
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        
+        // Activar la seleccionada
+        document.getElementById('tab-' + tabId).classList.add('active');
+        btn.classList.add('active');
+        
+        // Si vamos al dashboard, aprovechamos para recargar datos si está vacío
+        if(tabId === 'dashboard' && datosCrudos.length === 0) {
+            cargarDatos();
+        }
+    }
+</script>
+
+</body>
+</html>
