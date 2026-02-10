@@ -3,47 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Granja Manager Pro 🚀</title>
+    <title>Granja Animal Pro</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         /* ESTILOS BASE */
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; margin: 0; padding-bottom: 90px; }
         header { background-color: #2c3e50; color: white; padding: 15px; text-align: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-        
-        /* BUSCADOR */
         .search-container { padding: 10px 15px; background: #2c3e50; margin-bottom: 10px; }
         .search-box { width: 100%; padding: 10px; border-radius: 20px; border: none; font-size: 1rem; text-align: center; outline: none; }
-
-        /* VISTAS */
         .tab-content { display: none; padding: 15px; animation: fadeIn 0.3s; }
         .tab-content.active { display: block; }
         .sub-view { display: none; } 
-
+        
         /* DASHBOARD */
         .grid-dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .card-dash { background: white; padding: 15px; border-radius: 12px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: pointer; position: relative; }
+        .card-dash { background: white; padding: 15px; border-radius: 12px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: pointer; position: relative; overflow: hidden; }
         .card-dash:active { transform: scale(0.98); }
         .card-dash h3 { margin: 0; font-size: 0.75rem; color: #7f8c8d; text-transform: uppercase; }
         .card-dash h2 { margin: 10px 0 0 0; font-size: 2rem; color: #2c3e50; }
-        .card-total { grid-column: span 2; background: linear-gradient(135deg, #2ecc71, #27ae60); color: white; }
-        .card-total h2, .card-total h3 { color: white !important; }
+        
+        /* PUNTOS DE ALERTA (NUEVO) */
+        .status-dot {
+            position: absolute; top: 10px; right: 10px;
+            width: 15px; height: 15px; border-radius: 50%;
+            border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .dot-red { background-color: #c0392b; animation: pulse 2s infinite; }
+        .dot-yellow { background-color: #f1c40f; }
+        
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(192, 57, 43, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(192, 57, 43, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(192, 57, 43, 0); }
+        }
 
-        /* FORMULARIO */
+        /* TARJETAS ESPECIALES */
+        .card-maestra { grid-column: span 2; background: linear-gradient(135deg, #2c3e50, #34495e); color: white; border: 2px solid #f1c40f; }
+        .card-total { grid-column: span 1; background: linear-gradient(135deg, #2ecc71, #27ae60); color: white; }
+        .card-lechones { grid-column: span 1; background: linear-gradient(135deg, #f39c12, #d35400); color: white; }
+        .card-maestra h2, .card-maestra h3, .card-total h2, .card-total h3, .card-lechones h2, .card-lechones h3 { color: white !important; }
+
+        /* LISTAS CON COLORES */
+        .alerta-roja { border-left: 5px solid #c0392b !important; background-color: #fadbd8; }
+        .alerta-amarilla { border-left: 5px solid #f1c40f !important; background-color: #fcf3cf; }
+        
+        /* FORMULARIO Y OTROS */
         .card-form { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         label { display: block; font-weight: 600; margin-top: 15px; color: #34495e; font-size: 0.95rem; }
         input, select { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #bdc3c7; border-radius: 8px; box-sizing: border-box; background: #fff; font-size: 16px; }
-        
+        .parto-section { background-color: #fff3cd; border: 1px solid #ffeeba; padding: 15px; border-radius: 8px; margin-top: 15px; display: none; }
+        .parto-row { display: flex; gap: 15px; }
         .input-group { display: flex; gap: 10px; align-items: flex-end; }
         .btn-add { background: #27ae60; color: white; border: none; padding: 12px 15px; border-radius: 8px; cursor: pointer; font-size: 1.2rem; height: 46px; margin-top: 5px; }
-        
-        /* BOTONES */
         button.btn-primary { width: 100%; padding: 15px; background-color: #2980b9; color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; margin-top: 25px; cursor: pointer; }
         .btn-edit { background-color: #f39c12; color: white; padding: 10px; width: 100%; border:none; border-radius:8px; font-weight:bold; cursor:pointer; margin-top:10px; }
         
         /* LISTAS */
-        .item-lista { background: white; padding: 15px; margin-bottom: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; }
-        
-        /* LÍNEA DE TIEMPO (NUEVO) */
+        .item-lista { background: white; padding: 15px; margin-bottom: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; border-left: 5px solid transparent; }
+        .badge-lechones { background: #e67e22; color: white; font-size: 0.75rem; padding: 2px 6px; border-radius: 10px; margin-left: 5px; }
+        .tag-chapeta { background: #3498db; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; margin-right: 5px; }
+        .tag-dias { font-size: 0.75rem; font-weight: bold; color: #555; background: #eee; padding: 2px 5px; border-radius: 4px; }
+
+        /* TIMELINE */
         .timeline { list-style: none; padding: 0; margin-top: 20px; }
         .timeline li { border-left: 2px solid #bdc3c7; padding-left: 20px; position: relative; margin-bottom: 20px; }
         .timeline li::before { content: ''; width: 10px; height: 10px; background: #2980b9; border-radius: 50%; position: absolute; left: -6px; top: 5px; }
@@ -51,7 +72,6 @@
         .timeline-action { font-weight: bold; color: #2c3e50; }
         .timeline-note { font-size: 0.9rem; color: #555; background: #f9f9f9; padding: 5px; border-radius: 5px; margin-top: 5px; }
 
-        /* NAVEGACIÓN */
         .nav-bar { position: fixed; bottom: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid #eee; z-index: 90; }
         .nav-btn { background: none; border: none; font-size: 1.5rem; color: #bdc3c7; display: flex; flex-direction: column; align-items: center; }
         .nav-btn.active { color: #2980b9; }
@@ -63,28 +83,31 @@
 <body>
 
 <header>
-    <h2>🐷 Granja Manager</h2>
+    <h2>🐷 Granja ANIMAL PRO</h2>
     <div class="search-container" id="search-bar-container" style="display:none;">
-        <input type="text" id="inputBusqueda" class="search-box" placeholder="🔍 Buscar Chapeta o ID..." onkeyup="buscarCerdo()">
+        <input type="text" id="inputBusqueda" class="search-box" placeholder="🔍 Buscar Tatuaje o Chapeta..." onkeyup="buscarCerdo()">
     </div>
 </header>
 
 <div id="tab-dashboard" class="tab-content active">
-    <div class="loader" id="loader-dash">⏳ Cargando base de datos...</div>
-    
+    <div class="loader" id="loader-dash">⏳ Analizando días...</div>
     <div id="view-dashboard-summary" style="display:none;">
         <div class="grid-dashboard" id="dashboard-container"></div>
-        <div style="text-align:center; margin-top: 30px;">
+        
+        <div style="margin-top:20px; background:white; padding:10px; border-radius:10px; display:flex; justify-content:space-around; font-size:0.8rem; color:#555;">
+            <div style="display:flex; align-items:center;"><div style="width:15px; height:15px; background:#c0392b; border-radius:50%; margin-right:5px; border:2px solid #fff; box-shadow:0 0 3px #ccc;"></div> Vencido (¡Mover!)</div>
+            <div style="display:flex; align-items:center;"><div style="width:15px; height:15px; background:#f1c40f; border-radius:50%; margin-right:5px; border:2px solid #fff; box-shadow:0 0 3px #ccc;"></div> Próximo</div>
+        </div>
+
+        <div style="text-align:center; margin-top: 20px;">
             <button onclick="location.reload()" style="background:none; border:none; color:#2980b9; font-weight:bold;">🔄 Actualizar</button>
         </div>
     </div>
-
     <div id="view-list" class="sub-view">
         <button class="btn-back" onclick="volverAlTablero()"><i class="fas fa-arrow-left"></i> Volver</button>
         <h2 id="titulo-lista" style="color:#2c3e50; border-bottom: 2px solid #2ecc71; padding-bottom: 10px;">Listado</h2>
         <div id="contenedor-lista"></div>
     </div>
-
     <div id="view-detail" class="sub-view">
         <button class="btn-back" onclick="volverALista()"><i class="fas fa-arrow-left"></i> Volver</button>
         <div id="contenedor-detalle" class="card-form"></div>
@@ -94,60 +117,61 @@
 <div id="tab-registro" class="tab-content">
     <div class="card-form">
         <h3 id="titulo-form" style="margin-top:0; color:#2c3e50;">Nuevo Movimiento</h3>
-
-        <label>Chapeta (ID):</label>
-        <input type="number" id="chapeta" placeholder="Ej. 504" inputmode="numeric">
-
+        <label>Tatuaje (ID Principal):</label>
+        <input type="text" id="tatuaje" placeholder="Ej. TAT-504" style="font-weight:bold; border: 2px solid #3498db;">
+        <label>Chapeta (Opcional):</label>
+        <input type="text" id="chapeta" placeholder="Ej. 105 (Solo si tiene)">
         <label>Acción:</label>
         <select id="accion" onchange="verificarAccion()">
-            <option value="INGRESO">🟢 Nacimiento / Compra</option>
-            <option value="TRASLADO">🔵 Traslado / Cambio</option>
+            <option value="INGRESO">🟢 Nuevo Ingreso</option>
+            <option value="PARTO">🐷 PARTO (Nacimiento)</option>
+            <option value="TRASLADO">🔵 Traslado / Poner Chapeta</option>
             <option value="VENTA">💰 Venta</option>
             <option value="MUERTE">🔴 Muerte / Baja</option>
         </select>
-
-        <label>Ubicación / Fase Nueva:</label>
-        <div class="input-group">
-            <select id="fase"></select>
-            <button class="btn-add" onclick="agregarNuevaFase()">+</button>
+        <div id="section-parto" class="parto-section">
+            <h4 style="margin:0 0 10px 0; color:#d35400;">👶 Registro de Camada</h4>
+            <div class="parto-row">
+                <div style="flex:1"><label style="margin-top:0">Vivos</label><input type="number" id="vivos" placeholder="0"></div>
+                <div style="flex:1"><label style="margin-top:0">Muertos</label><input type="number" id="muertos" placeholder="0"></div>
+            </div>
         </div>
-
+        <div id="section-fase">
+            <label>Ubicación / Fase Nueva:</label>
+            <div class="input-group">
+                <select id="fase"></select>
+                <button class="btn-add" onclick="agregarNuevaFase()">+</button>
+            </div>
+        </div>
         <label>Genealogía:</label>
         <div style="display:flex; gap:10px;">
              <select id="madre" style="flex:1"><option value="">Madre</option></select>
              <input type="text" id="padre" placeholder="Padre" style="flex:1; margin-top:5px;">
         </div>
-        
         <div style="margin-top:15px; display:flex; align-items:center; gap:10px;">
              <input type="checkbox" id="esReproductora" style="width:20px; height:20px;">
              <label style="margin:0;">Es Futura Madre</label>
         </div>
-
         <label>Notas / Peso:</label>
-        <input type="text" id="notas" placeholder="Peso, observaciones...">
-        
+        <input type="text" id="notas" placeholder="Observaciones...">
         <div class="file-upload-wrapper" id="drop-zone" onclick="document.getElementById('fotoInput').click()" style="margin-top:15px; border:2px dashed #ccc; padding:15px; text-align:center;">
             <div id="text-foto">📸 Toca para foto</div>
             <input type="file" id="fotoInput" accept="image/*" capture="environment" onchange="procesarFoto()" style="display:none;">
         </div>
-
         <button id="btnEnviar" class="btn-primary" onclick="enviarDatos()">Guardar Registro 💾</button>
     </div>
 </div>
 
 <div id="tab-reportes" class="tab-content">
     <h2 style="text-align:center; margin-bottom:20px; color:#c0392b;">🚨 Historial de Salidas</h2>
-    
     <div style="background:white; padding:10px; border-radius:8px; margin-bottom:15px;">
-        <select id="filtro-reporte" onchange="cargarReportes()" style="width:100%; padding:10px; border-radius:5px;">
-            <option value="TODOS">Ver Todo (Ventas y Muertes)</option>
-            <option value="VENTA">💰 Solo Ventas</option>
-            <option value="MUERTE">🔴 Solo Muertes</option>
+        <select id="filtro-reporte" onchange="cargarReportes()" style="width:100%; padding:10px;">
+            <option value="TODOS">Ver Todo</option>
+            <option value="VENTA">💰 Ventas</option>
+            <option value="MUERTE">🔴 Muertes</option>
         </select>
     </div>
-
-    <div id="contenedor-reportes">
-        </div>
+    <div id="contenedor-reportes"></div>
 </div>
 
 <div class="nav-bar">
@@ -157,11 +181,14 @@
 </div>
 
 <script>
-    // --- PEGA TU URL DE APPS SCRIPT AQUÍ ---
-    const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbz0k3IwWN0Yx616SzA5c9UMho_L7p2DvwsDEOsDPkkR284W21LgmuCH5K37esQZtjsW1Q/exec";
+    const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbxFSaHzMegQVKg7cfnD2da-sop2AFL_KtNvfd8wrlmyuoiSyULJyBs7aUPewwHm3_zy/exec";
+
+    // --- REGLAS DE TIEMPO (Días Límite) ---
+    const REGLAS_MADRES = { "GESTACION": 100, "MATERNIDAD": 39, "DESCANSO": 6 };
+    const REGLAS_CERDOS = { "LACTANCIA": 24, "PRECEBO": 47, "LEVANTE": 81, "ENGORDE": 100 };
 
     let inventarioGlobal = []; 
-    let historialCompleto = []; // AQUÍ GUARDAMOS TODO EL HISTORIAL CRUDO
+    let historialCompleto = [];
     let fasesGlobales = [];
     let imagenBase64 = ""; 
     let categoriaActual = "";
@@ -171,79 +198,104 @@
     function verTab(tabId, btn) {
         document.querySelectorAll('.tab-content').forEach(d => d.style.display='none');
         document.getElementById('tab-'+tabId).style.display='block';
-        if(btn) {
-            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-        }
-        
+        if(btn) document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        if(btn) btn.classList.add('active');
         if(tabId === 'dashboard') {
             document.getElementById('search-bar-container').style.display = 'block';
             limpiarFormulario();
         } else if (tabId === 'reportes') {
             document.getElementById('search-bar-container').style.display = 'none';
-            cargarReportes(); // Cargar al entrar
+            cargarReportes();
         } else {
             document.getElementById('search-bar-container').style.display = 'none';
         }
     }
 
-    // --- CARGA DE DATOS ---
     function cargarDatos() {
         document.getElementById('loader-dash').style.display='block';
         fetch(URL_SCRIPT)
             .then(r => r.json())
             .then(data => {
-                let registros = data.registros || (Array.isArray(data) ? data : []);
+                let registros = data.registros || [];
                 let fases = data.fases || [];
-                
-                // GUARDAMOS TODO EL HISTORIAL PARA USARLO LUEGO
                 historialCompleto = registros;
-                
                 procesarFases(fases);
                 procesarMadres(registros);
                 procesarDashboard(registros);
-                
                 document.getElementById('loader-dash').style.display='none';
                 document.getElementById('view-dashboard-summary').style.display='block';
                 document.getElementById('search-bar-container').style.display='block';
             })
-            .catch(e => {
-                console.error(e);
-                alert("Error de conexión. Revisa que el script sea 'Cualquier persona'");
-            });
+            .catch(e => { console.error(e); alert("Error de conexión. Verifica la implementación."); });
     }
 
-    // --- DASHBOARD (SOLO ÚLTIMO ESTADO) ---
     function procesarDashboard(data) {
-        let counts = { TOTAL: 0 };
+        let counts = { TOTAL: 0, LECHONES: 0 };
         let estados = {};
+        // OBJETO PARA CONTAR ALERTAS POR FASE { "PARIDERA": {rojo: 2, amarillo: 1}, ... }
+        let alertasPorFase = {}; 
 
         data.forEach(fila => {
-            let id = fila[1], acc = fila[2], fase = fila[3];
-            if(!estados[id]) estados[id] = {};
+            let fechaMov = new Date(fila[0]);
+            let id = fila[1], acc = fila[2], fase = fila[3], notas = fila[5];
+            let chapeta = fila[10]; 
+
+            if(!estados[id]) estados[id] = { piglets: 0, fechaEntrada: fechaMov };
             
-            // Sobreescribimos con lo último
             estados[id].id = id;
-            estados[id].notas = fila[5];
+            estados[id].chapeta = chapeta; 
+            estados[id].notas = notas;
             estados[id].padre = fila[6];
             estados[id].madre = fila[7];
             estados[id].esRepro = fila[8];
             estados[id].foto = fila[9];
+            
+            if(estados[id].fase !== fase) {
+                estados[id].fechaEntrada = fechaMov;
+            }
 
             if(acc === 'VENTA' || acc === 'MUERTE') {
-                estados[id].status = 'OFF';
-                estados[id].fase = 'FUERA';
+                estados[id].status = 'OFF'; estados[id].fase = 'FUERA'; estados[id].piglets = 0;
             } else {
                 estados[id].status = 'ON';
                 estados[id].fase = fase ? fase.toUpperCase().trim() : "SIN_CATEGORIA";
+                if (acc === 'PARTO') {
+                    let match = notas.match(/Vivos: (\d+)/);
+                    if (match) estados[id].piglets = parseInt(match[1]);
+                } else if (acc === 'TRASLADO' && estados[id].piglets > 0) {
+                    estados[id].piglets = 0; 
+                }
             }
         });
 
         inventarioGlobal = [];
+        let hoy = new Date();
+
         for(let id in estados) {
             let animal = estados[id];
             if(animal.status === 'ON') {
                 counts.TOTAL++;
+                counts.LECHONES += (animal.piglets || 0);
+                
+                // CALCULAR DÍAS
+                let diffTime = Math.abs(hoy - animal.fechaEntrada);
+                let diasEnFase = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                animal.dias = diasEnFase; 
+                
+                // CALCULAR ALERTA
+                let limite = 0;
+                if(animal.esRepro === "SI") limite = REGLAS_MADRES[animal.fase] || 100;
+                else limite = REGLAS_CERDOS[animal.fase] || 100;
+                
+                animal.alerta = "verde";
+                if(diasEnFase >= limite) animal.alerta = "roja";
+                else if(diasEnFase >= (limite - 5)) animal.alerta = "amarilla";
+
+                // CONTAR ALERTA EN LA FASE
+                if(!alertasPorFase[animal.fase]) alertasPorFase[animal.fase] = { r: 0, y: 0 };
+                if(animal.alerta === 'roja') alertasPorFase[animal.fase].r++;
+                if(animal.alerta === 'amarilla') alertasPorFase[animal.fase].y++;
+
                 let f = animal.fase;
                 if(!counts[f]) counts[f] = 0;
                 counts[f]++;
@@ -252,257 +304,103 @@
         }
 
         const container = document.getElementById('dashboard-container');
-        container.innerHTML = `<div class="card-dash card-total"><h3>Total</h3><h2>${counts.TOTAL}</h2></div>`;
+        let poblacionTotal = counts.TOTAL + counts.LECHONES;
+        container.innerHTML = `<div class="card-dash card-maestra"><h3>POBLACIÓN TOTAL</h3><h1>${poblacionTotal}</h1></div>`;
+        container.innerHTML += `<div class="card-dash card-total"><h3>Adultos</h3><h2>${counts.TOTAL}</h2></div>`;
+        container.innerHTML += `<div class="card-dash card-lechones"><h3>👶 Lechones</h3><h2>${counts.LECHONES}</h2></div>`;
 
         let fasesAMostrar = new Set([...Array.from(document.getElementById('fase').options).map(o=>o.value), ...Object.keys(counts)]);
-        fasesAMostrar.delete("TOTAL"); fasesAMostrar.delete("FUERA"); fasesAMostrar.delete("");
+        fasesAMostrar.delete("TOTAL"); fasesAMostrar.delete("LECHONES"); fasesAMostrar.delete("FUERA"); fasesAMostrar.delete("");
 
         fasesAMostrar.forEach(fase => {
             let cant = counts[fase] || 0;
-            container.innerHTML += `<div class="card-dash" onclick="verLista('${fase}')"><h3>${fase}</h3><h2>${cant}</h2></div>`;
+            // LOGICA DEL PUNTICO
+            let indicator = "";
+            if (alertasPorFase[fase] && alertasPorFase[fase].r > 0) {
+                indicator = `<div class="status-dot dot-red" title="${alertasPorFase[fase].r} Vencidos"></div>`;
+            } else if (alertasPorFase[fase] && alertasPorFase[fase].y > 0) {
+                indicator = `<div class="status-dot dot-yellow" title="Próximos"></div>`;
+            }
+
+            container.innerHTML += `
+                <div class="card-dash" onclick="verLista('${fase}')">
+                    ${indicator}
+                    <h3>${fase}</h3>
+                    <h2>${cant}</h2>
+                </div>`;
         });
     }
 
-    // --- DETALLE CON HISTORIAL (NUEVO) ---
-    function verDetalle(id) {
-        let animal = inventarioGlobal.find(a => a.id == id);
-        if (!animal) return;
-
-        document.getElementById('view-list').style.display = 'none';
-        document.getElementById('view-detail').style.display = 'block';
-        
-        let html = `
-            <div style="text-align:center">
-                <h1 style="margin:0">${animal.id}</h1>
-                <span style="background:#2ecc71;color:white;padding:2px 8px;border-radius:10px;">${animal.fase}</span>
-            </div>
-            <hr>
-            <p><strong>Madre:</strong> ${animal.madre || '-'} | <strong>Padre:</strong> ${animal.padre || '-'}</p>
-            <p><strong>Notas:</strong> ${animal.notas || '-'}</p>
-        `;
-        
-        if(animal.foto && animal.foto.includes("http")) {
-            html += `<img src="${animal.foto}" style="width:100%; border-radius:10px; margin-top:10px;">`;
-        }
-
-        // BOTÓN EDITAR
-        html += `<div style="margin-top:20px; margin-bottom:20px;">
-                <button class="btn-edit" onclick="cargarParaEditar('${animal.id}')">✏️ Editar / Trasladar</button>
-            </div>`;
-
-        // === ZONA DE HISTORIAL ===
-        html += `<h3 style="border-top:1px solid #eee; padding-top:15px;">📜 Historial de Vida</h3>`;
-        html += `<ul class="timeline">`;
-        
-        // Filtramos del historial completo solo los eventos de ESTE cerdo
-        let miHistorial = historialCompleto.filter(h => h[1] == id); // h[1] es ID
-        
-        // Si quieres ordenarlos (aunque ya vienen ordenados de Sheets)
-        // miHistorial.reverse(); // Si quieres ver lo mas reciente arriba
-
-        miHistorial.forEach(evento => {
-            let fechaRaw = evento[0];
-            let fecha = new Date(fechaRaw).toLocaleDateString();
-            let accion = evento[2];
-            let fase = evento[3];
-            let notas = evento[5];
-            
-            let icono = "🔵";
-            if(accion === "INGRESO") icono = "🟢";
-            if(accion === "VENTA") icono = "💰";
-            if(accion === "MUERTE") icono = "🔴";
-
-            html += `
-                <li>
-                    <div class="timeline-date">${fecha}</div>
-                    <div class="timeline-action">${icono} ${accion} ${fase ? '-> '+fase : ''}</div>
-                    ${notas ? `<div class="timeline-note">${notas}</div>` : ''}
-                </li>
-            `;
-        });
-        html += `</ul>`;
-        
-        document.getElementById('contenedor-detalle').innerHTML = html;
-    }
-
-    // --- REPORTES DE VENTAS Y MUERTES (NUEVO) ---
-    function cargarReportes() {
-        let filtro = document.getElementById('filtro-reporte').value; // TODOS, VENTA, MUERTE
-        let contenedor = document.getElementById('contenedor-reportes');
-        contenedor.innerHTML = "";
-
-        // Filtrar del historial completo
-        let salidas = historialCompleto.filter(fila => {
-            let accion = fila[2];
-            if (filtro === "TODOS") return accion === 'VENTA' || accion === 'MUERTE';
-            return accion === filtro;
-        });
-
-        if(salidas.length === 0) {
-            contenedor.innerHTML = "<p style='text-align:center; color:#777;'>No hay registros de salidas.</p>";
-            return;
-        }
-
-        // Invertir para ver lo más reciente primero
-        let salidasRecientes = [...salidas].reverse();
-
-        salidasRecientes.forEach(s => {
-            let fecha = new Date(s[0]).toLocaleDateString();
-            let id = s[1];
-            let accion = s[2];
-            let notas = s[5];
-            
-            let colorBorde = accion === 'VENTA' ? '#27ae60' : '#c0392b';
-            let icono = accion === 'VENTA' ? '💰 VENTA' : '🔴 MUERTE';
-
-            let card = document.createElement('div');
-            card.style = `background:white; padding:15px; margin-bottom:10px; border-left:5px solid ${colorBorde}; border-radius:5px; box-shadow:0 1px 3px rgba(0,0,0,0.1);`;
-            
-            card.innerHTML = `
-                <div style="display:flex; justify-content:space-between;">
-                    <strong>🐷 ID: ${id}</strong>
-                    <span style="color:#777; font-size:0.8rem;">${fecha}</span>
-                </div>
-                <div style="font-weight:bold; margin:5px 0;">${icono}</div>
-                <div style="color:#555; font-size:0.9rem;">${notas || 'Sin notas'}</div>
-            `;
-            contenedor.appendChild(card);
-        });
-    }
-
-    // --- RESTO DE FUNCIONES (IGUAL QUE ANTES) ---
-    function buscarCerdo() {
-        let texto = document.getElementById('inputBusqueda').value.toUpperCase();
-        if (texto.length === 0) {
-            document.getElementById('view-dashboard-summary').style.display = 'block';
-            document.getElementById('view-list').style.display = 'none';
-            return;
-        }
-        let resultados = inventarioGlobal.filter(a => a.id.toString().includes(texto));
-        document.getElementById('view-dashboard-summary').style.display = 'none';
-        document.getElementById('view-list').style.display = 'block';
-        document.getElementById('view-detail').style.display = 'none';
-        document.getElementById('titulo-lista').innerText = `Resultados: ${resultados.length}`;
-        pintarLista(resultados);
-    }
-
+    // --- RESTO DE FUNCIONES IGUALES ---
     function verLista(categoria) {
         categoriaActual = categoria;
         document.getElementById('view-dashboard-summary').style.display = 'none';
         document.getElementById('view-list').style.display = 'block';
         document.getElementById('titulo-lista').innerText = "En: " + categoria;
         let filtrados = inventarioGlobal.filter(a => a.fase === categoria);
+        filtrados.sort((a, b) => { let peso = { "roja": 3, "amarilla": 2, "verde": 1 }; return peso[b.alerta] - peso[a.alerta]; });
         pintarLista(filtrados);
     }
 
     function pintarLista(lista) {
         const cont = document.getElementById('contenedor-lista');
         cont.innerHTML = "";
-        if(lista.length === 0) { cont.innerHTML = "<p style='text-align:center'>No hay resultados</p>"; return; }
+        if(lista.length === 0) { cont.innerHTML = "<p style='text-align:center'>Vacío</p>"; return; }
+        
         lista.forEach(animal => {
+            let claseAlerta = "alerta-" + animal.alerta;
+            let textoAlerta = "";
+            if(animal.alerta === "roja") textoAlerta = "🚨 VENCIDO";
+            if(animal.alerta === "amarilla") textoAlerta = "⚠️ PRÓXIMO";
+            let lechonesBadge = animal.piglets > 0 ? `<span class="badge-lechones">👶 ${animal.piglets}</span>` : '';
+            let chapetaTag = animal.chapeta ? `<span class="tag-chapeta">🏷️ ${animal.chapeta}</span>` : '';
+            
             let div = document.createElement('div');
-            div.className = 'item-lista';
-            div.innerHTML = `<div><strong>🐷 ${animal.id}</strong><br><small>${animal.notas || ''}</small></div><i class="fas fa-chevron-right"></i>`;
+            div.className = `item-lista ${claseAlerta}`;
+            div.innerHTML = `<div>
+                <div style="display:flex; justify-content:space-between;"><strong>${animal.id}</strong> <span style="font-size:0.7rem; color:#c0392b; font-weight:bold;">${textoAlerta}</span></div>
+                ${chapetaTag} ${lechonesBadge} <span class="tag-dias">📅 ${animal.dias} días en fase</span><br>
+                <small>${animal.notas || ''}</small>
+            </div><i class="fas fa-chevron-right"></i>`;
             div.onclick = () => verDetalle(animal.id);
             cont.appendChild(div);
         });
     }
-
-    function cargarParaEditar(id) {
-        let animal = inventarioGlobal.find(a => a.id == id);
-        verTab('registro', document.querySelectorAll('.nav-btn')[1]);
-        document.getElementById('titulo-form').innerText = "Editar / Trasladar Cerdo " + id;
-        document.getElementById('chapeta').value = animal.id;
-        document.getElementById('chapeta').readOnly = true; 
-        document.getElementById('chapeta').style.backgroundColor = "#eee";
-        document.getElementById('accion').value = "TRASLADO";
-        document.getElementById('fase').value = animal.fase;
-        document.getElementById('notas').value = animal.notas;
-        document.getElementById('padre').value = animal.padre;
-        document.getElementById('madre').value = animal.madre;
-        document.getElementById('esReproductora').checked = (animal.esRepro === "SI");
-        alert("Realiza el movimiento y guarda.");
-    }
-
-    function limpiarFormulario() {
-        document.getElementById('chapeta').value = "";
-        document.getElementById('chapeta').readOnly = false;
-        document.getElementById('chapeta').style.backgroundColor = "white";
-        document.getElementById('accion').value = "INGRESO";
-        document.getElementById('notas').value = "";
-        document.getElementById('titulo-form').innerText = "Nuevo Movimiento";
-    }
-
-    function procesarFases(lista) {
-        const sel = document.getElementById('fase');
-        sel.innerHTML = "";
-        let base = lista && lista.length ? lista : ['PARIDERA','PRECEBO','LEVANTE','ENGORDE'];
-        base.forEach(f => {
-            let opt = document.createElement('option');
-            opt.value = f.toUpperCase(); opt.text = f; sel.add(opt);
-        });
-        let optF = document.createElement('option'); optF.value = "FUERA"; optF.text = "Fuera"; sel.add(optF);
-    }
     
-    function agregarNuevaFase() {
-        let n = prompt("Nueva fase:"); if(!n) return;
-        n = n.toUpperCase().trim();
-        let sel = document.getElementById('fase');
-        for (let i = 0; i < sel.options.length; i++) { if (sel.options[i].value === n) { alert("Ya existe"); return; } }
-        let opt = document.createElement('option'); opt.value = n; opt.text = n;
-        sel.add(opt, sel.options[sel.length-1]); sel.value = n;
-        fetch(URL_SCRIPT, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tipo:"NUEVA_FASE", nombre:n})});
+    // FUNCIONES BASE (BUSCAR, DETALLE, EDITAR, ETC - SIN CAMBIOS)
+    function buscarCerdo() {
+        let texto = document.getElementById('inputBusqueda').value.toUpperCase();
+        if (texto.length === 0) { document.getElementById('view-dashboard-summary').style.display = 'block'; document.getElementById('view-list').style.display = 'none'; return; }
+        let resultados = inventarioGlobal.filter(a => a.id.toString().includes(texto) || (a.chapeta && a.chapeta.toString().includes(texto)));
+        document.getElementById('view-dashboard-summary').style.display = 'none'; document.getElementById('view-list').style.display = 'block'; document.getElementById('view-detail').style.display = 'none';
+        document.getElementById('titulo-lista').innerText = `Resultados: ${resultados.length}`;
+        pintarLista(resultados);
     }
-
-    function procesarMadres(reg) {
-        let sel = document.getElementById('madre');
-        sel.innerHTML = '<option value="">Madre</option><option value="NA">N/A</option>';
-        let m = new Set();
-        reg.forEach(r => { if(r[8]==='SI') m.add(r[1]); });
-        m.forEach(x => { let o = document.createElement('option'); o.value=x; o.text="Madre "+x; sel.add(o); });
+    function verDetalle(id) {
+        let animal = inventarioGlobal.find(a => a.id == id);
+        if (!animal) return;
+        document.getElementById('view-list').style.display = 'none';
+        document.getElementById('view-detail').style.display = 'block';
+        let infoLechones = animal.piglets > 0 ? `<div style="background:#fff3cd; color:#d35400; padding:10px; border-radius:5px; margin:10px 0; font-weight:bold; text-align:center;">👶 Tiene ${animal.piglets} lechones</div>` : '';
+        let colorDias = animal.alerta === 'roja' ? 'color:red' : (animal.alerta === 'amarilla' ? 'color:orange' : 'color:green');
+        let html = `<div style="text-align:center"><h1 style="margin:0">${animal.id}</h1>${animal.chapeta ? `<h2 style="color:#2980b9; margin:5px;">🏷️ Chapeta: ${animal.chapeta}</h2>` : ''}<span style="background:#2ecc71;color:white;padding:2px 8px;border-radius:10px;">${animal.fase}</span><p style="margin-top:10px; font-weight:bold; ${colorDias}">📅 Lleva ${animal.dias} días en esta etapa</p></div>${infoLechones}<hr><p><strong>Madre:</strong> ${animal.madre || '-'} | <strong>Padre:</strong> ${animal.padre || '-'}</p><p><strong>Notas:</strong> ${animal.notas || '-'}</p>`;
+        if(animal.foto && animal.foto.includes("http")) html += `<img src="${animal.foto}" style="width:100%; border-radius:10px; margin-top:10px;">`;
+        html += `<div style="margin:20px 0;"><button class="btn-edit" onclick="cargarParaEditar('${animal.id}')">✏️ Editar / Agregar Chapeta</button></div>`;
+        html += `<h3 style="border-top:1px solid #eee; padding-top:15px;">📜 Historial</h3><ul class="timeline">`;
+        let miHistorial = historialCompleto.filter(h => h[1] == id).reverse();
+        miHistorial.forEach(evento => { let icono = evento[2] === "PARTO" ? "👶" : (evento[2] === "INGRESO" ? "🟢" : "🔵"); html += `<li><div class="timeline-date">${new Date(evento[0]).toLocaleDateString()}</div><div class="timeline-action">${icono} ${evento[2]} ${evento[3] ? '-> '+evento[3] : ''}</div><div class="timeline-note">${evento[5]}</div></li>`; });
+        html += `</ul>`;
+        document.getElementById('contenedor-detalle').innerHTML = html;
     }
-
-    function procesarFoto() {
-        let f = document.getElementById('fotoInput').files[0]; if(!f)return;
-        let r = new FileReader(); r.readAsDataURL(f);
-        r.onload = e => {
-            let i = new Image(); i.src = e.target.result;
-            i.onload = () => {
-                let c = document.createElement("canvas");
-                let s = 800/i.width; c.width=800; c.height=i.height*s;
-                c.getContext("2d").drawImage(i,0,0,c.width,c.height);
-                imagenBase64 = c.toDataURL("image/jpeg",0.6).split(",")[1];
-                document.getElementById('text-foto').innerText = "✅ Foto OK";
-            }
-        }
-    }
-
-    function enviarDatos() {
-        let btn = document.getElementById('btnEnviar');
-        let d = {
-            chapeta: document.getElementById('chapeta').value,
-            accion: document.getElementById('accion').value,
-            fase: document.getElementById('fase').value,
-            ubicacion: document.getElementById('fase').value,
-            notas: document.getElementById('notas').value,
-            padre: document.getElementById('padre').value,
-            madre: document.getElementById('madre').value,
-            esReproductora: document.getElementById('esReproductora').checked ? "SI" : "NO",
-            imagenBase64: imagenBase64,
-            mimeType: "image/jpeg"
-        };
-        if(!d.chapeta) return alert("Falta ID");
-        btn.disabled = true; btn.innerText = "Guardando...";
-        fetch(URL_SCRIPT, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)})
-        .then(() => { alert("✅ Guardado"); location.reload(); })
-        .catch(() => { alert("❌ Error"); btn.disabled = false; });
-    }
-
-    function verificarAccion() {
-        if(['VENTA','MUERTE'].includes(document.getElementById('accion').value)) 
-            document.getElementById('fase').value = 'FUERA';
-    }
-
+    function cargarParaEditar(id) { let animal = inventarioGlobal.find(a => a.id == id); verTab('registro', document.querySelectorAll('.nav-btn')[1]); document.getElementById('titulo-form').innerText = "Editar " + id; document.getElementById('tatuaje').value = animal.id; document.getElementById('tatuaje').readOnly = true; document.getElementById('tatuaje').style.backgroundColor = "#eee"; document.getElementById('chapeta').value = animal.chapeta || ""; document.getElementById('accion').value = "TRASLADO"; verificarAccion(); document.getElementById('fase').value = animal.fase; document.getElementById('padre').value = animal.padre; document.getElementById('madre').value = animal.madre; document.getElementById('esReproductora').checked = (animal.esRepro === "SI"); }
+    function limpiarFormulario() { document.getElementById('tatuaje').value = ""; document.getElementById('tatuaje').readOnly = false; document.getElementById('tatuaje').style.backgroundColor = "white"; document.getElementById('chapeta').value = ""; document.getElementById('accion').value = "INGRESO"; verificarAccion(); document.getElementById('notas').value = ""; document.getElementById('vivos').value = ""; document.getElementById('muertos').value = ""; document.getElementById('titulo-form').innerText = "Nuevo Movimiento"; }
+    function verificarAccion() { let val = document.getElementById('accion').value; let secParto = document.getElementById('section-parto'); let secFase = document.getElementById('section-fase'); if(val === 'PARTO') { secParto.style.display = 'block'; secFase.style.display = 'none'; } else if(['VENTA','MUERTE'].includes(val)) { secParto.style.display = 'none'; secFase.style.display = 'none'; document.getElementById('fase').value = 'FUERA'; } else { secParto.style.display = 'none'; secFase.style.display = 'block'; } }
+    function procesarFases(lista) { const sel = document.getElementById('fase'); sel.innerHTML = ""; let base = lista && lista.length ? lista : ['PARIDERA','PRECEBO','LEVANTE','ENGORDE']; base.forEach(f => { let o = document.createElement('option'); o.value = f.toUpperCase(); o.text = f; sel.add(o); }); let optF = document.createElement('option'); optF.value = "FUERA"; optF.text = "Fuera"; sel.add(optF); }
+    function agregarNuevaFase() { let n = prompt("Nueva fase:"); if(!n) return; n = n.toUpperCase().trim(); let sel = document.getElementById('fase'); let opt = document.createElement('option'); opt.value = n; opt.text = n; sel.add(opt, sel.options[sel.length-1]); sel.value = n; fetch(URL_SCRIPT, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tipo:"NUEVA_FASE", nombre:n})}); }
+    function procesarMadres(reg) { let sel = document.getElementById('madre'); sel.innerHTML = '<option value="">Madre</option><option value="NA">N/A</option>'; let m = new Set(); reg.forEach(r => { if(r[8]==='SI') m.add(r[1]); }); m.forEach(x => { let o = document.createElement('option'); o.value=x; o.text="Madre "+x; sel.add(o); }); }
+    function procesarFoto() { let f = document.getElementById('fotoInput').files[0]; if(!f)return; let r = new FileReader(); r.readAsDataURL(f); r.onload = e => { let i = new Image(); i.src = e.target.result; i.onload = () => { let c = document.createElement("canvas"); let s = 800/i.width; c.width=800; c.height=i.height*s; c.getContext("2d").drawImage(i,0,0,c.width,c.height); imagenBase64 = c.toDataURL("image/jpeg",0.6).split(",")[1]; document.getElementById('text-foto').innerText = "✅ Foto OK"; } } }
+    function cargarReportes() { let filtro = document.getElementById('filtro-reporte').value; let contenedor = document.getElementById('contenedor-reportes'); contenedor.innerHTML = ""; let salidas = historialCompleto.filter(fila => { let accion = fila[2]; if (filtro === "TODOS") return accion === 'VENTA' || accion === 'MUERTE'; return accion === filtro; }).reverse(); if(salidas.length === 0) { contenedor.innerHTML = "<p style='text-align:center;'>Sin registros recientes.</p>"; return; } salidas.forEach(s => { let color = s[2] === 'VENTA' ? '#27ae60' : '#c0392b'; contenedor.innerHTML += `<div style="background:white; padding:15px; margin-bottom:10px; border-left:5px solid ${color}; border-radius:5px; box-shadow:0 1px 3px rgba(0,0,0,0.1);"><div style="display:flex; justify-content:space-between;"><strong>🐷 ${s[1]}</strong><span style="color:#777; font-size:0.8rem;">${new Date(s[0]).toLocaleDateString()}</span></div><div style="font-weight:bold; margin:5px 0;">${s[2]}</div><div style="color:#555;">${s[5] || '-'}</div></div>`; }); }
+    function enviarDatos() { let accion = document.getElementById('accion').value; let notasRaw = document.getElementById('notas').value; if (accion === 'PARTO') { let vivos = document.getElementById('vivos').value || 0; let muertos = document.getElementById('muertos').value || 0; notasRaw = `PARTO | Vivos: ${vivos} | Muertos: ${muertos} - ${notasRaw}`; } let d = { tatuaje: document.getElementById('tatuaje').value, chapeta: document.getElementById('chapeta').value, accion: accion, fase: document.getElementById('fase').value, ubicacion: document.getElementById('fase').value, notas: notasRaw, padre: document.getElementById('padre').value, madre: document.getElementById('madre').value, esReproductora: document.getElementById('esReproductora').checked ? "SI" : "NO", imagenBase64: imagenBase64, mimeType: "image/jpeg" }; if(!d.tatuaje) return alert("Falta el Tatuaje (ID)"); let btn = document.getElementById('btnEnviar'); btn.disabled = true; btn.innerText = "Guardando..."; fetch(URL_SCRIPT, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}).then(() => { alert("✅ Guardado"); location.reload(); }).catch(() => { alert("❌ Error"); btn.disabled = false; }); }
     function volverAlTablero() { document.getElementById('view-list').style.display='none'; document.getElementById('view-dashboard-summary').style.display='block'; }
     function volverALista() { document.getElementById('view-detail').style.display='none'; if(categoriaActual) verLista(categoriaActual); else document.getElementById('view-list').style.display='block'; }
 </script>
