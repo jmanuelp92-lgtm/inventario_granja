@@ -3,187 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Granja Pro 📸</title>
+    <title>Granja Manager Pro 🔍</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        /* ESTILOS GENERALES */
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-            background-color: #f0f2f5; 
-            margin: 0; 
-            padding-bottom: 90px; /* Espacio para el menú inferior */
-        }
+        /* ESTILOS BASE */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; margin: 0; padding-bottom: 90px; }
+        header { background-color: #2c3e50; color: white; padding: 15px; text-align: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
         
-        /* HEADER FIJO */
-        header { 
-            background-color: #2c3e50; 
-            color: white; 
-            padding: 15px; 
-            text-align: center; 
-            position: sticky; 
-            top: 0; 
-            z-index: 100; 
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-        h2 { margin: 0; font-size: 1.2rem; letter-spacing: 0.5px; }
+        /* BUSCADOR */
+        .search-container { padding: 10px 15px; background: #2c3e50; margin-bottom: 10px; }
+        .search-box { width: 100%; padding: 10px; border-radius: 20px; border: none; font-size: 1rem; text-align: center; outline: none; }
 
-        /* PESTAÑAS */
+        /* VISTAS */
         .tab-content { display: none; padding: 15px; animation: fadeIn 0.3s; }
         .tab-content.active { display: block; }
-        
-        /* FORMULARIO */
-        .card-form { 
-            background: white; 
-            padding: 20px; 
-            border-radius: 12px; 
-            box-shadow: 0 4px 10px rgba(0,0,0,0.05); 
-        }
-        label { 
-            display: block; 
-            font-weight: 600; 
-            margin-top: 15px; 
-            color: #34495e; 
-            font-size: 0.95rem;
-        }
-        input, select { 
-            width: 100%; 
-            padding: 12px; 
-            margin-top: 5px; 
-            border: 1px solid #bdc3c7; 
-            border-radius: 8px; 
-            box-sizing: border-box; 
-            background: #fff; 
-            font-size: 16px; /* Evita zoom en iPhone */
-        }
-        
-        /* BOTÓN FOTO */
-        .file-upload-wrapper { 
-            margin-top: 15px; 
-            border: 2px dashed #bdc3c7; 
-            padding: 20px; 
-            text-align: center; 
-            border-radius: 8px; 
-            cursor: pointer; 
-            background: #f9f9f9; 
-            transition: all 0.3s;
-        }
-        .file-upload-wrapper.has-file { 
-            border-color: #27ae60; 
-            background: #e9f7ef; 
-        }
-        input[type="file"] { display: none; }
-        
-        /* BOTÓN PRINCIPAL */
-        button.btn-primary { 
-            width: 100%; 
-            padding: 15px; 
-            background-color: #2980b9; 
-            color: white; 
-            border: none; 
-            border-radius: 8px; 
-            font-size: 18px; 
-            font-weight: bold; 
-            margin-top: 25px; 
-            cursor: pointer;
-            box-shadow: 0 4px 6px rgba(41, 128, 185, 0.3);
-        }
-        button:disabled { background-color: #95a5a6; box-shadow: none; }
+        .sub-view { display: none; } 
 
         /* DASHBOARD */
-        .grid-dashboard { 
-            display: grid; 
-            grid-template-columns: 1fr 1fr; 
-            gap: 15px; 
-        }
-        .card-dash { 
-            background: white; 
-            padding: 15px; 
-            border-radius: 12px; 
-            text-align: center; 
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
-        }
-        .card-dash h3 { margin: 0; font-size: 0.8rem; color: #7f8c8d; text-transform: uppercase; }
+        .grid-dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .card-dash { background: white; padding: 15px; border-radius: 12px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: pointer; position: relative; }
+        .card-dash:active { transform: scale(0.98); }
+        .card-dash h3 { margin: 0; font-size: 0.75rem; color: #7f8c8d; text-transform: uppercase; }
         .card-dash h2 { margin: 10px 0 0 0; font-size: 2rem; color: #2c3e50; }
+        .card-total { grid-column: span 2; background: linear-gradient(135deg, #2ecc71, #27ae60); color: white; }
+        .card-total h2, .card-total h3 { color: white !important; }
 
-        /* MENÚ INFERIOR */
-        .nav-bar { 
-            position: fixed; 
-            bottom: 0; 
-            width: 100%; 
-            background: white; 
-            display: flex; 
-            justify-content: space-around; 
-            padding: 12px 0; 
-            border-top: 1px solid #eee; 
-            z-index: 90; 
-            box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
-        }
-        .nav-btn { 
-            background: none; 
-            border: none; 
-            font-size: 1.5rem; 
-            color: #bdc3c7;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        .nav-btn span { font-size: 0.7rem; margin-top: 2px; font-weight: bold; }
+        /* FORMULARIO */
+        .card-form { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        label { display: block; font-weight: 600; margin-top: 15px; color: #34495e; font-size: 0.95rem; }
+        input, select { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #bdc3c7; border-radius: 8px; box-sizing: border-box; background: #fff; font-size: 16px; }
+        
+        .input-group { display: flex; gap: 10px; align-items: flex-end; }
+        .btn-add { background: #27ae60; color: white; border: none; padding: 12px 15px; border-radius: 8px; cursor: pointer; font-size: 1.2rem; height: 46px; margin-top: 5px; }
+        
+        /* BOTONES */
+        button.btn-primary { width: 100%; padding: 15px; background-color: #2980b9; color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; margin-top: 25px; cursor: pointer; }
+        .btn-edit { background-color: #f39c12; color: white; padding: 10px; width: 100%; border:none; border-radius:8px; font-weight:bold; cursor:pointer; margin-top:10px; }
+        
+        /* LISTAS */
+        .item-lista { background: white; padding: 15px; margin-bottom: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; }
+        
+        /* NAVEGACIÓN */
+        .nav-bar { position: fixed; bottom: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid #eee; z-index: 90; }
+        .nav-btn { background: none; border: none; font-size: 1.5rem; color: #bdc3c7; display: flex; flex-direction: column; align-items: center; }
         .nav-btn.active { color: #2980b9; }
-
-        /* UTILIDADES */
+        .btn-back { background: none; border: none; color: #2980b9; font-size: 1rem; cursor: pointer; margin-bottom: 15px; display: flex; align-items: center; gap: 5px; font-weight: 600; }
         .loader { text-align: center; padding: 20px; display: none; color: #7f8c8d; }
-        #preview-img { max-width: 100%; height: auto; border-radius: 8px; margin-top: 10px; display: none; border: 1px solid #ddd; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-        /* Checkbox grande */
-        .checkbox-row { display: flex; align-items: center; margin-top: 15px; background: #fff; padding: 10px; border-radius: 8px; border: 1px solid #e0e0e0; }
-        .checkbox-row input { width: 25px; height: 25px; margin: 0 10px 0 0; }
     </style>
 </head>
 <body>
 
 <header>
     <h2>🐷 Granja Manager</h2>
+    <div class="search-container" id="search-bar-container" style="display:none;">
+        <input type="text" id="inputBusqueda" class="search-box" placeholder="🔍 Buscar Chapeta o ID..." onkeyup="buscarCerdo()">
+    </div>
 </header>
 
 <div id="tab-dashboard" class="tab-content active">
-    <div class="loader" id="loader-dash">⏳ Sincronizando datos...</div>
+    <div class="loader" id="loader-dash">⏳ Cargando...</div>
     
-    <div id="dash-view" style="display:none;">
-        <div class="grid-dashboard">
-            <div class="card-dash" style="grid-column: span 2; background: linear-gradient(135deg, #2ecc71, #27ae60); color: white;">
-                <h3 style="color: #e9f7ef;">Total Animales</h3>
-                <h2 id="total" style="color: white; font-size: 3rem;">0</h2>
+    <div id="view-dashboard-summary" style="display:none;">
+        <div class="grid-dashboard" id="dashboard-container">
             </div>
-            
-            <div class="card-dash">
-                <h3>Paridera</h3>
-                <h2 id="c-paridera">0</h2>
-            </div>
-            <div class="card-dash">
-                <h3>Precebo</h3>
-                <h2 id="c-precebo">0</h2>
-            </div>
-            <div class="card-dash">
-                <h3>Levante</h3>
-                <h2 id="c-levante">0</h2>
-            </div>
-            <div class="card-dash">
-                <h3>Engorde</h3>
-                <h2 id="c-engorde">0</h2>
-            </div>
-        </div>
-        
         <div style="text-align:center; margin-top: 30px;">
-            <button onclick="location.reload()" style="background:none; border:none; color:#2980b9; font-weight:bold; cursor:pointer; padding:10px;">
-                🔄 Actualizar ahora
-            </button>
+            <button onclick="location.reload()" style="background:none; border:none; color:#2980b9; font-weight:bold;">🔄 Actualizar</button>
         </div>
+    </div>
+
+    <div id="view-list" class="sub-view">
+        <button class="btn-back" onclick="volverAlTablero()"><i class="fas fa-arrow-left"></i> Volver</button>
+        <h2 id="titulo-lista" style="color:#2c3e50; border-bottom: 2px solid #2ecc71; padding-bottom: 10px;">Listado</h2>
+        <div id="contenedor-lista"></div>
+    </div>
+
+    <div id="view-detail" class="sub-view">
+        <button class="btn-back" onclick="volverALista()"><i class="fas fa-arrow-left"></i> Volver</button>
+        <div id="contenedor-detalle" class="card-form"></div>
     </div>
 </div>
 
 <div id="tab-registro" class="tab-content">
     <div class="card-form">
-        <h3 style="margin-top:0; color:#2c3e50;">Nuevo Movimiento</h3>
+        <h3 id="titulo-form" style="margin-top:0; color:#2c3e50;">Nuevo Movimiento</h3>
 
         <label>Chapeta (ID):</label>
         <input type="number" id="chapeta" placeholder="Ej. 504" inputmode="numeric">
@@ -191,245 +94,338 @@
         <label>Acción:</label>
         <select id="accion" onchange="verificarAccion()">
             <option value="INGRESO">🟢 Nacimiento / Compra</option>
-            <option value="TRASLADO">🔵 Cambio de Corral</option>
+            <option value="TRASLADO">🔵 Traslado / Corrección</option>
             <option value="VENTA">💰 Venta</option>
             <option value="MUERTE">🔴 Muerte / Baja</option>
         </select>
 
         <label>Ubicación / Fase Nueva:</label>
-        <select id="fase">
-            <option value="PARIDERA">Paridera</option>
-            <option value="PRECEBO">Precebo</option>
-            <option value="LEVANTE">Levante</option>
-            <option value="ENGORDE">Engorde</option>
-            <option value="FUERA">Fuera de Granja</option>
-        </select>
-        
-        <label>Genealogía (Opcional):</label>
+        <div class="input-group">
+            <select id="fase">
+                </select>
+            <button class="btn-add" onclick="agregarNuevaFase()">+</button>
+        </div>
+
+        <label>Genealogía:</label>
         <div style="display:flex; gap:10px;">
-             <div style="flex:1">
-                 <select id="madre">
-                     <option value="">Cargando...</option>
-                 </select>
-             </div>
-             <div style="flex:1">
-                 <input type="text" id="padre" placeholder="Padre (ID)">
-             </div>
+             <select id="madre" style="flex:1"><option value="">Madre</option></select>
+             <input type="text" id="padre" placeholder="Padre" style="flex:1; margin-top:5px;">
         </div>
 
-        <div class="checkbox-row">
-             <input type="checkbox" id="esReproductora">
-             <label style="margin:0; width:auto; font-weight:normal;">Marcar como <strong>Futura Madre</strong></label>
+        <div style="margin-top:15px; display:flex; align-items:center; gap:10px;">
+             <input type="checkbox" id="esReproductora" style="width:20px; height:20px;">
+             <label style="margin:0;">Es Futura Madre</label>
         </div>
 
-        <label>Evidencia / Foto (Opcional):</label>
-        <div class="file-upload-wrapper" id="drop-zone" onclick="document.getElementById('fotoInput').click()">
-            <div id="text-foto">
-                <span style="font-size:2rem;">📸</span><br>
-                Toca para tomar foto
-            </div>
-            <input type="file" id="fotoInput" accept="image/*" capture="environment" onchange="procesarFoto()">
-            <img id="preview-img" src="">
-        </div>
-
-        <label>Notas:</label>
+        <label>Notas / Peso:</label>
         <input type="text" id="notas" placeholder="Peso, observaciones...">
+        
+        <div class="file-upload-wrapper" id="drop-zone" onclick="document.getElementById('fotoInput').click()" style="margin-top:15px; border:2px dashed #ccc; padding:15px; text-align:center;">
+            <div id="text-foto">📸 Toca para foto</div>
+            <input type="file" id="fotoInput" accept="image/*" capture="environment" onchange="procesarFoto()" style="display:none;">
+        </div>
 
         <button id="btnEnviar" class="btn-primary" onclick="enviarDatos()">Guardar Registro 💾</button>
     </div>
 </div>
 
 <div class="nav-bar">
-    <button class="nav-btn active" onclick="verTab('dashboard', this)">
-        <span>📊</span>
-        <span>Tablero</span>
-    </button>
-    <button class="nav-btn" onclick="verTab('registro', this)">
-        <span>➕</span>
-        <span>Registrar</span>
-    </button>
+    <button class="nav-btn active" onclick="verTab('dashboard', this)"><span>📊</span><span>Tablero</span></button>
+    <button class="nav-btn" onclick="verTab('registro', this)"><span>➕</span><span>Registrar</span></button>
 </div>
 
 <script>
-    // --- TU NUEVA URL ---
-    const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbxeIx7qOJyFYEF1k2jggGll1ha-RC_HZVkB2BNW27w4cBe6Mg8LsEJJOWXaWueDpuD7qw/exec";
+    // --- TU URL DE GOOGLE APPS SCRIPT ---
+    const URL_SCRIPT = "https://script.google.com/macros/s/AKfycby_sbcvFYmbDdzhoqCwaWxI1nM90c_z92g1xzWuKMOAmS0-UITWccD7XAoeatM8KVpRZQ/exec";
 
+    let inventarioGlobal = []; 
+    let fasesGlobales = [];
     let imagenBase64 = ""; 
-    let inventario = {}; 
+    let categoriaActual = "";
 
-    // Iniciar app
     window.onload = cargarDatos;
 
     function verTab(tabId, btn) {
-        // Cambiar contenido
         document.querySelectorAll('.tab-content').forEach(d => d.style.display='none');
         document.getElementById('tab-'+tabId).style.display='block';
-        
-        // Cambiar botones activos
         if(btn) {
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
         }
+        
+        // Mostrar buscador solo en dashboard
+        if(tabId === 'dashboard') {
+            document.getElementById('search-bar-container').style.display = 'block';
+            document.getElementById('titulo-form').innerText = "Nuevo Movimiento";
+            limpiarFormulario(); // Limpiar si vienes de editar
+        } else {
+            document.getElementById('search-bar-container').style.display = 'none';
+        }
     }
 
-    // --- CARGAR DATOS DEL SCRIPT ---
+    // --- CARGA DE DATOS ---
     function cargarDatos() {
         document.getElementById('loader-dash').style.display='block';
-        
         fetch(URL_SCRIPT)
             .then(r => r.json())
             .then(data => {
-                procesarDashboard(data);
-                llenarMadres(data);
+                let registros = data.registros || (Array.isArray(data) ? data : []);
+                let fases = data.fases || [];
+                procesarFases(fases);
+                procesarMadres(registros);
+                procesarDashboard(registros);
                 document.getElementById('loader-dash').style.display='none';
-                document.getElementById('dash-view').style.display='block';
+                document.getElementById('view-dashboard-summary').style.display='block';
+                document.getElementById('search-bar-container').style.display='block';
             })
-            .catch(error => {
-                console.error(error);
-                document.getElementById('loader-dash').innerHTML = "⚠️ Error de conexión<br><small>Verifica tu internet</small>";
+            .catch(e => {
+                console.error(e);
+                alert("Error de conexión. Revisa que el script sea 'Cualquier persona'");
             });
     }
 
-    // --- PROCESAR INVENTARIO ---
+    // --- BUSCADOR (NUEVO) ---
+    function buscarCerdo() {
+        let texto = document.getElementById('inputBusqueda').value.toUpperCase();
+        
+        if (texto.length === 0) {
+            // Si borran, volver al dashboard
+            document.getElementById('view-dashboard-summary').style.display = 'block';
+            document.getElementById('view-list').style.display = 'none';
+            return;
+        }
+
+        // Filtrar
+        let resultados = inventarioGlobal.filter(a => a.id.toString().includes(texto));
+        
+        // Mostrar vista lista forzada
+        document.getElementById('view-dashboard-summary').style.display = 'none';
+        document.getElementById('view-list').style.display = 'block';
+        document.getElementById('view-detail').style.display = 'none';
+        document.getElementById('titulo-lista').innerText = `Resultados: ${resultados.length}`;
+        
+        pintarLista(resultados);
+    }
+
+    // --- DASHBOARD Y LÓGICA DE ESTADO ---
     function procesarDashboard(data) {
-        let counts = {PARIDERA:0, PRECEBO:0, LEVANTE:0, ENGORDE:0, TOTAL:0};
+        let counts = { TOTAL: 0 };
         let estados = {};
-        
-        // Recorremos historial
+
+        // Recorremos cronológicamente: el último registro sobreescribe el estado
         data.forEach(fila => {
-            // fila = [Fecha, Chapeta, Accion, Fase, Ubicacion, Notas, Padre, Madre, EsRepro, Foto]
             let id = fila[1], acc = fila[2], fase = fila[3];
+            // Inicializamos o actualizamos
+            if(!estados[id]) estados[id] = {};
             
-            if(!estados[id]) estados[id] = {st:'?', fs:''};
-            
+            // Guardamos datos más recientes
+            estados[id].id = id;
+            estados[id].notas = fila[5];
+            estados[id].padre = fila[6]; // Padre
+            estados[id].madre = fila[7]; // Madre
+            estados[id].esRepro = fila[8];
+            estados[id].foto = fila[9];
+
             if(acc === 'VENTA' || acc === 'MUERTE') {
-                estados[id].st = 'OFF';
-                estados[id].fs = 'FUERA';
+                estados[id].status = 'OFF';
+                estados[id].fase = 'FUERA';
             } else {
-                estados[id].st = 'ON';
-                estados[id].fs = fase;
+                estados[id].status = 'ON';
+                estados[id].fase = fase ? fase.toUpperCase().trim() : "SIN_CATEGORIA";
             }
         });
 
-        // Contar activos
+        // Convertimos el objeto estados a lista limpia
+        inventarioGlobal = [];
         for(let id in estados) {
-            if(estados[id].st === 'ON') {
+            let animal = estados[id];
+            if(animal.status === 'ON') {
                 counts.TOTAL++;
-                // Normalizar texto por si viene en minúsculas
-                let faseKey = estados[id].fs ? estados[id].fs.toUpperCase() : "DESCONOCIDO";
-                if(counts[faseKey] !== undefined) counts[faseKey]++;
+                let f = animal.fase;
+                if(!counts[f]) counts[f] = 0;
+                counts[f]++;
+                inventarioGlobal.push(animal);
             }
         }
 
-        // Pintar números
-        document.getElementById('total').innerText = counts.TOTAL;
-        document.getElementById('c-paridera').innerText = counts.PARIDERA;
-        document.getElementById('c-precebo').innerText = counts.PRECEBO;
-        document.getElementById('c-levante').innerText = counts.LEVANTE;
-        document.getElementById('c-engorde').innerText = counts.ENGORDE;
+        // Renderizar Tablero
+        const container = document.getElementById('dashboard-container');
+        container.innerHTML = `<div class="card-dash card-total"><h3>Total</h3><h2>${counts.TOTAL}</h2></div>`;
+
+        let fasesAMostrar = new Set([...Array.from(document.getElementById('fase').options).map(o=>o.value), ...Object.keys(counts)]);
+        fasesAMostrar.delete("TOTAL"); fasesAMostrar.delete("FUERA"); fasesAMostrar.delete("");
+
+        fasesAMostrar.forEach(fase => {
+            let cant = counts[fase] || 0;
+            container.innerHTML += `<div class="card-dash" onclick="verLista('${fase}')"><h3>${fase}</h3><h2>${cant}</h2></div>`;
+        });
     }
 
-    // --- LLENAR SELECT DE MADRES ---
-    function llenarMadres(data) {
+    // --- LISTAS Y DETALLES ---
+    function verLista(categoria) {
+        categoriaActual = categoria;
+        document.getElementById('view-dashboard-summary').style.display = 'none';
+        document.getElementById('view-list').style.display = 'block';
+        document.getElementById('titulo-lista').innerText = "En: " + categoria;
+        
+        let filtrados = inventarioGlobal.filter(a => a.fase === categoria);
+        pintarLista(filtrados);
+    }
+
+    function pintarLista(lista) {
+        const cont = document.getElementById('contenedor-lista');
+        cont.innerHTML = "";
+        if(lista.length === 0) { cont.innerHTML = "<p style='text-align:center'>No hay resultados</p>"; return; }
+
+        lista.forEach(animal => {
+            let div = document.createElement('div');
+            div.className = 'item-lista';
+            div.innerHTML = `<div><strong>🐷 ${animal.id}</strong><br><small>${animal.notas || ''}</small></div><i class="fas fa-chevron-right"></i>`;
+            div.onclick = () => verDetalle(animal.id);
+            cont.appendChild(div);
+        });
+    }
+
+    function verDetalle(id) {
+        let animal = inventarioGlobal.find(a => a.id == id);
+        if (!animal) return; // Por si acaso
+
+        document.getElementById('view-list').style.display = 'none';
+        document.getElementById('view-detail').style.display = 'block';
+        
+        let html = `
+            <div style="text-align:center">
+                <h1 style="margin:0">${animal.id}</h1>
+                <span style="background:#2ecc71;color:white;padding:2px 8px;border-radius:10px;font-size:0.8rem">${animal.fase}</span>
+            </div>
+            <hr>
+            <p><strong>Madre:</strong> ${animal.madre || '-'} | <strong>Padre:</strong> ${animal.padre || '-'}</p>
+            <p><strong>Notas:</strong> ${animal.notas || '-'}</p>
+        `;
+        
+        if(animal.foto && animal.foto.includes("http")) {
+            html += `<img src="${animal.foto}" style="width:100%; border-radius:10px; margin-top:10px;">`;
+        }
+
+        // --- BOTÓN DE EDITAR / TRASLADAR ---
+        html += `
+            <div style="margin-top:20px;">
+                <button class="btn-edit" onclick="cargarParaEditar('${animal.id}')">
+                    ✏️ Editar / Trasladar
+                </button>
+            </div>
+        `;
+        
+        document.getElementById('contenedor-detalle').innerHTML = html;
+    }
+
+    // --- FUNCIÓN DE EDICIÓN / TRASLADO (NUEVO) ---
+    function cargarParaEditar(id) {
+        let animal = inventarioGlobal.find(a => a.id == id);
+        
+        // 1. Ir a la pestaña registro
+        verTab('registro', document.querySelectorAll('.nav-btn')[1]);
+        
+        // 2. Cambiar título para que sepa que está editando
+        document.getElementById('titulo-form').innerText = "Editar / Trasladar Cerdo " + id;
+        
+        // 3. Llenar los datos
+        document.getElementById('chapeta').value = animal.id;
+        // Bloquear ID para no crear otro cerdo por error
+        document.getElementById('chapeta').readOnly = true; 
+        document.getElementById('chapeta').style.backgroundColor = "#eee";
+
+        document.getElementById('accion').value = "TRASLADO"; // Por defecto sugerimos traslado
+        document.getElementById('fase').value = animal.fase;
+        document.getElementById('notas').value = animal.notas;
+        document.getElementById('padre').value = animal.padre;
+        document.getElementById('madre').value = animal.madre;
+        document.getElementById('esReproductora').checked = (animal.esRepro === "SI");
+
+        alert("Modifica la FASE o los DATOS y guarda para actualizar.");
+    }
+
+    function limpiarFormulario() {
+        document.getElementById('chapeta').value = "";
+        document.getElementById('chapeta').readOnly = false;
+        document.getElementById('chapeta').style.backgroundColor = "white";
+        document.getElementById('accion').value = "INGRESO";
+        document.getElementById('notas').value = "";
+        document.getElementById('titulo-form').innerText = "Nuevo Movimiento";
+    }
+
+    // --- FASES, MADRES Y ENVÍO ---
+    function procesarFases(lista) {
+        const sel = document.getElementById('fase');
+        sel.innerHTML = "";
+        let base = lista && lista.length ? lista : ['PARIDERA','PRECEBO','LEVANTE','ENGORDE'];
+        base.forEach(f => {
+            let opt = document.createElement('option');
+            opt.value = f.toUpperCase(); opt.text = f; sel.add(opt);
+        });
+        let optF = document.createElement('option'); optF.value = "FUERA"; optF.text = "Fuera"; sel.add(optF);
+    }
+    
+    function agregarNuevaFase() {
+        let n = prompt("Nueva fase:"); if(!n) return;
+        n = n.toUpperCase().trim();
+        let sel = document.getElementById('fase');
+        let opt = document.createElement('option'); opt.value = n; opt.text = n;
+        sel.add(opt, sel.options[sel.length-1]); sel.value = n;
+        fetch(URL_SCRIPT, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tipo:"NUEVA_FASE", nombre:n})});
+    }
+
+    function procesarMadres(reg) {
         let sel = document.getElementById('madre');
-        sel.innerHTML = '<option value="">-- Sel --</option><option value="NA">N/A</option><option value="COMPRA">Externa</option>';
-        
-        let madres = new Set();
-        data.forEach(r => { 
-            // Si columna EsReproductora (index 8) es SI
-            if(r[8] === 'SI') madres.add(r[1]); 
-        });
-        
-        madres.forEach(m => {
-            let o = document.createElement('option'); 
-            o.value=m; 
-            o.text="Madre " + m; 
-            sel.add(o);
-        });
+        sel.innerHTML = '<option value="">Madre</option><option value="NA">N/A</option>';
+        let m = new Set();
+        reg.forEach(r => { if(r[8]==='SI') m.add(r[1]); });
+        m.forEach(x => { let o = document.createElement('option'); o.value=x; o.text="Madre "+x; sel.add(o); });
     }
 
-    // --- COMPRESIÓN DE FOTO ---
     function procesarFoto() {
-        const file = document.getElementById('fotoInput').files[0];
-        if (!file) return;
-
-        document.getElementById('text-foto').innerHTML = "⏳ Procesando...";
-
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = function(event) {
-            const imgElement = document.createElement("img");
-            imgElement.src = event.target.result;
-            
-            imgElement.onload = function() {
-                // Redimensionar a max 800px para que suba rápido
-                const canvas = document.createElement("canvas");
-                const MAX_WIDTH = 800;
-                const scaleSize = MAX_WIDTH / imgElement.width;
-                canvas.width = MAX_WIDTH;
-                canvas.height = imgElement.height * scaleSize;
-
-                const ctx = canvas.getContext("2d");
-                ctx.drawImage(imgElement, 0, 0, canvas.width, canvas.height);
-
-                // Comprimir a JPG calidad 60%
-                imagenBase64 = canvas.toDataURL("image/jpeg", 0.6).split(",")[1]; 
-
-                // Mostrar preview
-                const preview = document.getElementById('preview-img');
-                preview.src = canvas.toDataURL("image/jpeg", 0.6);
-                preview.style.display = 'block';
-                
-                document.getElementById('text-foto').innerHTML = "✅ Foto Lista";
-                document.getElementById('drop-zone').classList.add('has-file');
+        let f = document.getElementById('fotoInput').files[0]; if(!f)return;
+        let r = new FileReader(); r.readAsDataURL(f);
+        r.onload = e => {
+            let i = new Image(); i.src = e.target.result;
+            i.onload = () => {
+                let c = document.createElement("canvas");
+                let s = 800/i.width; c.width=800; c.height=i.height*s;
+                c.getContext("2d").drawImage(i,0,0,c.width,c.height);
+                imagenBase64 = c.toDataURL("image/jpeg",0.6).split(",")[1];
+                document.getElementById('text-foto').innerText = "✅ Foto OK";
             }
-        }
-    }
-
-    // --- ENVÍO DE DATOS ---
-    function verificarAccion() {
-        const accion = document.getElementById('accion').value;
-        if(accion === 'MUERTE' || accion === 'VENTA') {
-            document.getElementById('fase').value = 'FUERA';
         }
     }
 
     function enviarDatos() {
-        const btn = document.getElementById('btnEnviar');
-        
-        const datos = {
+        let btn = document.getElementById('btnEnviar');
+        let d = {
             chapeta: document.getElementById('chapeta').value,
             accion: document.getElementById('accion').value,
             fase: document.getElementById('fase').value,
             ubicacion: document.getElementById('fase').value,
             notas: document.getElementById('notas').value,
-            madre: document.getElementById('madre').value,
             padre: document.getElementById('padre').value,
+            madre: document.getElementById('madre').value,
             esReproductora: document.getElementById('esReproductora').checked ? "SI" : "NO",
             imagenBase64: imagenBase64,
             mimeType: "image/jpeg"
         };
-
-        if(!datos.chapeta) { alert("⚠️ Falta el número de Chapeta"); return; }
-        
-        btn.disabled = true;
-        btn.innerText = "Subiendo a la nube... ☁️";
-
-        fetch(URL_SCRIPT, {
-            method: 'POST', 
-            mode: 'no-cors',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(datos)
-        }).then(() => {
-            alert("✅ ¡Guardado Exitosamente!");
-            location.reload(); // Recargar para actualizar dashboard
-        }).catch(e => {
-            alert("❌ Error al subir. Intenta de nuevo.");
-            btn.disabled = false;
-            btn.innerText = "Reintentar";
-        });
+        if(!d.chapeta) return alert("Falta ID");
+        btn.disabled = true; btn.innerText = "Guardando...";
+        fetch(URL_SCRIPT, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)})
+        .then(() => { alert("Guardado"); location.reload(); })
+        .catch(() => { alert("Error"); btn.disabled = false; });
     }
-</script>
 
+    function verificarAccion() {
+        if(['VENTA','MUERTE'].includes(document.getElementById('accion').value)) 
+            document.getElementById('fase').value = 'FUERA';
+    }
+
+    function volverAlTablero() { document.getElementById('view-list').style.display='none'; document.getElementById('view-dashboard-summary').style.display='block'; }
+    function volverALista() { document.getElementById('view-detail').style.display='none'; if(categoriaActual) verLista(categoriaActual); else document.getElementById('view-list').style.display='block'; }
+</script>
 </body>
 </html>
