@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Granja Manager Pro 🔍</title>
+    <title>Granja Manager Pro 🚀</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         /* ESTILOS BASE */
@@ -43,6 +43,14 @@
         /* LISTAS */
         .item-lista { background: white; padding: 15px; margin-bottom: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; }
         
+        /* LÍNEA DE TIEMPO (NUEVO) */
+        .timeline { list-style: none; padding: 0; margin-top: 20px; }
+        .timeline li { border-left: 2px solid #bdc3c7; padding-left: 20px; position: relative; margin-bottom: 20px; }
+        .timeline li::before { content: ''; width: 10px; height: 10px; background: #2980b9; border-radius: 50%; position: absolute; left: -6px; top: 5px; }
+        .timeline-date { font-size: 0.8rem; color: #7f8c8d; }
+        .timeline-action { font-weight: bold; color: #2c3e50; }
+        .timeline-note { font-size: 0.9rem; color: #555; background: #f9f9f9; padding: 5px; border-radius: 5px; margin-top: 5px; }
+
         /* NAVEGACIÓN */
         .nav-bar { position: fixed; bottom: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid #eee; z-index: 90; }
         .nav-btn { background: none; border: none; font-size: 1.5rem; color: #bdc3c7; display: flex; flex-direction: column; align-items: center; }
@@ -62,11 +70,10 @@
 </header>
 
 <div id="tab-dashboard" class="tab-content active">
-    <div class="loader" id="loader-dash">⏳ Cargando...</div>
+    <div class="loader" id="loader-dash">⏳ Cargando base de datos...</div>
     
     <div id="view-dashboard-summary" style="display:none;">
-        <div class="grid-dashboard" id="dashboard-container">
-            </div>
+        <div class="grid-dashboard" id="dashboard-container"></div>
         <div style="text-align:center; margin-top: 30px;">
             <button onclick="location.reload()" style="background:none; border:none; color:#2980b9; font-weight:bold;">🔄 Actualizar</button>
         </div>
@@ -94,15 +101,14 @@
         <label>Acción:</label>
         <select id="accion" onchange="verificarAccion()">
             <option value="INGRESO">🟢 Nacimiento / Compra</option>
-            <option value="TRASLADO">🔵 Traslado / Corrección</option>
+            <option value="TRASLADO">🔵 Traslado / Cambio</option>
             <option value="VENTA">💰 Venta</option>
             <option value="MUERTE">🔴 Muerte / Baja</option>
         </select>
 
         <label>Ubicación / Fase Nueva:</label>
         <div class="input-group">
-            <select id="fase">
-                </select>
+            <select id="fase"></select>
             <button class="btn-add" onclick="agregarNuevaFase()">+</button>
         </div>
 
@@ -111,7 +117,7 @@
              <select id="madre" style="flex:1"><option value="">Madre</option></select>
              <input type="text" id="padre" placeholder="Padre" style="flex:1; margin-top:5px;">
         </div>
-
+        
         <div style="margin-top:15px; display:flex; align-items:center; gap:10px;">
              <input type="checkbox" id="esReproductora" style="width:20px; height:20px;">
              <label style="margin:0;">Es Futura Madre</label>
@@ -129,16 +135,33 @@
     </div>
 </div>
 
+<div id="tab-reportes" class="tab-content">
+    <h2 style="text-align:center; margin-bottom:20px; color:#c0392b;">🚨 Historial de Salidas</h2>
+    
+    <div style="background:white; padding:10px; border-radius:8px; margin-bottom:15px;">
+        <select id="filtro-reporte" onchange="cargarReportes()" style="width:100%; padding:10px; border-radius:5px;">
+            <option value="TODOS">Ver Todo (Ventas y Muertes)</option>
+            <option value="VENTA">💰 Solo Ventas</option>
+            <option value="MUERTE">🔴 Solo Muertes</option>
+        </select>
+    </div>
+
+    <div id="contenedor-reportes">
+        </div>
+</div>
+
 <div class="nav-bar">
     <button class="nav-btn active" onclick="verTab('dashboard', this)"><span>📊</span><span>Tablero</span></button>
     <button class="nav-btn" onclick="verTab('registro', this)"><span>➕</span><span>Registrar</span></button>
+    <button class="nav-btn" onclick="verTab('reportes', this)"><span>📋</span><span>Reportes</span></button>
 </div>
 
 <script>
-    // --- TU URL DE GOOGLE APPS SCRIPT ---
-    const URL_SCRIPT = "https://script.google.com/macros/s/AKfycby_sbcvFYmbDdzhoqCwaWxI1nM90c_z92g1xzWuKMOAmS0-UITWccD7XAoeatM8KVpRZQ/exec";
+    // --- PEGA TU URL DE APPS SCRIPT AQUÍ ---
+    const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbz0k3IwWN0Yx616SzA5c9UMho_L7p2DvwsDEOsDPkkR284W21LgmuCH5K37esQZtjsW1Q/exec";
 
     let inventarioGlobal = []; 
+    let historialCompleto = []; // AQUÍ GUARDAMOS TODO EL HISTORIAL CRUDO
     let fasesGlobales = [];
     let imagenBase64 = ""; 
     let categoriaActual = "";
@@ -153,11 +176,12 @@
             btn.classList.add('active');
         }
         
-        // Mostrar buscador solo en dashboard
         if(tabId === 'dashboard') {
             document.getElementById('search-bar-container').style.display = 'block';
-            document.getElementById('titulo-form').innerText = "Nuevo Movimiento";
-            limpiarFormulario(); // Limpiar si vienes de editar
+            limpiarFormulario();
+        } else if (tabId === 'reportes') {
+            document.getElementById('search-bar-container').style.display = 'none';
+            cargarReportes(); // Cargar al entrar
         } else {
             document.getElementById('search-bar-container').style.display = 'none';
         }
@@ -171,9 +195,14 @@
             .then(data => {
                 let registros = data.registros || (Array.isArray(data) ? data : []);
                 let fases = data.fases || [];
+                
+                // GUARDAMOS TODO EL HISTORIAL PARA USARLO LUEGO
+                historialCompleto = registros;
+                
                 procesarFases(fases);
                 procesarMadres(registros);
                 procesarDashboard(registros);
+                
                 document.getElementById('loader-dash').style.display='none';
                 document.getElementById('view-dashboard-summary').style.display='block';
                 document.getElementById('search-bar-container').style.display='block';
@@ -184,45 +213,20 @@
             });
     }
 
-    // --- BUSCADOR (NUEVO) ---
-    function buscarCerdo() {
-        let texto = document.getElementById('inputBusqueda').value.toUpperCase();
-        
-        if (texto.length === 0) {
-            // Si borran, volver al dashboard
-            document.getElementById('view-dashboard-summary').style.display = 'block';
-            document.getElementById('view-list').style.display = 'none';
-            return;
-        }
-
-        // Filtrar
-        let resultados = inventarioGlobal.filter(a => a.id.toString().includes(texto));
-        
-        // Mostrar vista lista forzada
-        document.getElementById('view-dashboard-summary').style.display = 'none';
-        document.getElementById('view-list').style.display = 'block';
-        document.getElementById('view-detail').style.display = 'none';
-        document.getElementById('titulo-lista').innerText = `Resultados: ${resultados.length}`;
-        
-        pintarLista(resultados);
-    }
-
-    // --- DASHBOARD Y LÓGICA DE ESTADO ---
+    // --- DASHBOARD (SOLO ÚLTIMO ESTADO) ---
     function procesarDashboard(data) {
         let counts = { TOTAL: 0 };
         let estados = {};
 
-        // Recorremos cronológicamente: el último registro sobreescribe el estado
         data.forEach(fila => {
             let id = fila[1], acc = fila[2], fase = fila[3];
-            // Inicializamos o actualizamos
             if(!estados[id]) estados[id] = {};
             
-            // Guardamos datos más recientes
+            // Sobreescribimos con lo último
             estados[id].id = id;
             estados[id].notas = fila[5];
-            estados[id].padre = fila[6]; // Padre
-            estados[id].madre = fila[7]; // Madre
+            estados[id].padre = fila[6];
+            estados[id].madre = fila[7];
             estados[id].esRepro = fila[8];
             estados[id].foto = fila[9];
 
@@ -235,7 +239,6 @@
             }
         });
 
-        // Convertimos el objeto estados a lista limpia
         inventarioGlobal = [];
         for(let id in estados) {
             let animal = estados[id];
@@ -248,7 +251,6 @@
             }
         }
 
-        // Renderizar Tablero
         const container = document.getElementById('dashboard-container');
         container.innerHTML = `<div class="card-dash card-total"><h3>Total</h3><h2>${counts.TOTAL}</h2></div>`;
 
@@ -261,34 +263,10 @@
         });
     }
 
-    // --- LISTAS Y DETALLES ---
-    function verLista(categoria) {
-        categoriaActual = categoria;
-        document.getElementById('view-dashboard-summary').style.display = 'none';
-        document.getElementById('view-list').style.display = 'block';
-        document.getElementById('titulo-lista').innerText = "En: " + categoria;
-        
-        let filtrados = inventarioGlobal.filter(a => a.fase === categoria);
-        pintarLista(filtrados);
-    }
-
-    function pintarLista(lista) {
-        const cont = document.getElementById('contenedor-lista');
-        cont.innerHTML = "";
-        if(lista.length === 0) { cont.innerHTML = "<p style='text-align:center'>No hay resultados</p>"; return; }
-
-        lista.forEach(animal => {
-            let div = document.createElement('div');
-            div.className = 'item-lista';
-            div.innerHTML = `<div><strong>🐷 ${animal.id}</strong><br><small>${animal.notas || ''}</small></div><i class="fas fa-chevron-right"></i>`;
-            div.onclick = () => verDetalle(animal.id);
-            cont.appendChild(div);
-        });
-    }
-
+    // --- DETALLE CON HISTORIAL (NUEVO) ---
     function verDetalle(id) {
         let animal = inventarioGlobal.find(a => a.id == id);
-        if (!animal) return; // Por si acaso
+        if (!animal) return;
 
         document.getElementById('view-list').style.display = 'none';
         document.getElementById('view-detail').style.display = 'block';
@@ -296,7 +274,7 @@
         let html = `
             <div style="text-align:center">
                 <h1 style="margin:0">${animal.id}</h1>
-                <span style="background:#2ecc71;color:white;padding:2px 8px;border-radius:10px;font-size:0.8rem">${animal.fase}</span>
+                <span style="background:#2ecc71;color:white;padding:2px 8px;border-radius:10px;">${animal.fase}</span>
             </div>
             <hr>
             <p><strong>Madre:</strong> ${animal.madre || '-'} | <strong>Padre:</strong> ${animal.padre || '-'}</p>
@@ -307,42 +285,143 @@
             html += `<img src="${animal.foto}" style="width:100%; border-radius:10px; margin-top:10px;">`;
         }
 
-        // --- BOTÓN DE EDITAR / TRASLADAR ---
-        html += `
-            <div style="margin-top:20px;">
-                <button class="btn-edit" onclick="cargarParaEditar('${animal.id}')">
-                    ✏️ Editar / Trasladar
-                </button>
-            </div>
-        `;
+        // BOTÓN EDITAR
+        html += `<div style="margin-top:20px; margin-bottom:20px;">
+                <button class="btn-edit" onclick="cargarParaEditar('${animal.id}')">✏️ Editar / Trasladar</button>
+            </div>`;
+
+        // === ZONA DE HISTORIAL ===
+        html += `<h3 style="border-top:1px solid #eee; padding-top:15px;">📜 Historial de Vida</h3>`;
+        html += `<ul class="timeline">`;
+        
+        // Filtramos del historial completo solo los eventos de ESTE cerdo
+        let miHistorial = historialCompleto.filter(h => h[1] == id); // h[1] es ID
+        
+        // Si quieres ordenarlos (aunque ya vienen ordenados de Sheets)
+        // miHistorial.reverse(); // Si quieres ver lo mas reciente arriba
+
+        miHistorial.forEach(evento => {
+            let fechaRaw = evento[0];
+            let fecha = new Date(fechaRaw).toLocaleDateString();
+            let accion = evento[2];
+            let fase = evento[3];
+            let notas = evento[5];
+            
+            let icono = "🔵";
+            if(accion === "INGRESO") icono = "🟢";
+            if(accion === "VENTA") icono = "💰";
+            if(accion === "MUERTE") icono = "🔴";
+
+            html += `
+                <li>
+                    <div class="timeline-date">${fecha}</div>
+                    <div class="timeline-action">${icono} ${accion} ${fase ? '-> '+fase : ''}</div>
+                    ${notas ? `<div class="timeline-note">${notas}</div>` : ''}
+                </li>
+            `;
+        });
+        html += `</ul>`;
         
         document.getElementById('contenedor-detalle').innerHTML = html;
     }
 
-    // --- FUNCIÓN DE EDICIÓN / TRASLADO (NUEVO) ---
+    // --- REPORTES DE VENTAS Y MUERTES (NUEVO) ---
+    function cargarReportes() {
+        let filtro = document.getElementById('filtro-reporte').value; // TODOS, VENTA, MUERTE
+        let contenedor = document.getElementById('contenedor-reportes');
+        contenedor.innerHTML = "";
+
+        // Filtrar del historial completo
+        let salidas = historialCompleto.filter(fila => {
+            let accion = fila[2];
+            if (filtro === "TODOS") return accion === 'VENTA' || accion === 'MUERTE';
+            return accion === filtro;
+        });
+
+        if(salidas.length === 0) {
+            contenedor.innerHTML = "<p style='text-align:center; color:#777;'>No hay registros de salidas.</p>";
+            return;
+        }
+
+        // Invertir para ver lo más reciente primero
+        let salidasRecientes = [...salidas].reverse();
+
+        salidasRecientes.forEach(s => {
+            let fecha = new Date(s[0]).toLocaleDateString();
+            let id = s[1];
+            let accion = s[2];
+            let notas = s[5];
+            
+            let colorBorde = accion === 'VENTA' ? '#27ae60' : '#c0392b';
+            let icono = accion === 'VENTA' ? '💰 VENTA' : '🔴 MUERTE';
+
+            let card = document.createElement('div');
+            card.style = `background:white; padding:15px; margin-bottom:10px; border-left:5px solid ${colorBorde}; border-radius:5px; box-shadow:0 1px 3px rgba(0,0,0,0.1);`;
+            
+            card.innerHTML = `
+                <div style="display:flex; justify-content:space-between;">
+                    <strong>🐷 ID: ${id}</strong>
+                    <span style="color:#777; font-size:0.8rem;">${fecha}</span>
+                </div>
+                <div style="font-weight:bold; margin:5px 0;">${icono}</div>
+                <div style="color:#555; font-size:0.9rem;">${notas || 'Sin notas'}</div>
+            `;
+            contenedor.appendChild(card);
+        });
+    }
+
+    // --- RESTO DE FUNCIONES (IGUAL QUE ANTES) ---
+    function buscarCerdo() {
+        let texto = document.getElementById('inputBusqueda').value.toUpperCase();
+        if (texto.length === 0) {
+            document.getElementById('view-dashboard-summary').style.display = 'block';
+            document.getElementById('view-list').style.display = 'none';
+            return;
+        }
+        let resultados = inventarioGlobal.filter(a => a.id.toString().includes(texto));
+        document.getElementById('view-dashboard-summary').style.display = 'none';
+        document.getElementById('view-list').style.display = 'block';
+        document.getElementById('view-detail').style.display = 'none';
+        document.getElementById('titulo-lista').innerText = `Resultados: ${resultados.length}`;
+        pintarLista(resultados);
+    }
+
+    function verLista(categoria) {
+        categoriaActual = categoria;
+        document.getElementById('view-dashboard-summary').style.display = 'none';
+        document.getElementById('view-list').style.display = 'block';
+        document.getElementById('titulo-lista').innerText = "En: " + categoria;
+        let filtrados = inventarioGlobal.filter(a => a.fase === categoria);
+        pintarLista(filtrados);
+    }
+
+    function pintarLista(lista) {
+        const cont = document.getElementById('contenedor-lista');
+        cont.innerHTML = "";
+        if(lista.length === 0) { cont.innerHTML = "<p style='text-align:center'>No hay resultados</p>"; return; }
+        lista.forEach(animal => {
+            let div = document.createElement('div');
+            div.className = 'item-lista';
+            div.innerHTML = `<div><strong>🐷 ${animal.id}</strong><br><small>${animal.notas || ''}</small></div><i class="fas fa-chevron-right"></i>`;
+            div.onclick = () => verDetalle(animal.id);
+            cont.appendChild(div);
+        });
+    }
+
     function cargarParaEditar(id) {
         let animal = inventarioGlobal.find(a => a.id == id);
-        
-        // 1. Ir a la pestaña registro
         verTab('registro', document.querySelectorAll('.nav-btn')[1]);
-        
-        // 2. Cambiar título para que sepa que está editando
         document.getElementById('titulo-form').innerText = "Editar / Trasladar Cerdo " + id;
-        
-        // 3. Llenar los datos
         document.getElementById('chapeta').value = animal.id;
-        // Bloquear ID para no crear otro cerdo por error
         document.getElementById('chapeta').readOnly = true; 
         document.getElementById('chapeta').style.backgroundColor = "#eee";
-
-        document.getElementById('accion').value = "TRASLADO"; // Por defecto sugerimos traslado
+        document.getElementById('accion').value = "TRASLADO";
         document.getElementById('fase').value = animal.fase;
         document.getElementById('notas').value = animal.notas;
         document.getElementById('padre').value = animal.padre;
         document.getElementById('madre').value = animal.madre;
         document.getElementById('esReproductora').checked = (animal.esRepro === "SI");
-
-        alert("Modifica la FASE o los DATOS y guarda para actualizar.");
+        alert("Realiza el movimiento y guarda.");
     }
 
     function limpiarFormulario() {
@@ -354,7 +433,6 @@
         document.getElementById('titulo-form').innerText = "Nuevo Movimiento";
     }
 
-    // --- FASES, MADRES Y ENVÍO ---
     function procesarFases(lista) {
         const sel = document.getElementById('fase');
         sel.innerHTML = "";
@@ -370,6 +448,7 @@
         let n = prompt("Nueva fase:"); if(!n) return;
         n = n.toUpperCase().trim();
         let sel = document.getElementById('fase');
+        for (let i = 0; i < sel.options.length; i++) { if (sel.options[i].value === n) { alert("Ya existe"); return; } }
         let opt = document.createElement('option'); opt.value = n; opt.text = n;
         sel.add(opt, sel.options[sel.length-1]); sel.value = n;
         fetch(URL_SCRIPT, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tipo:"NUEVA_FASE", nombre:n})});
@@ -415,8 +494,8 @@
         if(!d.chapeta) return alert("Falta ID");
         btn.disabled = true; btn.innerText = "Guardando...";
         fetch(URL_SCRIPT, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)})
-        .then(() => { alert("Guardado"); location.reload(); })
-        .catch(() => { alert("Error"); btn.disabled = false; });
+        .then(() => { alert("✅ Guardado"); location.reload(); })
+        .catch(() => { alert("❌ Error"); btn.disabled = false; });
     }
 
     function verificarAccion() {
