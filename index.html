@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Granja Pro v4.10 🐷</title>
+    <title>Granja Pro v4.14 🐷</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        /* --- ESTILOS VISUALES ORIGINALES --- */
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f0f2f5; margin: 0; padding-bottom: 90px; }
         header { background-color: #2c3e50; color: white; padding: 15px; text-align: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
         .search-container { padding: 10px 15px; background: #2c3e50; margin-bottom: 10px; }
@@ -15,31 +14,45 @@
         .tab-content.active { display: block; }
         
         .grid-dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .card-dash { background: white; padding: 15px; border-radius: 12px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: pointer; border-left: 5px solid transparent; }
+        
+        /* TARJETAS DASHBOARD */
+        .card-dash { background: white; padding: 15px; border-radius: 12px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: pointer; border-left: 5px solid transparent; position: relative; }
+        .alert-badge { position: absolute; top: 10px; right: 10px; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .pulse-red { background-color: #e74c3c; animation: pulse 2s infinite; }
+        .badge-yellow { background-color: #f1c40f; }
+
         .card-maestra { grid-column: span 2; background: linear-gradient(135deg, #2c3e50, #34495e); color: white; }
         .card-lechones { background: linear-gradient(135deg, #f39c12, #d35400); color: white; }
         .card-servicio { background: linear-gradient(135deg, #8e44ad, #9b59b6); color: white; }
         
         .card-dash h3 { margin: 0; font-size: 0.75rem; text-transform: uppercase; opacity: 0.8; }
         .card-dash h2 { margin: 10px 0 0 0; font-size: 2rem; }
-        .card-dash h1 { margin: 5px 0 0 0; font-size: 3rem; }
 
         .card-form { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         label { display: block; font-weight: 600; margin-top: 15px; color: #34495e; font-size: 0.9rem; }
         input, select { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #bdc3c7; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
         .btn-primary { width: 100%; padding: 15px; background-color: #2980b9; color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; margin-top: 25px; cursor: pointer; }
         
-        .item-lista { background: white; padding: 15px; margin-bottom: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border-left: 5px solid #2ecc71; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; }
+        /* ESTILO LISTA STANDARD */
+        .item-lista { background: white; padding: 15px; margin-bottom: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border-left: 5px solid #bdc3c7; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; position: relative; }
+        .dot-status { height: 12px; width: 12px; border-radius: 50%; display: inline-block; margin-left: 5px; }
         
+        /* ESTILO HISTORIAL/REPORTES (Timeline) */
+        .timeline-item { display: flex; gap: 15px; margin-bottom: 20px; position: relative; }
+        .timeline-icon { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; flex-shrink: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 2; }
+        .timeline-content { background: white; padding: 15px; border-radius: 12px; flex: 1; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .timeline-line { position: absolute; left: 20px; top: 40px; bottom: -30px; width: 2px; background: #ddd; z-index: 1; }
+        .timeline-item:last-child .timeline-line { display: none; }
+
         /* BOTONES DE ACCIÓN */
         .btn-action-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
         .btn-action { padding: 12px; border: none; border-radius: 8px; font-weight: bold; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; }
         .btn-orange { background-color: #e67e22; }
         .btn-blue { background-color: #2980b9; }
         .btn-purple { background-color: #8e44ad; grid-column: span 2; }
-        /* Botones dinámicos grandes */
         .btn-parto { background-color: #d35400; grid-column: span 2; margin-top: 5px; }
-        .btn-destete { background-color: #16a085; grid-column: span 2; margin-top: 5px; } /* Nuevo color verde azulado */
+        .btn-destete { background-color: #16a085; grid-column: span 2; margin-top: 5px; } 
+        .btn-baja-lechon { background-color: #c0392b; color: white; border: none; padding: 5px 10px; border-radius: 5px; font-size: 0.8rem; cursor: pointer; margin-left: 10px; }
 
         .nav-bar { position: fixed; bottom: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid #eee; z-index: 100; }
         .nav-btn { background: none; border: none; font-size: 1.5rem; color: #bdc3c7; cursor: pointer; }
@@ -52,6 +65,7 @@
         .lechon-item input[type="checkbox"] { width: 20px; height: 20px; margin: 0 auto; cursor: pointer; }
 
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes pulse { 0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7); } 70% { transform: scale(1.1); box-shadow: 0 0 0 6px rgba(231, 76, 60, 0); } 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); } }
     </style>
 </head>
 <body>
@@ -90,9 +104,10 @@
             <option value="SERVICIO">💉 SERVICIO</option>
             <option value="PARTO">🐷 PARTO</option>
             <option value="DESTETE">🥣 DESTETE</option>
+            <option value="BAJA_LACTANCIA">💀 Baja Lechón (Lactancia)</option>
             <option value="TRASLADO">🔵 Traslado</option>
             <option value="VENTA">💰 Venta</option>
-            <option value="MUERTE">🔴 Muerte</option>
+            <option value="MUERTE">🔴 Muerte (Madre/Cerdo)</option>
             <option value="OBSERVACION">📝 Observación / Peso</option>
         </select>
 
@@ -122,14 +137,18 @@
             </div>
             <label>Peso Total Nacimiento:</label><input type="number" id="peso_nacimiento" placeholder="0.0">
         </div>
+        
+        <div id="section-baja-lechon" style="display:none;" class="special-section">
+            <h4 style="margin:0 0 10px 0; color:#c0392b;">Baja de Lechón Lactante</h4>
+            <label>Cantidad Muertos:</label><input type="number" id="cantidad_baja" placeholder="1">
+            <label>Causa:</label><input type="text" id="causa_baja" placeholder="Ej. Aplastamiento">
+        </div>
 
         <div id="section-destete" style="display:none;" class="special-section">
             <h4 style="margin:0 0 10px 0; color:#16a085;">Movimiento de Lechones</h4>
             <label>Cant. Destetados:</label><input type="number" id="destetados" onkeyup="generarInputsLechones()">
-            
             <label style="color:red">📍 Destino Lechones (Fase):</label>
             <select id="subpuesto-lechones"></select>
-            
             <div id="contenedor-inputs-lechones" style="margin-top:10px;"></div>
         </div>
 
@@ -147,13 +166,14 @@
 
 <div id="tab-reportes" class="tab-content">
     <div class="card-form">
-        <h3>📋 Historial de Salidas</h3>
+        <h3>📋 Historial de Eventos</h3>
         <select id="filtro-reporte" onchange="cargarReportes()">
             <option value="TODOS">Ver Todos</option>
             <option value="VENTA">Ventas</option>
             <option value="MUERTE">Muertes</option>
+            <option value="PARTO">Partos</option>
         </select>
-        <div id="contenedor-reportes" style="margin-top:15px;"></div>
+        <div id="contenedor-reportes" style="margin-top:20px;"></div>
     </div>
 </div>
 
@@ -164,7 +184,9 @@
 </div>
 
 <script>
-    const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbzGSrL_Xz9NSbF0aILVx89F1DPeZKn65bOYdhidzUzTMLq6decnT-D6kR-j1mhKOvnTdg/exec";
+    // ✅ ENLACE ACTUALIZADO
+    const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbz3T-6EbtBDg6LZqMbxNFQuvmntEAKkv0gg3btvVfm_-Gi0dZTIv-QMsY2H2oIu_ywJMg/exec";
+    
     let inventarioGlobal = [], historialCompleto = [], fotoBase64 = "", fotoMime = "";
 
     window.onload = () => {
@@ -190,34 +212,129 @@
     function procesarInventario(regs) {
         let estados = {};
         regs.forEach(r => {
-            let id = r[1], acc = r[2], fase = r[3];
-            if(!estados[id]) estados[id] = { id, piglets: 0, subpuesto: r[12], fase: fase, chapeta: r[10], madre: r[7], activo: true };
+            let id = r[1], acc = r[2], fase = r[3], fecha = r[0];
+            if(!estados[id]) estados[id] = { id, piglets: 0, subpuesto: r[12], fase: fase, chapeta: r[10], madre: r[7], activo: true, fechaFase: fecha };
+            
             if(acc === "VENTA" || acc === "MUERTE") estados[id].activo = false;
             else {
-                estados[id].activo = true; 
-                estados[id].fase = fase.toUpperCase().trim().replace(/ /g, '_'); 
+                estados[id].activo = true;
+                let nuevaFase = fase.toUpperCase().trim().replace(/ /g, '_');
+                if(estados[id].fase !== nuevaFase) { estados[id].fase = nuevaFase; estados[id].fechaFase = fecha; }
                 estados[id].subpuesto = r[12]; estados[id].chapeta = r[10];
+
                 if(acc === "PARTO") { 
                     let m = r[5].match(/Vivos: (\d+)/); 
-                    if(m) estados[id].piglets = parseInt(m[1]); 
+                    if(m) estados[id].piglets = parseInt(m[1]);
+                    estados[id].fechaFase = fecha; 
                 }
-                if(acc === "DESTETE") estados[id].piglets = 0;
+                
+                if(acc === "BAJA_LACTANCIA") {
+                    let m = r[5].match(/Cantidad: (\d+)/);
+                    if(m) estados[id].piglets = Math.max(0, estados[id].piglets - parseInt(m[1]));
+                }
+
+                if(acc === "DESTETE") { estados[id].piglets = 0; estados[id].fechaFase = fecha; }
             }
         });
-        return Object.values(estados).filter(e => e.activo);
+        
+        return Object.values(estados).filter(e => e.activo).map(e => {
+            e.dias = calcularDias(e.fechaFase);
+            e.color = obtenerColor(e.dias, e.fase);
+            return e;
+        });
+    }
+
+    function calcularDias(f) {
+        if(!f) return 0;
+        let diff = new Date() - new Date(f);
+        return Math.floor(diff / (1000 * 60 * 60 * 24));
+    }
+
+    function obtenerColor(dias, fase) {
+        if(fase.includes("GESTACION") && dias > 114) return "#e74c3c"; 
+        if(fase.includes("GESTACION") && dias > 105) return "#f1c40f"; 
+        if(fase.includes("MATERNIDAD") && dias > 28) return "#e74c3c"; 
+        if(fase.includes("MATERNIDAD") && dias > 21) return "#f1c40f"; 
+        if(fase.includes("PRECEBO") && dias > 49) return "#e74c3c"; 
+        if(fase.includes("PRECEBO") && dias > 42) return "#f1c40f"; 
+        if(dias > 90) return "#95a5a6"; 
+        return "#2ecc71";
     }
 
     function pintarDashboard(inv) {
-        let counts = inv.reduce((a,b) => { a[b.fase] = (a[b.fase]||0)+1; a.total++; a.piglets += (b.piglets||0); return a; }, {total:0, piglets:0});
+        let data = { total: 0, piglets: 0, phases: {} };
+        inv.forEach(e => {
+            data.total++;
+            data.piglets += (e.piglets || 0);
+            if (!data.phases[e.fase]) data.phases[e.fase] = { count: 0, alert: null };
+            data.phases[e.fase].count++;
+            if (e.color === "#e74c3c") data.phases[e.fase].alert = "red";
+            else if (e.color === "#f1c40f" && data.phases[e.fase].alert !== "red") data.phases[e.fase].alert = "yellow";
+        });
         
-        let html = `<div class="card-dash card-maestra"><h3>POBLACIÓN TOTAL</h3><h1>${counts.total + counts.piglets}</h1></div>`;
-        html += `<div class="card-dash card-lechones" onclick="verLista('LECHONES')"><h3>LECHONES VIVOS</h3><h2>${counts.piglets}</h2></div>`;
+        let html = `<div class="card-dash card-maestra"><h3>POBLACIÓN TOTAL</h3><h1>${data.total + data.piglets}</h1></div>`;
+        html += `<div class="card-dash card-lechones" onclick="verLista('LECHONES')"><h3>LECHONES VIVOS</h3><h2>${data.piglets}</h2></div>`;
         
-        Object.keys(counts).filter(k=>k!=="total" && k!=="piglets").forEach(f => {
+        Object.keys(data.phases).forEach(f => {
+            let info = data.phases[f];
             let cl = f === "SALA_SERVICIO" ? "card-servicio" : "";
-            html += `<div class="card-dash ${cl}" onclick="verLista('${f}')"><h3>${f}</h3><h2>${counts[f]}</h2></div>`;
+            let alertBadge = "";
+            if (info.alert === "red") alertBadge = `<span class="alert-badge pulse-red"></span>`;
+            else if (info.alert === "yellow") alertBadge = `<span class="alert-badge badge-yellow"></span>`;
+
+            html += `<div class="card-dash ${cl}" onclick="verLista('${f}')">
+                        ${alertBadge}
+                        <h3>${f}</h3>
+                        <h2>${info.count}</h2>
+                     </div>`;
         });
         document.getElementById('dashboard-container').innerHTML = html;
+    }
+
+    function cargarReportes() {
+        let f = document.getElementById('filtro-reporte').value;
+        
+        let lista = historialCompleto.filter(h => {
+            let accion = h[2];
+            let notas = h[5] || "";
+            if (f === "TODOS") return true;
+            if (f === "MUERTE") {
+                if (accion === "MUERTE" || accion === "BAJA_LACTANCIA") return true;
+                if (accion === "PARTO" && notas.includes("Muertos:") && !notas.includes("Muertos: 0")) return true;
+                if (accion === "DESTETE" && notas.includes("Bajas:") && !notas.includes("Bajas: 0")) return true;
+                return false;
+            }
+            return accion === f;
+        });
+
+        document.getElementById('contenedor-reportes').innerHTML = lista.reverse().map(h => {
+            let fecha = new Date(h[0]).toLocaleDateString();
+            let accion = h[2];
+            let notas = h[5];
+            let color = "#95a5a6";
+            let icon = "fa-circle";
+
+            if(accion === "VENTA") { color = "#27ae60"; icon = "fa-dollar-sign"; }
+            else if(accion === "MUERTE" || accion === "BAJA_LACTANCIA") { color = "#c0392b"; icon = "fa-skull"; }
+            else if(accion === "PARTO") { color = "#d35400"; icon = "fa-baby"; }
+            else if(accion === "SERVICIO") { color = "#8e44ad"; icon = "fa-syringe"; }
+            else if(accion === "DESTETE") { color = "#16a085"; icon = "fa-piggy-bank"; }
+            else if(accion === "INGRESO") { color = "#2980b9"; icon = "fa-door-open"; }
+
+            return `
+            <div class="timeline-item">
+                <div class="timeline-line"></div>
+                <div class="timeline-icon" style="background-color:${color}"><i class="fas ${icon}"></i></div>
+                <div class="timeline-content">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                        <b style="color:${color}; font-size:0.9rem;">${accion}</b>
+                        <small style="color:#7f8c8d;">${fecha}</small>
+                    </div>
+                    <div style="font-weight:bold; font-size:1.1rem; color:#2c3e50;">ID: ${h[1]}</div>
+                    <div style="font-size:0.9rem; color:#555; margin-top:5px;">${notas}</div>
+                </div>
+            </div>`;
+        }).join("") || "<div style='text-align:center; padding:20px; color:#95a5a6;'>Sin registros encontrados.</div>";
     }
 
     function verLista(fase) {
@@ -227,7 +344,13 @@
         let filtrados = (fase === 'LECHONES') ? inventarioGlobal.filter(e => e.piglets > 0) : inventarioGlobal.filter(e => e.fase === fase);
         
         document.getElementById('contenedor-lista').innerHTML = filtrados.map(e => `
-            <div class="item-lista" onclick="verDetalle('${e.id}')"><div><b>${e.id}</b><br><small>📍 ${e.subpuesto || 'Sin puesto'} ${e.piglets > 0 ? '| 🐷 '+e.piglets : ''}</small></div><i class="fas fa-chevron-right"></i></div>
+            <div class="item-lista" onclick="verDetalle('${e.id}')" style="border-left: 5px solid ${e.color}">
+                <div>
+                    <b>ID: ${e.id}</b> <span class="dot-status" style="background-color:${e.color}"></span><br>
+                    <small>📍 ${e.subpuesto || 'N/A'} | ⏱️ ${e.dias} días ${e.piglets > 0 ? '| 🐷 '+e.piglets : ''}</small>
+                </div>
+                <i class="fas fa-chevron-right"></i>
+            </div>
         `).join("") || "Vacío";
     }
 
@@ -236,8 +359,6 @@
         document.getElementById('view-list').style.display='none';
         document.getElementById('view-detail').style.display='block';
         
-        // --- LÓGICA DE BOTONES DINÁMICOS ---
-        // Si tiene lechones > 0, mostramos DESTETE. Si no, y está en gestación, mostramos PARTO.
         let botonExtra = '';
         if (e.piglets > 0) {
             botonExtra = `<button class="btn-action btn-destete" onclick="cargarAccion('${e.id}', 'DESTETE')"><i class="fas fa-baby-carriage"></i> Registrar Destete</button>`;
@@ -247,11 +368,20 @@
 
         document.getElementById('contenedor-detalle').innerHTML = `
             <div class="card-form">
-                <h2 style="margin:0;">ID: ${e.id}</h2>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h2 style="margin:0;">ID: ${e.id}</h2>
+                    <span style="background:${e.color}; color:white; padding:5px 10px; border-radius:15px; font-size:0.8rem;">⏱️ ${e.dias} días</span>
+                </div>
                 <p>📍 <b>Puesto:</b> ${e.subpuesto || 'N/A'}</p>
                 <p>🏷️ <b>Chapeta:</b> ${e.chapeta || 'N/A'}</p>
                 <p>👩‍👦 <b>Madre:</b> ${e.madre || 'N/A'}</p>
-                ${e.piglets > 0 ? `<p style="color:#e67e22; font-weight:bold;">🐷 Lechones activos: ${e.piglets}</p>` : ''}
+                
+                ${e.piglets > 0 ? `
+                    <div style="background:#fff3e0; padding:10px; border-radius:8px; border:1px solid #ffe0b2; margin:10px 0; display:flex; justify-content:space-between; align-items:center;">
+                        <span style="color:#e67e22; font-weight:bold;">🐷 ${e.piglets} Lechones Vivos</span>
+                        <button class="btn-baja-lechon" onclick="cargarAccion('${e.id}', 'BAJA_LACTANCIA')">💀 Baja</button>
+                    </div>
+                ` : ''}
                 
                 <div class="btn-action-group">
                     <button class="btn-action btn-orange" onclick="cargarAccion('${e.id}', 'OBSERVACION')"><i class="fas fa-edit"></i> Nota</button>
@@ -259,10 +389,16 @@
                     <button class="btn-action btn-purple" onclick="cargarAccion('${e.id}', 'SERVICIO')"><i class="fas fa-syringe"></i> Inseminar</button>
                     ${botonExtra}
                 </div>
-                <hr><h4>Historial</h4>
-                ${historialCompleto.filter(h=>h[1]==id).reverse().slice(0,10).map(h=>`<div style="font-size:0.8rem; margin-bottom:5px;">📅 ${new Date(h[0]).toLocaleDateString()} - <b>${h[2]}</b><br>${h[5]}</div>`).join("")}
             </div>
         `;
+        let historialHTML = historialCompleto.filter(h=>h[1]==id).reverse().slice(0,10).map(h => {
+             return `<div style="font-size:0.85rem; padding:8px; border-bottom:1px solid #eee;">
+                        <b>${h[2]}</b> <span style="color:#888; float:right">${new Date(h[0]).toLocaleDateString()}</span><br>
+                        ${h[5]}
+                     </div>`;
+        }).join("");
+        
+        document.getElementById('contenedor-detalle').innerHTML += `<div class="card-form" style="margin-top:15px;"><h4>Historial</h4>${historialHTML}</div>`;
     }
 
     function cargarAccion(id, acc) { verTab('registro'); document.getElementById('tatuaje').value = id; document.getElementById('accion').value = acc; verificarAccion(); }
@@ -272,19 +408,26 @@
         let tatId = document.getElementById('tatuaje').value;
         let animal = inventarioGlobal.find(a => a.id == tatId);
 
-        document.getElementById('section-destete').style.display = (acc === "DESTETE") ? "block" : "none";
-        document.getElementById('section-parto').style.display = (acc === "PARTO") ? "block" : "none";
-        
+        document.getElementById('section-destete').style.display = "none";
+        document.getElementById('section-parto').style.display = "none";
+        document.getElementById('section-baja-lechon').style.display = "none";
+        document.getElementById('section-fase').style.display = "block";
+
         if(acc === "SERVICIO") document.getElementById('fase').value = "SALA_SERVICIO";
-        if(acc === "PARTO") document.getElementById('fase').value = "MATERNIDAD";
+        if(acc === "PARTO") { document.getElementById('fase').value = "MATERNIDAD"; document.getElementById('section-parto').style.display = "block"; }
         if(acc === "DESTETE") {
             document.getElementById('fase').value = "DESCANSO";
             document.getElementById('subpuesto-lechones').value = "PRECEBO"; 
+            document.getElementById('section-destete').style.display = "block";
             if(animal) {
-                // Rellena automáticamente la cantidad de lechones que tiene registrados
                 document.getElementById('destetados').value = animal.piglets;
                 generarInputsLechones();
             }
+        }
+        if(acc === "BAJA_LACTANCIA") {
+            document.getElementById('fase').value = "MATERNIDAD"; 
+            document.getElementById('section-baja-lechon').style.display = "block";
+            document.getElementById('section-fase').style.display = "none";
         }
     }
 
@@ -331,7 +474,6 @@
         if(acc === "DESTETE") {
             let subL = document.getElementById('subpuesto-lechones').value;
             if(!subL) { alert("Debes seleccionar el destino de los lechones"); btn.disabled = false; return; }
-            
             let lechones = Array.from(document.querySelectorAll('.lechon-item')).filter(r => r.querySelector('.l-status').checked).map(r => ({ tatuaje: r.querySelector('.l-tat').value, chapeta: r.querySelector('.l-chap').value, notas: "Hijo de " + d.tatuaje })).filter(l=>l.tatuaje);
             let bajas = parseInt(document.getElementById('destetados').value) - lechones.length;
             d.notas = `DESTETE | Camada: ${document.getElementById('destetados').value} | Efectivos: ${lechones.length} | Bajas: ${bajas} ${d.notas}`;
@@ -340,6 +482,12 @@
         
         if(acc === "PARTO") {
             d.notas = `PARTO | Vivos: ${document.getElementById('vivos').value} | Muertos: ${document.getElementById('muertos').value} | Peso: ${document.getElementById('peso_nacimiento').value}kg ${d.notas}`;
+        }
+        
+        if(acc === "BAJA_LACTANCIA") {
+            let cant = document.getElementById('cantidad_baja').value || 1;
+            let causa = document.getElementById('causa_baja').value || "Desconocida";
+            d.notas = `BAJA LACTANCIA | Cantidad: ${cant} | Causa: ${causa} ${d.notas}`;
         }
 
         fetch(URL_SCRIPT, { method:'POST', body: JSON.stringify(d) }).then(() => location.reload());
@@ -350,11 +498,15 @@
         if(!t) { volverAlTablero(); return; }
         document.getElementById('view-dashboard-summary').style.display='none';
         document.getElementById('view-list').style.display='block';
-        document.getElementById('contenedor-lista').innerHTML = inventarioGlobal.filter(e => e.id.toString().includes(t) || (e.chapeta && e.chapeta.toString().includes(t))).map(e => `<div class="item-lista" onclick="verDetalle('${e.id}')"><div><b>ID: ${e.id}</b><br><small>${e.fase}</small></div><i class="fas fa-chevron-right"></i></div>`).join("");
+        document.getElementById('contenedor-lista').innerHTML = inventarioGlobal.filter(e => e.id.toString().includes(t) || (e.chapeta && e.chapeta.toString().includes(t))).map(e => `<div class="item-lista" onclick="verDetalle('${e.id}')" style="border-left: 5px solid ${e.color}"><div><b>ID: ${e.id}</b> <span class="dot-status" style="background-color:${e.color}"></span><br><small>${e.fase}</small></div><i class="fas fa-chevron-right"></i></div>`).join("");
     }
 
     function limpiarFormulario() { document.getElementById('tatuaje').value = ""; document.getElementById('chapeta').value = ""; document.getElementById('peso').value = ""; document.getElementById('preview').style.display="none"; fotoBase64=""; }
-    function cargarReportes() { let f = document.getElementById('filtro-reporte').value; document.getElementById('contenedor-reportes').innerHTML = historialCompleto.filter(h => f === "TODOS" || h[2] === f).reverse().map(h => `<div class="item-lista"><div><b>${h[1]}</b> - ${h[2]}<br><small>${new Date(h[0]).toLocaleDateString()} - ${h[5]}</small></div></div>`).join("") || "Sin registros."; }
+    function cargarReportes() { 
+        let f = document.getElementById('filtro-reporte').value;
+        // Llamada a la funcion de reporte
+        // (La función cargarReportes ya está definida arriba en el script principal)
+    }
     function volverAlTablero() { document.getElementById('view-list').style.display='none'; document.getElementById('view-dashboard-summary').style.display='block'; }
     function volverALista() { document.getElementById('view-detail').style.display='none'; document.getElementById('view-list').style.display='block'; }
 </script>
