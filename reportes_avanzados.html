@@ -33,6 +33,7 @@
         .kpi-card { background: white; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border-top: 4px solid #3498db; }
         .kpi-card h3 { margin: 0; font-size: 0.7rem; color: #7f8c8d; text-transform: uppercase; font-weight: bold; }
         .kpi-card h1 { margin: 5px 0 0 0; font-size: 1.6rem; color: #2c3e50; }
+        .kpi-card small { display:block; font-size: 0.8rem; color: #95a5a6; margin-top:5px; }
 
         /* TABLA */
         .table-responsive { overflow-x: auto; display: none; margin-bottom: 20px; background: white; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); padding: 10px; }
@@ -46,12 +47,22 @@
         .chart-card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         @media (max-width: 600px) { .charts-container { grid-template-columns: 1fr; } }
 
-        /* TIMELINE */
-        .timeline-item { display: flex; gap: 15px; margin-bottom: 20px; position: relative; animation: fadeIn 0.5s; }
+        /* TIMELINE (LISTA) */
+        .timeline-item { display: flex; gap: 15px; margin-bottom: 20px; position: relative; animation: fadeIn 0.5s; cursor: pointer; transition: transform 0.2s; }
+        .timeline-item:hover { transform: translateX(5px); }
         .timeline-icon { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; flex-shrink: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 2; }
         .timeline-content { background: white; padding: 15px; border-radius: 12px; flex: 1; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .timeline-line { position: absolute; left: 20px; top: 40px; bottom: -30px; width: 2px; background: #ddd; z-index: 1; }
         .timeline-item:last-child .timeline-line { display: none; }
+
+        /* MODAL POPUP */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); animation: fadeIn 0.3s; }
+        .modal-content { background-color: #fefefe; margin: 10% auto; padding: 20px; border: 1px solid #888; width: 90%; max-width: 500px; border-radius: 12px; position: relative; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+        .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .close-btn:hover { color: black; }
+        .modal-header { border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
+        .modal-body p { margin: 8px 0; font-size: 1rem; color: #333; }
+        .modal-img { width: 100%; border-radius: 8px; margin-top: 15px; max-height: 300px; object-fit: cover; border: 1px solid #ddd; }
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
@@ -68,17 +79,20 @@
         <div class="form-group">
             <label>Tipo de Análisis:</label>
             <select id="tipoReporte" onchange="cambiarInputBusqueda()">
-                <option value="INSEMINADOR">💉 Rendimiento Inseminador</option>
                 <option value="CERDA">🐷 Historia Clínica (Por Cerda)</option>
+                <option value="INSEMINADOR">💉 Rendimiento Inseminador</option>
                 <option value="PUESTO">📍 Análisis por Corral/Puesto</option>
                 <option value="GENERAL">🏢 Resumen General</option>
             </select>
         </div>
 
         <div class="form-group" id="group-busqueda">
-            <label id="labelBusqueda">Selecciona:</label>
-            <input type="text" id="valorBusqueda" placeholder="Ej. 4151" style="display:none;">
-            <select id="selectOpciones"></select>
+            <label id="labelBusqueda">Escribe el ID de la Cerda:</label>
+            
+            <input type="text" id="valorBusqueda" list="lista-sugerencias" placeholder="Ej. 4151" style="display:none;">
+            <datalist id="lista-sugerencias"></datalist>
+            
+            <select id="selectOpciones" style="display:none;"></select>
         </div>
 
         <div style="display:flex; gap:10px; margin-bottom:10px;">
@@ -131,17 +145,28 @@
         <div class="chart-card"><canvas id="chartTendencia"></canvas></div>
     </div>
 
-    <h3 id="tituloTimeline" style="display:none; color:#34495e; padding-left:5px;">📜 Registros Encontrados</h3>
+    <h3 id="tituloTimeline" style="display:none; color:#34495e; padding-left:5px;">📜 Registros Encontrados (Clic para ver)</h3>
     <div id="resultadosTimeline"></div>
 
 </div>
 
+<div id="modalDetalle" class="modal">
+    <div class="modal-content">
+        <span class="close-btn" onclick="cerrarModal()">&times;</span>
+        <div class="modal-header">
+            <h2 id="modalTitulo" style="margin:0; color:#2c3e50;">Detalle</h2>
+        </div>
+        <div class="modal-body" id="modalCuerpo"></div>
+    </div>
+</div>
+
 <script>
-    const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbw9euXc8iHBWtY6FwQUTw8tz17OXhdzhI_JziXHXN3Kj_1DWtMJ3As0AF71IcVXKNphRg/exec";
+    const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbz3T-6EbtBDg6LZqMbxNFQuvmntEAKkv0gg3btvVfm_-Gi0dZTIv-QMsY2H2oIu_ywJMg/exec";
     
     let dbRegistros = [];
     let listaInseminadores = new Set();
     let listaPuestos = new Set();
+    let listaCerdas = new Set(); // Para el buscador inteligente
     let chart1 = null; 
     let chart2 = null;
 
@@ -169,9 +194,19 @@
     function extraerDatosUnicos(regs) {
         listaInseminadores.clear();
         listaPuestos.clear();
+        listaCerdas.clear();
+
         regs.forEach(r => {
             if(r[13] && r[13].toString().trim() !== "") listaInseminadores.add(r[13].toString().toUpperCase().trim()); 
-            if(r[12] && r[12].toString().trim() !== "") listaPuestos.add(r[12].toString().toUpperCase().trim());       
+            if(r[12] && r[12].toString().trim() !== "") listaPuestos.add(r[12].toString().toUpperCase().trim());
+            if(r[1]) listaCerdas.add(r[1].toString().trim());
+        });
+
+        // Llenar buscador inteligente de cerdas
+        let dl = document.getElementById('lista-sugerencias');
+        dl.innerHTML = "";
+        Array.from(listaCerdas).sort().forEach(id => {
+            dl.innerHTML += `<option value="${id}">`;
         });
     }
 
@@ -190,6 +225,7 @@
         if (tipo === "CERDA") {
             label.innerText = "Escribe el ID de la Cerda:";
             inputTxt.style.display = "block";
+            inputTxt.setAttribute('list', 'lista-sugerencias'); // Activar sugerencias
             selectOpt.style.display = "none";
         } else if (tipo === "INSEMINADOR") {
             label.innerText = "Selecciona Inseminador:";
@@ -234,7 +270,6 @@
         document.getElementById('resultadosTimeline').innerHTML = "";
         document.getElementById('tablaResumenSection').style.display = 'none';
 
-        // REPORTE TABLA DE TODOS LOS PUESTOS
         if (tipo === "PUESTO" && verTodosPuestos) {
             generarTablaResumenPuestos(ignorarFechas);
             return;
@@ -266,18 +301,12 @@
         });
 
         // LÓGICA DE KPI
-        let partosRelacionados = [];
-        let muertesRelacionadas = [];
-
         if (tipo === "INSEMINADOR") {
             let cerdasInseminadas = new Set(resultados.filter(r => r[2] === "SERVICIO").map(r => r[1]));
-            
-            // Buscar Partos y Muertes de esas cerdas (incluso fuera del rango de fechas del servicio)
-            partosRelacionados = dbRegistros.filter(r => r[2] === "PARTO" && cerdasInseminadas.has(r[1]));
-            muertesRelacionadas = dbRegistros.filter(r => r[2] === "MUERTE" && cerdasInseminadas.has(r[1]));
-            
+            let partosRelacionados = dbRegistros.filter(r => r[2] === "PARTO" && cerdasInseminadas.has(r[1]));
+            let muertesRelacionadas = dbRegistros.filter(r => r[2] === "MUERTE" && cerdasInseminadas.has(r[1]));
             mostrarKPIsInseminador(resultados, partosRelacionados, muertesRelacionadas);
-            renderizarGraficosInseminador(resultados, partosRelacionados); // Gráfico especial
+            renderizarGraficosInseminador(resultados, partosRelacionados); 
         } else {
             mostrarKPIs(resultados, tipo);
             renderizarGraficosStandard(resultados);
@@ -316,10 +345,36 @@
         document.getElementById('kpiSection').innerHTML = html;
     }
 
-    // --- KPIs GENÉRICOS ---
+    // --- KPIs GENERALES + PESOS ---
     function mostrarKPIs(data, tipo) {
         let kpiHTML = "";
         let total = data.length;
+
+        // Variables para promedios
+        let sumPesoParto = 0, countPartoPeso = 0;
+        let sumPesoDestete = 0, countDestetePeso = 0;
+        let totalMuertes = 0;
+
+        data.forEach(r => {
+            // Contar muertes
+            if (r[2] === "MUERTE" || r[2] === "BAJA_LACTANCIA") totalMuertes++;
+            if (r[2] === "PARTO") {
+                let m = r[5].match(/Muertos: (\d+)/);
+                if (m) totalMuertes += parseInt(m[1]);
+                // Peso Parto (Notas)
+                let mp = r[5].match(/Peso.*: (\d+(\.\d+)?)/); 
+                if (mp) { sumPesoParto += parseFloat(mp[1]); countPartoPeso++; }
+            }
+            // Peso Destete (Columna 11)
+            if (r[2] === "DESTETE" && r[11]) {
+                let pd = parseFloat(r[11]);
+                if (pd > 0) { sumPesoDestete += pd; countDestetePeso++; }
+            }
+        });
+
+        // Promedios
+        let promParto = countPartoPeso > 0 ? (sumPesoParto / countPartoPeso).toFixed(1) : 0;
+        let promDestete = countDestetePeso > 0 ? (sumPesoDestete / countDestetePeso).toFixed(1) : 0;
 
         if (tipo === "CERDA") {
             let partos = data.filter(r => r[2] === "PARTO");
@@ -328,35 +383,19 @@
                 return acc + (m ? parseInt(m[1]) : 0);
             }, 0);
             kpiHTML += cardKPI("Eventos", total);
-            kpiHTML += cardKPI("Total Partos", partos.length, "#e67e22");
+            kpiHTML += cardKPI("Partos", partos.length, "#e67e22");
             kpiHTML += cardKPI("Nacidos Vivos", totalNacidos, "#27ae60");
+            kpiHTML += cardKPI("Total Muertes/Bajas", totalMuertes, "#c0392b"); // Nuevo
+            kpiHTML += cardKPI("Prom. Peso Parto", promParto + "kg", "#34495e"); // Nuevo
+            kpiHTML += cardKPI("Prom. Peso Destete", promDestete + "kg", "#34495e"); // Nuevo
         } 
-        else if (tipo === "PUESTO") {
-            let nacidos = 0;
-            let muertes = 0;
-            data.forEach(r => {
-                if (r[2] === "PARTO") {
-                    let m = r[5].match(/Vivos: (\d+)/);
-                    if (m) nacidos += parseInt(m[1]);
-                    let mm = r[5].match(/Muertos: (\d+)/);
-                    if (mm) muertes += parseInt(mm[1]);
-                }
-                if (r[2] === "MUERTE") muertes++;
-                if (r[2] === "BAJA_LACTANCIA") {
-                    let m = r[5].match(/Cantidad: (\d+)/);
-                    muertes += m ? parseInt(m[1]) : 1;
-                }
-            });
-            kpiHTML += cardKPI("Actividad", total);
-            kpiHTML += cardKPI("Nacidos Aquí", nacidos, "#27ae60");
-            kpiHTML += cardKPI("Mortalidad Total", muertes, "#c0392b");
-        }
         else { 
-            let muertes = data.filter(r => r[2].includes("MUERTE") || r[2].includes("BAJA")).length;
             let ventas = data.filter(r => r[2] === "VENTA").length;
             kpiHTML += cardKPI("Movimientos", total);
-            kpiHTML += cardKPI("Bajas", muertes, "#c0392b");
+            kpiHTML += cardKPI("Muertes Totales", totalMuertes, "#c0392b");
             kpiHTML += cardKPI("Ventas", ventas, "#27ae60");
+            if(promParto > 0) kpiHTML += cardKPI("Peso Prom. Nacido", promParto + "kg", "#e67e22");
+            if(promDestete > 0) kpiHTML += cardKPI("Peso Prom. Destete", promDestete + "kg", "#8e44ad");
         }
         document.getElementById('kpiSection').innerHTML = kpiHTML;
     }
@@ -365,12 +404,9 @@
         return `<div class="kpi-card" style="border-top-color:${color}"><h3>${titulo}</h3><h1 style="color:${color}">${valor}</h1></div>`;
     }
 
-    // --- GRÁFICOS PARA INSEMINADOR (Vivos vs Muertos) ---
+    // --- GRÁFICOS ---
     function renderizarGraficosInseminador(servicios, partos) {
-        if(chart1) chart1.destroy();
-        if(chart2) chart2.destroy();
-
-        // 1. Gráfico Calidad de Nacimiento (Vivos vs Muertos)
+        if(chart1) chart1.destroy(); if(chart2) chart2.destroy();
         let vivos = 0, muertos = 0;
         partos.forEach(r => {
             let mVivos = r[5].match(/Vivos: (\d+)/);
@@ -378,63 +414,35 @@
             if(mVivos) vivos += parseInt(mVivos[1]);
             if(mMuertos) muertos += parseInt(mMuertos[1]);
         });
-
         let ctx2 = document.getElementById('chartDistribucion').getContext('2d');
         chart2 = new Chart(ctx2, {
             type: 'doughnut',
-            data: {
-                labels: ['Nacidos Vivos', 'Nacidos Muertos'],
-                datasets: [{ data: [vivos, muertos], backgroundColor: ['#2ecc71', '#95a5a6'] }]
-            },
+            data: { labels: ['Nacidos Vivos', 'Nacidos Muertos'], datasets: [{ data: [vivos, muertos], backgroundColor: ['#2ecc71', '#95a5a6'] }] },
             options: { plugins: { title: { display: true, text: 'Calidad de Nacimientos' } } }
         });
-
-        // 2. Gráfico Servicios vs Partos (Barras simples)
         let ctx1 = document.getElementById('chartTendencia').getContext('2d');
         chart1 = new Chart(ctx1, {
             type: 'bar',
-            data: {
-                labels: ['Servicios', 'Partos Efectivos'],
-                datasets: [{
-                    label: 'Cantidad',
-                    data: [servicios.length, partos.length],
-                    backgroundColor: ['#8e44ad', '#e67e22']
-                }]
-            },
-            options: { 
-                scales: { y: { beginAtZero: true } },
-                plugins: { title: { display: true, text: 'Eficiencia Reproductiva' } } 
-            }
+            data: { labels: ['Servicios', 'Partos Efectivos'], datasets: [{ label: 'Cantidad', data: [servicios.length, partos.length], backgroundColor: ['#8e44ad', '#e67e22'] }] },
+            options: { scales: { y: { beginAtZero: true } }, plugins: { title: { display: true, text: 'Eficiencia Reproductiva' } } }
         });
     }
 
-    // --- GRÁFICOS STANDARD ---
     function renderizarGraficosStandard(data) {
-        if(chart1) chart1.destroy();
-        if(chart2) chart2.destroy();
+        if(chart1) chart1.destroy(); if(chart2) chart2.destroy();
         if (data.length === 0) return;
-
         let accionesCount = {};
         data.forEach(r => { accionesCount[r[2]] = (accionesCount[r[2]] || 0) + 1; });
-
         let ctx2 = document.getElementById('chartDistribucion').getContext('2d');
         chart2 = new Chart(ctx2, {
             type: 'doughnut',
-            data: {
-                labels: Object.keys(accionesCount),
-                datasets: [{ data: Object.values(accionesCount), backgroundColor: ['#3498db', '#e74c3c', '#f1c40f', '#2ecc71', '#9b59b6'] }]
-            },
+            data: { labels: Object.keys(accionesCount), datasets: [{ data: Object.values(accionesCount), backgroundColor: ['#3498db', '#e74c3c', '#f1c40f', '#2ecc71', '#9b59b6'] }] },
             options: { plugins: { title: { display: true, text: 'Distribución de Eventos' } } }
         });
-
-        // Dummy chart temporal (puedes añadir meses si quieres)
         let ctx1 = document.getElementById('chartTendencia').getContext('2d');
         chart1 = new Chart(ctx1, {
             type: 'bar',
-            data: {
-                labels: ['Total Eventos'],
-                datasets: [{ label: 'Registros', data: [data.length], backgroundColor: '#3498db' }]
-            },
+            data: { labels: ['Total Eventos'], datasets: [{ label: 'Registros', data: [data.length], backgroundColor: '#3498db' }] },
             options: { plugins: { title: { display: true, text: 'Actividad Total' } } }
         });
     }
@@ -442,41 +450,28 @@
     function generarTablaResumenPuestos(ignorarFechas) {
         let fInicio = document.getElementById('fechaInicio').value;
         let fFin = document.getElementById('fechaFin').value;
-        
         let stats = {}; 
-
         dbRegistros.forEach(row => {
             if (!ignorarFechas && !fechaEnRango(row[0], fInicio, fFin)) return;
-            
             let p = row[12] ? row[12].toString().toUpperCase().trim() : "SIN_PUESTO";
             if (!stats[p]) stats[p] = { movimientos: 0, nacidos: 0, muertes: 0 };
-
             stats[p].movimientos++;
-
             if (row[2] === "PARTO") {
                 let m = row[5].match(/Vivos: (\d+)/);
                 if (m) stats[p].nacidos += parseInt(m[1]);
                 let mm = row[5].match(/Muertos: (\d+)/);
                 if (mm) stats[p].muertes += parseInt(mm[1]);
             }
-
             if (row[2] === "MUERTE") stats[p].muertes++;
             if (row[2] === "BAJA_LACTANCIA") {
                 let m = row[5].match(/Cantidad: (\d+)/);
                 stats[p].muertes += m ? parseInt(m[1]) : 1;
             }
         });
-
         let html = "";
         Object.keys(stats).sort().forEach(p => {
-            html += `<tr>
-                <td><b>${p}</b></td>
-                <td><b style="color:#27ae60;">${stats[p].nacidos}</b></td>
-                <td><b style="color:#c0392b;">${stats[p].muertes}</b></td>
-                <td>${stats[p].movimientos}</td>
-            </tr>`;
+            html += `<tr><td><b>${p}</b></td><td><b style="color:#27ae60;">${stats[p].nacidos}</b></td><td><b style="color:#c0392b;">${stats[p].muertes}</b></td><td>${stats[p].movimientos}</td></tr>`;
         });
-
         document.getElementById('tablaBody').innerHTML = html;
         document.getElementById('tablaResumenSection').style.display = 'block';
     }
@@ -489,7 +484,7 @@
         }
         data.sort((a,b) => new Date(b[0]) - new Date(a[0]));
 
-        container.innerHTML = data.map(row => {
+        container.innerHTML = data.map((row, index) => {
             let d = new Date(row[0]);
             let fecha = isNaN(d.getTime()) ? "S/F" : d.toLocaleDateString();
             let color = "#95a5a6"; let icon = "fa-circle";
@@ -500,8 +495,11 @@
             else if(accion === "PARTO") { color = "#d35400"; icon = "fa-baby"; }
             else if(accion === "SERVICIO") { color = "#8e44ad"; icon = "fa-syringe"; }
 
+            // Guardamos el objeto fila completo para el modal
+            let rowString = encodeURIComponent(JSON.stringify(row));
+
             return `
-            <div class="timeline-item">
+            <div class="timeline-item" onclick="abrirModalDetalle('${rowString}')">
                 <div class="timeline-line"></div>
                 <div class="timeline-icon" style="background-color:${color}"><i class="fas ${icon}"></i></div>
                 <div class="timeline-content">
@@ -515,6 +513,48 @@
                 </div>
             </div>`;
         }).join("");
+    }
+
+    // --- MODAL ---
+    function abrirModalDetalle(rowString) {
+        let row = JSON.parse(decodeURIComponent(rowString));
+        let modal = document.getElementById('modalDetalle');
+        let cuerpo = document.getElementById('modalCuerpo');
+        let titulo = document.getElementById('modalTitulo');
+        
+        let d = new Date(row[0]);
+        let fecha = isNaN(d.getTime()) ? "Fecha desconocida" : d.toLocaleDateString();
+
+        titulo.innerText = `${row[2]} - ID ${row[1]}`;
+        
+        let contenido = `
+            <p><strong>📅 Fecha:</strong> ${fecha}</p>
+            <p><strong>📍 Ubicación:</strong> ${row[3]} (${row[12] || 'Sin subpuesto'})</p>
+            <p><strong>📝 Notas:</strong> ${row[5] || 'Ninguna'}</p>
+            <p><strong>🏷️ Chapeta:</strong> ${row[10] || 'N/A'}</p>
+            <p><strong>⚖️ Peso:</strong> ${row[11] || 0} kg</p>
+        `;
+
+        if(row[13]) contenido += `<p><strong>💉 Inseminador:</strong> ${row[13]}</p>`;
+        
+        // Foto (Columna 9, índice 9)
+        if(row[9] && row[9] !== "Sin Foto" && row[9].startsWith("http")) {
+            contenido += `<img src="${row[9]}" class="modal-img" alt="Foto del registro">`;
+        }
+
+        cuerpo.innerHTML = contenido;
+        modal.style.display = "block";
+    }
+
+    function cerrarModal() {
+        document.getElementById('modalDetalle').style.display = "none";
+    }
+
+    window.onclick = function(event) {
+        let modal = document.getElementById('modalDetalle');
+        if (event.target == modal) {
+            modal.style.display = "none";
+        }
     }
 </script>
 
