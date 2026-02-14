@@ -3,495 +3,360 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Granja Pro 🐷</title>
+    <title>Granja Pro v4.10 🐷</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        /* ESTILOS BASE */
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; margin: 0; padding-bottom: 90px; }
+        /* --- ESTILOS VISUALES ORIGINALES --- */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f0f2f5; margin: 0; padding-bottom: 90px; }
         header { background-color: #2c3e50; color: white; padding: 15px; text-align: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
         .search-container { padding: 10px 15px; background: #2c3e50; margin-bottom: 10px; }
-        .search-box { width: 100%; padding: 10px; border-radius: 20px; border: none; font-size: 1rem; text-align: center; outline: none; }
+        .search-box { width: 100%; padding: 12px; border-radius: 20px; border: none; font-size: 1rem; text-align: center; outline: none; }
         .tab-content { display: none; padding: 15px; animation: fadeIn 0.3s; }
         .tab-content.active { display: block; }
-        .sub-view { display: none; } 
         
-        /* DASHBOARD */
         .grid-dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .card-dash { background: white; padding: 15px; border-radius: 12px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: pointer; position: relative; overflow: hidden;}
-        .card-dash:active { transform: scale(0.98); }
-        .card-dash h3 { margin: 0; font-size: 0.75rem; color: #7f8c8d; text-transform: uppercase; }
-        .card-dash h2 { margin: 10px 0 0 0; font-size: 2rem; color: #2c3e50; }
+        .card-dash { background: white; padding: 15px; border-radius: 12px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: pointer; border-left: 5px solid transparent; }
+        .card-maestra { grid-column: span 2; background: linear-gradient(135deg, #2c3e50, #34495e); color: white; }
+        .card-lechones { background: linear-gradient(135deg, #f39c12, #d35400); color: white; }
+        .card-servicio { background: linear-gradient(135deg, #8e44ad, #9b59b6); color: white; }
         
-        /* TARJETAS ESPECIALES */
-        .card-maestra { grid-column: span 2; background: linear-gradient(135deg, #2c3e50, #34495e); color: white; border: 2px solid #f1c40f; }
-        .card-total { grid-column: span 1; background: linear-gradient(135deg, #2ecc71, #27ae60); color: white; }
-        .card-lechones { grid-column: span 1; background: linear-gradient(135deg, #f39c12, #d35400); color: white; }
-        .card-maestra h2, .card-maestra h3, .card-total h2, .card-total h3, .card-lechones h2, .card-lechones h3 { color: white !important; }
+        .card-dash h3 { margin: 0; font-size: 0.75rem; text-transform: uppercase; opacity: 0.8; }
+        .card-dash h2 { margin: 10px 0 0 0; font-size: 2rem; }
+        .card-dash h1 { margin: 5px 0 0 0; font-size: 3rem; }
 
-        /* ALERTAS DE SEMÁFORO */
-        .alerta-roja { border-left: 5px solid #c0392b !important; background-color: #fadbd8; }
-        .alerta-amarilla { border-left: 5px solid #f1c40f !important; background-color: #fcf3cf; }
-        .status-dot { position: absolute; top: 10px; right: 10px; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-        .dot-red { background-color: #c0392b; animation: pulse 2s infinite; }
-        .dot-yellow { background-color: #f1c40f; }
-        @keyframes pulse { 0% { transform: scale(0.95); } 70% { transform: scale(1); } 100% { transform: scale(0.95); } }
-
-        /* FORMULARIO */
         .card-form { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-        label { display: block; font-weight: 600; margin-top: 15px; color: #34495e; font-size: 0.95rem; }
-        input, select { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #bdc3c7; border-radius: 8px; box-sizing: border-box; background: #fff; font-size: 16px; }
+        label { display: block; font-weight: 600; margin-top: 15px; color: #34495e; font-size: 0.9rem; }
+        input, select { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #bdc3c7; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+        .btn-primary { width: 100%; padding: 15px; background-color: #2980b9; color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; margin-top: 25px; cursor: pointer; }
         
-        /* ESTILOS LOTE (NUEVO) */
-        .switch-container { display: flex; justify-content: center; margin-bottom: 20px; background: #ecf0f1; padding: 5px; border-radius: 20px; }
-        .switch-btn { flex: 1; padding: 10px; text-align: center; border-radius: 15px; cursor: pointer; font-weight: bold; color: #7f8c8d; }
-        .switch-btn.active { background: #3498db; color: white; shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .item-lista { background: white; padding: 15px; margin-bottom: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border-left: 5px solid #2ecc71; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; }
         
-        .table-lote { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        .table-lote th { background: #2c3e50; color: white; padding: 8px; font-size: 0.8rem; }
-        .table-lote td { padding: 5px; border-bottom: 1px solid #eee; }
-        .table-lote input { margin: 0; padding: 8px; font-size: 0.9rem; }
+        /* BOTONES DE ACCIÓN */
+        .btn-action-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
+        .btn-action { padding: 12px; border: none; border-radius: 8px; font-weight: bold; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; }
+        .btn-orange { background-color: #e67e22; }
+        .btn-blue { background-color: #2980b9; }
+        .btn-purple { background-color: #8e44ad; grid-column: span 2; }
+        /* Botones dinámicos grandes */
+        .btn-parto { background-color: #d35400; grid-column: span 2; margin-top: 5px; }
+        .btn-destete { background-color: #16a085; grid-column: span 2; margin-top: 5px; } /* Nuevo color verde azulado */
 
-        /* OTROS */
-        .parto-section { background-color: #fff3cd; border: 1px solid #ffeeba; padding: 15px; border-radius: 8px; margin-top: 15px; display: none; }
-        .parto-row { display: flex; gap: 15px; }
-        .input-group { display: flex; gap: 10px; align-items: flex-end; }
-        .btn-add { background: #27ae60; color: white; border: none; padding: 12px 15px; border-radius: 8px; cursor: pointer; font-size: 1.2rem; height: 46px; margin-top: 5px; }
-        button.btn-primary { width: 100%; padding: 15px; background-color: #2980b9; color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; margin-top: 25px; cursor: pointer; }
-        .btn-edit { background-color: #f39c12; color: white; padding: 10px; width: 100%; border:none; border-radius:8px; font-weight:bold; cursor:pointer; margin-top:10px; }
-        
-        .item-lista { background: white; padding: 15px; margin-bottom: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; border-left: 5px solid transparent; }
-        .badge-lechones { background: #e67e22; color: white; font-size: 0.75rem; padding: 2px 6px; border-radius: 10px; margin-left: 5px; }
-        .tag-chapeta { background: #3498db; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; margin-right: 5px; }
-        .tag-dias { font-size: 0.75rem; font-weight: bold; color: #555; background: #eee; padding: 2px 5px; border-radius: 4px; }
-        .timeline { list-style: none; padding: 0; margin-top: 20px; }
-        .timeline li { border-left: 2px solid #bdc3c7; padding-left: 20px; position: relative; margin-bottom: 20px; }
-        .timeline li::before { content: ''; width: 10px; height: 10px; background: #2980b9; border-radius: 50%; position: absolute; left: -6px; top: 5px; }
-        .nav-bar { position: fixed; bottom: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid #eee; z-index: 90; }
-        .nav-btn { background: none; border: none; font-size: 1.5rem; color: #bdc3c7; display: flex; flex-direction: column; align-items: center; }
+        .nav-bar { position: fixed; bottom: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid #eee; z-index: 100; }
+        .nav-btn { background: none; border: none; font-size: 1.5rem; color: #bdc3c7; cursor: pointer; }
         .nav-btn.active { color: #2980b9; }
-        .btn-back { background: none; border: none; color: #2980b9; font-size: 1rem; cursor: pointer; margin-bottom: 15px; display: flex; align-items: center; gap: 5px; font-weight: 600; }
-        .loader { text-align: center; padding: 20px; display: none; color: #7f8c8d; }
+
+        .special-section { background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 15px; border: 1px solid #eee; }
+        .preview-img { width: 100%; max-height: 200px; object-fit: cover; border-radius: 8px; margin-top: 10px; display: none; }
+        
+        .lechon-item { display: grid; grid-template-columns: 40px 1fr 1fr 40px; gap: 5px; align-items: center; margin-top: 8px; background: white; padding: 5px; border-radius: 5px; border: 1px solid #eee; }
+        .lechon-item input[type="checkbox"] { width: 20px; height: 20px; margin: 0 auto; cursor: pointer; }
+
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
 <body>
 
 <header>
-    <h2>🐷 Granja Manager</h2>
-    <div class="search-container" id="search-bar-container" style="display:none;">
-        <input type="text" id="inputBusqueda" class="search-box" placeholder="🔍 Buscar Tatuaje o Chapeta..." onkeyup="buscarCerdo()">
+    <h2>🐷 Granja Manager Pro</h2>
+    <div class="search-container">
+        <input type="text" id="inputBusqueda" class="search-box" placeholder="🔍 Tatuaje o Chapeta..." onkeyup="buscarCerdo()">
     </div>
 </header>
 
 <div id="tab-dashboard" class="tab-content active">
-    <div class="loader" id="loader-dash">⏳ Calculando fechas...</div>
+    <div id="loader-dash" style="text-align:center; padding:40px;">⏳ Sincronizando datos...</div>
     <div id="view-dashboard-summary" style="display:none;">
         <div class="grid-dashboard" id="dashboard-container"></div>
-        <div style="text-align:center; margin-top: 20px;">
-            <button onclick="location.reload()" style="background:none; border:none; color:#2980b9; font-weight:bold;">🔄 Actualizar</button>
-        </div>
     </div>
-    <div id="view-list" class="sub-view">
-        <button class="btn-back" onclick="volverAlTablero()"><i class="fas fa-arrow-left"></i> Volver</button>
-        <h2 id="titulo-lista" style="color:#2c3e50; border-bottom: 2px solid #2ecc71; padding-bottom: 10px;">Listado</h2>
+
+    <div id="view-list" style="display:none;">
+        <button onclick="volverAlTablero()" style="border:none; background:none; color:#2980b9; font-weight:bold; margin-bottom:15px;"><i class="fas fa-arrow-left"></i> Volver</button>
+        <h3 id="titulo-lista">Listado</h3>
         <div id="contenedor-lista"></div>
     </div>
-    <div id="view-detail" class="sub-view">
-        <button class="btn-back" onclick="volverALista()"><i class="fas fa-arrow-left"></i> Volver</button>
-        <div id="contenedor-detalle" class="card-form"></div>
+
+    <div id="view-detail" style="display:none;">
+        <button onclick="volverALista()" style="border:none; background:none; color:#2980b9; font-weight:bold; margin-bottom:15px;"><i class="fas fa-arrow-left"></i> Volver</button>
+        <div id="contenedor-detalle"></div>
     </div>
 </div>
 
 <div id="tab-registro" class="tab-content">
     <div class="card-form">
-        <div class="switch-container">
-            <div id="mode-single" class="switch-btn active" onclick="cambiarModo('single')">Individual</div>
-            <div id="mode-batch" class="switch-btn" onclick="cambiarModo('batch')">Por Lote 🚀</div>
+        <h3>Nuevo Registro</h3>
+        <label>Acción:</label>
+        <select id="accion" onchange="verificarAccion()">
+            <option value="INGRESO">🟢 Ingreso</option>
+            <option value="SERVICIO">💉 SERVICIO</option>
+            <option value="PARTO">🐷 PARTO</option>
+            <option value="DESTETE">🥣 DESTETE</option>
+            <option value="TRASLADO">🔵 Traslado</option>
+            <option value="VENTA">💰 Venta</option>
+            <option value="MUERTE">🔴 Muerte</option>
+            <option value="OBSERVACION">📝 Observación / Peso</option>
+        </select>
+
+        <label>Tatuaje (ID):</label>
+        <input type="text" id="tatuaje" placeholder="ID del animal">
+
+        <div style="display:flex; gap:10px;">
+            <div style="flex:1;"><label>Chapeta:</label><input type="text" id="chapeta" placeholder="N°"></div>
+            <div style="flex:1;"><label>Peso (kg):</label><input type="number" id="peso" placeholder="0.0"></div>
         </div>
 
-        <h3 id="titulo-form" style="margin-top:0; color:#2c3e50;">Nuevo Ingreso</h3>
-
-        <div style="background:#f8f9fa; padding:10px; border-radius:8px; margin-bottom:15px; border:1px solid #eee;">
-            <h4 style="margin:0 0 10px 0; color:#7f8c8d;">Datos Generales</h4>
-            <label style="margin-top:0">Acción:</label>
-            <select id="accion" onchange="verificarAccion()">
-                <option value="INGRESO">🟢 Nuevo Ingreso</option>
-                <option value="PARTO">🐷 PARTO</option>
-                <option value="TRASLADO">🔵 Traslado</option>
-                <option value="VENTA">💰 Venta</option>
-                <option value="MUERTE">🔴 Muerte</option>
-            </select>
-
-            <div id="section-fase">
-                <label>Ubicación / Fase:</label>
-                <div class="input-group">
-                    <select id="fase"></select>
-                    <button class="btn-add" onclick="agregarNuevaFase()">+</button>
-                </div>
+        <div id="section-fase">
+            <label>Ubicación / Fase:</label>
+            <div style="display:flex; gap:5px;">
+                <select id="fase" style="flex:1"></select>
+                <button class="btn-blue" onclick="agregarFase()" style="width:50px; margin-top:5px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:1.2rem;">+</button>
             </div>
+            <label>Sub-Puesto (Jaula/Corral):</label>
+            <input type="text" id="subpuesto" placeholder="Donde se encuentra">
+        </div>
 
-            <label>Genealogía (Padres del lote):</label>
+        <div id="section-parto" style="display:none;" class="special-section">
+            <h4 style="margin:0 0 10px 0; color:#d35400;">Registro de Camada</h4>
             <div style="display:flex; gap:10px;">
-                 <select id="madre" style="flex:1"><option value="">Madre</option></select>
-                 <input type="text" id="padre" placeholder="Padre" style="flex:1; margin-top:5px;">
+                <div style="flex:1;"><label>Vivos:</label><input type="number" id="vivos" placeholder="0"></div>
+                <div style="flex:1;"><label>Muertos:</label><input type="number" id="muertos" placeholder="0"></div>
             </div>
+            <label>Peso Total Nacimiento:</label><input type="number" id="peso_nacimiento" placeholder="0.0">
         </div>
 
-        <div id="form-single">
-            <label>Tatuaje (ID):</label>
-            <input type="text" id="tatuaje" placeholder="Ej. TAT-504" style="font-weight:bold; border: 2px solid #3498db;">
-            <label>Chapeta:</label>
-            <input type="text" id="chapeta" placeholder="Ej. 105">
+        <div id="section-destete" style="display:none;" class="special-section">
+            <h4 style="margin:0 0 10px 0; color:#16a085;">Movimiento de Lechones</h4>
+            <label>Cant. Destetados:</label><input type="number" id="destetados" onkeyup="generarInputsLechones()">
             
-            <div id="section-parto" class="parto-section">
-                <div class="parto-row">
-                    <div style="flex:1"><label>Vivos</label><input type="number" id="vivos"></div>
-                    <div style="flex:1"><label>Muertos</label><input type="number" id="muertos"></div>
-                </div>
-            </div>
-
-            <div style="margin-top:15px; display:flex; align-items:center; gap:10px;">
-                 <input type="checkbox" id="esReproductora" style="width:20px; height:20px;">
-                 <label style="margin:0;">Es Futura Madre</label>
-            </div>
-            <label>Notas / Peso:</label>
-            <input type="text" id="notas" placeholder="Observaciones...">
-            <div class="file-upload-wrapper" id="drop-zone" onclick="document.getElementById('fotoInput').click()" style="margin-top:15px; border:2px dashed #ccc; padding:15px; text-align:center;">
-                <div id="text-foto">📸 Toca para foto</div>
-                <input type="file" id="fotoInput" accept="image/*" capture="environment" onchange="procesarFoto()" style="display:none;">
-            </div>
-            <button id="btnEnviar" class="btn-primary" onclick="enviarDatos()">Guardar 💾</button>
+            <label style="color:red">📍 Destino Lechones (Fase):</label>
+            <select id="subpuesto-lechones"></select>
+            
+            <div id="contenedor-inputs-lechones" style="margin-top:10px;"></div>
         </div>
 
-        <div id="form-batch" style="display:none;">
-            <label>Cantidad de Animales:</label>
-            <div style="display:flex; gap:10px;">
-                <input type="number" id="loteCantidad" placeholder="Ej. 10" style="flex:1">
-                <button onclick="generarTablaLote()" style="background:#2c3e50; color:white; border:none; border-radius:8px; padding:0 20px;">Generar</button>
-            </div>
-            
-            <div id="lote-container" style="margin-top:15px; overflow-x:auto;">
-                </div>
-            
-            <button id="btnEnviarLote" class="btn-primary" onclick="enviarLote()" style="display:none; background:#8e44ad;">Guardar Lote Completo 🚀</button>
-        </div>
+        <label>Foto:</label>
+        <button onclick="document.getElementById('inputFoto').click()" style="width:100%; padding:10px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px;"><i class="fas fa-camera"></i> Tomar Foto</button>
+        <input type="file" id="inputFoto" accept="image/*" capture="environment" style="display:none" onchange="previewFoto(this)">
+        <img id="preview" class="preview-img">
 
+        <label>Notas:</label>
+        <input type="text" id="notas" placeholder="Observaciones adicionales">
+        
+        <button id="btnEnviar" class="btn-primary" onclick="enviarDatos()">Guardar 💾</button>
     </div>
 </div>
 
 <div id="tab-reportes" class="tab-content">
-    <h2 style="text-align:center; margin-bottom:20px; color:#c0392b;">🚨 Historial</h2>
-    <div style="background:white; padding:10px; border-radius:8px; margin-bottom:15px;">
-        <select id="filtro-reporte" onchange="cargarReportes()" style="width:100%; padding:10px;">
-            <option value="TODOS">Ver Todo</option>
-            <option value="VENTA">💰 Ventas</option>
-            <option value="MUERTE">🔴 Muertes</option>
+    <div class="card-form">
+        <h3>📋 Historial de Salidas</h3>
+        <select id="filtro-reporte" onchange="cargarReportes()">
+            <option value="TODOS">Ver Todos</option>
+            <option value="VENTA">Ventas</option>
+            <option value="MUERTE">Muertes</option>
         </select>
+        <div id="contenedor-reportes" style="margin-top:15px;"></div>
     </div>
-    <div id="contenedor-reportes"></div>
 </div>
 
 <div class="nav-bar">
-    <button class="nav-btn active" onclick="verTab('dashboard', this)"><span>📊</span></button>
-    <button class="nav-btn" onclick="verTab('registro', this)"><span>➕</span></button>
-    <button class="nav-btn" onclick="verTab('reportes', this)"><span>📋</span></button>
+    <button class="nav-btn active" onclick="verTab('dashboard', this)"><i class="fas fa-th-large"></i></button>
+    <button class="nav-btn" onclick="verTab('registro', this)"><i class="fas fa-plus-circle"></i></button>
+    <button class="nav-btn" onclick="verTab('reportes', this)"><i class="fas fa-file-alt"></i></button>
 </div>
 
 <script>
-    // --- PEGA TU URL NUEVA AQUÍ ---
-    const URL_SCRIPT = "https://script.google.com/macros/s/AKfycby7jLrVJ4UROLkxbe1j2B6_AGvQM6rSgcw4FX8R0i0t0FPhmAmI5SiomTTomLbV75tscw/exec";
+    const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbzGSrL_Xz9NSbF0aILVx89F1DPeZKn65bOYdhidzUzTMLq6decnT-D6kR-j1mhKOvnTdg/exec";
+    let inventarioGlobal = [], historialCompleto = [], fotoBase64 = "", fotoMime = "";
 
-    // REGLAS TIEMPO
-    const REGLAS_MADRES = { "GESTACION": 100, "MATERNIDAD": 39, "DESCANSO": 6 };
-    const REGLAS_CERDOS = { "LACTANCIA": 24, "PRECEBO": 47, "LEVANTE": 81, "ENGORDE": 100 };
+    window.onload = () => {
+        fetch(URL_SCRIPT).then(r => r.json()).then(data => {
+            historialCompleto = data.registros;
+            inventarioGlobal = procesarInventario(data.registros);
+            procesarFases(data.fases);
+            pintarDashboard(inventarioGlobal);
+            document.getElementById('loader-dash').style.display='none';
+            document.getElementById('view-dashboard-summary').style.display='block';
+        });
+    };
 
-    let inventarioGlobal = []; 
-    let historialCompleto = [];
-    let fasesGlobales = [];
-    let imagenBase64 = ""; 
-    let categoriaActual = "";
-    let modoActual = "single";
-
-    window.onload = cargarDatos;
-
-    function verTab(tabId, btn) {
-        document.querySelectorAll('.tab-content').forEach(d => d.style.display='none');
-        document.getElementById('tab-'+tabId).style.display='block';
-        if(btn) document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    function verTab(id, btn) {
+        document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+        document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+        document.getElementById('tab-'+id).classList.add('active');
         if(btn) btn.classList.add('active');
-        if(tabId === 'dashboard') {
-            document.getElementById('search-bar-container').style.display = 'block';
-            limpiarFormulario();
-        } else if (tabId === 'reportes') {
-            document.getElementById('search-bar-container').style.display = 'none';
-            cargarReportes();
-        } else {
-            document.getElementById('search-bar-container').style.display = 'none';
-        }
+        if(id === 'reportes') cargarReportes();
+        if(id === 'registro') limpiarFormulario();
     }
 
-    // --- MODO LOTE LOGICA ---
-    function cambiarModo(modo) {
-        modoActual = modo;
-        document.querySelectorAll('.switch-btn').forEach(b => b.classList.remove('active'));
-        document.getElementById('mode-'+modo).classList.add('active');
-        
-        if(modo === 'single') {
-            document.getElementById('form-single').style.display = 'block';
-            document.getElementById('form-batch').style.display = 'none';
-        } else {
-            document.getElementById('form-single').style.display = 'none';
-            document.getElementById('form-batch').style.display = 'block';
-        }
-    }
-
-    function generarTablaLote() {
-        let cant = parseInt(document.getElementById('loteCantidad').value);
-        if(!cant || cant < 1) return alert("Ingresa una cantidad válida");
-        
-        let html = `<table class="table-lote">
-            <thead><tr><th>#</th><th>Tatuaje *</th><th>Chapeta</th><th>Peso/Nota</th></tr></thead>
-            <tbody>`;
-            
-        for(let i=0; i<cant; i++) {
-            html += `<tr>
-                <td>${i+1}</td>
-                <td><input type="text" class="inp-tat" placeholder="ID-${i+1}"></td>
-                <td><input type="text" class="inp-chap" placeholder="Opc"></td>
-                <td><input type="text" class="inp-nota" placeholder="Kg"></td>
-            </tr>`;
-        }
-        html += `</tbody></table>`;
-        document.getElementById('lote-container').innerHTML = html;
-        document.getElementById('btnEnviarLote').style.display = 'block';
-    }
-
-    function enviarLote() {
-        let inputsTat = document.querySelectorAll('.inp-tat');
-        let inputsChap = document.querySelectorAll('.inp-chap');
-        let inputsNota = document.querySelectorAll('.inp-nota');
-        
-        let listaAnimales = [];
-        let error = false;
-
-        inputsTat.forEach((inp, index) => {
-            let tat = inp.value.trim();
-            if(!tat) error = true;
-            listaAnimales.push({
-                tatuaje: tat,
-                chapeta: inputsChap[index].value.trim(),
-                notas: inputsNota[index].value.trim()
-            });
-        });
-
-        if(error) return alert("⚠️ Error: Todos los animales deben tener Tatuaje (ID).");
-
-        let comun = {
-            accion: document.getElementById('accion').value,
-            fase: document.getElementById('fase').value,
-            padre: document.getElementById('padre').value,
-            madre: document.getElementById('madre').value
-        };
-
-        let btn = document.getElementById('btnEnviarLote');
-        btn.disabled = true; btn.innerText = "Enviando Lote...";
-
-        fetch(URL_SCRIPT, {
-            method: 'POST', mode: 'no-cors',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                tipo: "BATCH",
-                comun: comun,
-                animales: listaAnimales
-            })
-        }).then(() => {
-            alert("✅ Lote Guardado Exitosamente");
-            location.reload();
-        }).catch(e => {
-            alert("❌ Error enviando lote");
-            btn.disabled = false;
-        });
-    }
-
-    // --- CARGA Y PROCESAMIENTO (Igual que antes) ---
-    function cargarDatos() {
-        document.getElementById('loader-dash').style.display='block';
-        fetch(URL_SCRIPT)
-            .then(r => r.json())
-            .then(data => {
-                let registros = data.registros || [];
-                let fases = data.fases || [];
-                historialCompleto = registros;
-                procesarFases(fases);
-                procesarMadres(registros);
-                procesarDashboard(registros);
-                document.getElementById('loader-dash').style.display='none';
-                document.getElementById('view-dashboard-summary').style.display='block';
-                document.getElementById('search-bar-container').style.display='block';
-            })
-            .catch(e => { console.error(e); alert("Error de conexión."); });
-    }
-
-    function procesarDashboard(data) {
-        let counts = { TOTAL: 0, LECHONES: 0 };
+    function procesarInventario(regs) {
         let estados = {};
-        let alertasPorFase = {}; 
-
-        data.forEach(fila => {
-            let fechaMov = new Date(fila[0]);
-            let id = fila[1], acc = fila[2], fase = fila[3], notas = fila[5];
-            let chapeta = fila[10]; 
-
-            if(!estados[id]) estados[id] = { piglets: 0, fechaEntrada: fechaMov };
-            estados[id].id = id;
-            estados[id].chapeta = chapeta; 
-            estados[id].notas = notas;
-            estados[id].padre = fila[6];
-            estados[id].madre = fila[7];
-            estados[id].esRepro = fila[8];
-            estados[id].foto = fila[9];
-            
-            if(estados[id].fase !== fase) estados[id].fechaEntrada = fechaMov;
-
-            if(acc === 'VENTA' || acc === 'MUERTE') {
-                estados[id].status = 'OFF'; estados[id].fase = 'FUERA'; estados[id].piglets = 0;
-            } else {
-                estados[id].status = 'ON';
-                estados[id].fase = fase ? fase.toUpperCase().trim() : "SIN_CATEGORIA";
-                if (acc === 'PARTO') {
-                    let match = notas.match(/Vivos: (\d+)/);
-                    if (match) estados[id].piglets = parseInt(match[1]);
-                } else if (acc === 'TRASLADO' && estados[id].piglets > 0) estados[id].piglets = 0; 
+        regs.forEach(r => {
+            let id = r[1], acc = r[2], fase = r[3];
+            if(!estados[id]) estados[id] = { id, piglets: 0, subpuesto: r[12], fase: fase, chapeta: r[10], madre: r[7], activo: true };
+            if(acc === "VENTA" || acc === "MUERTE") estados[id].activo = false;
+            else {
+                estados[id].activo = true; 
+                estados[id].fase = fase.toUpperCase().trim().replace(/ /g, '_'); 
+                estados[id].subpuesto = r[12]; estados[id].chapeta = r[10];
+                if(acc === "PARTO") { 
+                    let m = r[5].match(/Vivos: (\d+)/); 
+                    if(m) estados[id].piglets = parseInt(m[1]); 
+                }
+                if(acc === "DESTETE") estados[id].piglets = 0;
             }
         });
-
-        inventarioGlobal = [];
-        let hoy = new Date();
-
-        for(let id in estados) {
-            let animal = estados[id];
-            if(animal.status === 'ON') {
-                counts.TOTAL++;
-                counts.LECHONES += (animal.piglets || 0);
-                
-                let diffTime = Math.abs(hoy - animal.fechaEntrada);
-                let diasEnFase = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-                animal.dias = diasEnFase; 
-                
-                let limite = 0;
-                if(animal.esRepro === "SI") limite = REGLAS_MADRES[animal.fase] || 100;
-                else limite = REGLAS_CERDOS[animal.fase] || 100;
-                
-                animal.alerta = "verde";
-                if(diasEnFase >= limite) animal.alerta = "roja";
-                else if(diasEnFase >= (limite - 5)) animal.alerta = "amarilla";
-
-                if(!alertasPorFase[animal.fase]) alertasPorFase[animal.fase] = { r: 0, y: 0 };
-                if(animal.alerta === 'roja') alertasPorFase[animal.fase].r++;
-                if(animal.alerta === 'amarilla') alertasPorFase[animal.fase].y++;
-
-                let f = animal.fase;
-                if(!counts[f]) counts[f] = 0;
-                counts[f]++;
-                inventarioGlobal.push(animal);
-            }
-        }
-
-        const container = document.getElementById('dashboard-container');
-        let poblacionTotal = counts.TOTAL + counts.LECHONES;
-        container.innerHTML = `<div class="card-dash card-maestra"><h3>POBLACIÓN TOTAL</h3><h1>${poblacionTotal}</h1></div>`;
-        container.innerHTML += `<div class="card-dash card-total"><h3>Adultos</h3><h2>${counts.TOTAL}</h2></div>`;
-        container.innerHTML += `<div class="card-dash card-lechones"><h3>👶 Lechones</h3><h2>${counts.LECHONES}</h2></div>`;
-
-        let fasesAMostrar = new Set([...Array.from(document.getElementById('fase').options).map(o=>o.value), ...Object.keys(counts)]);
-        fasesAMostrar.delete("TOTAL"); fasesAMostrar.delete("LECHONES"); fasesAMostrar.delete("FUERA"); fasesAMostrar.delete("");
-
-        fasesAMostrar.forEach(fase => {
-            let cant = counts[fase] || 0;
-            let indicator = "";
-            if (alertasPorFase[fase] && alertasPorFase[fase].r > 0) indicator = `<div class="status-dot dot-red"></div>`;
-            else if (alertasPorFase[fase] && alertasPorFase[fase].y > 0) indicator = `<div class="status-dot dot-yellow"></div>`;
-
-            container.innerHTML += `<div class="card-dash" onclick="verLista('${fase}')">${indicator}<h3>${fase}</h3><h2>${cant}</h2></div>`;
-        });
+        return Object.values(estados).filter(e => e.activo);
     }
 
-    // --- FUNCIONES COMUNES ---
-    function verLista(categoria) {
-        categoriaActual = categoria;
-        document.getElementById('view-dashboard-summary').style.display = 'none';
-        document.getElementById('view-list').style.display = 'block';
-        document.getElementById('titulo-lista').innerText = "En: " + categoria;
-        let filtrados = inventarioGlobal.filter(a => a.fase === categoria);
-        filtrados.sort((a, b) => { let peso = { "roja": 3, "amarilla": 2, "verde": 1 }; return peso[b.alerta] - peso[a.alerta]; });
-        pintarLista(filtrados);
-    }
-
-    function pintarLista(lista) {
-        const cont = document.getElementById('contenedor-lista');
-        cont.innerHTML = "";
-        if(lista.length === 0) { cont.innerHTML = "<p style='text-align:center'>Vacío</p>"; return; }
+    function pintarDashboard(inv) {
+        let counts = inv.reduce((a,b) => { a[b.fase] = (a[b.fase]||0)+1; a.total++; a.piglets += (b.piglets||0); return a; }, {total:0, piglets:0});
         
-        lista.forEach(animal => {
-            let claseAlerta = "alerta-" + animal.alerta;
-            let textoAlerta = "";
-            if(animal.alerta === "roja") textoAlerta = "🚨 VENCIDO";
-            if(animal.alerta === "amarilla") textoAlerta = "⚠️ PRÓXIMO";
-            let lechonesBadge = animal.piglets > 0 ? `<span class="badge-lechones">👶 ${animal.piglets}</span>` : '';
-            let chapetaTag = animal.chapeta ? `<span class="tag-chapeta">🏷️ ${animal.chapeta}</span>` : '';
-            
-            let div = document.createElement('div');
-            div.className = `item-lista ${claseAlerta}`;
-            div.innerHTML = `<div>
-                <div style="display:flex; justify-content:space-between;"><strong>${animal.id}</strong> <span style="font-size:0.7rem; color:#c0392b; font-weight:bold;">${textoAlerta}</span></div>
-                ${chapetaTag} ${lechonesBadge} <span class="tag-dias">📅 ${animal.dias} días</span><br>
-                <small>${animal.notas || ''}</small>
-            </div><i class="fas fa-chevron-right"></i>`;
-            div.onclick = () => verDetalle(animal.id);
-            cont.appendChild(div);
+        let html = `<div class="card-dash card-maestra"><h3>POBLACIÓN TOTAL</h3><h1>${counts.total + counts.piglets}</h1></div>`;
+        html += `<div class="card-dash card-lechones" onclick="verLista('LECHONES')"><h3>LECHONES VIVOS</h3><h2>${counts.piglets}</h2></div>`;
+        
+        Object.keys(counts).filter(k=>k!=="total" && k!=="piglets").forEach(f => {
+            let cl = f === "SALA_SERVICIO" ? "card-servicio" : "";
+            html += `<div class="card-dash ${cl}" onclick="verLista('${f}')"><h3>${f}</h3><h2>${counts[f]}</h2></div>`;
         });
+        document.getElementById('dashboard-container').innerHTML = html;
+    }
+
+    function verLista(fase) {
+        document.getElementById('view-dashboard-summary').style.display='none';
+        document.getElementById('view-list').style.display='block';
+        document.getElementById('titulo-lista').innerText = "En " + fase;
+        let filtrados = (fase === 'LECHONES') ? inventarioGlobal.filter(e => e.piglets > 0) : inventarioGlobal.filter(e => e.fase === fase);
+        
+        document.getElementById('contenedor-lista').innerHTML = filtrados.map(e => `
+            <div class="item-lista" onclick="verDetalle('${e.id}')"><div><b>${e.id}</b><br><small>📍 ${e.subpuesto || 'Sin puesto'} ${e.piglets > 0 ? '| 🐷 '+e.piglets : ''}</small></div><i class="fas fa-chevron-right"></i></div>
+        `).join("") || "Vacío";
     }
 
     function verDetalle(id) {
-        let animal = inventarioGlobal.find(a => a.id == id);
-        if (!animal) return;
-        document.getElementById('view-list').style.display = 'none';
-        document.getElementById('view-detail').style.display = 'block';
-        let infoLechones = animal.piglets > 0 ? `<div style="background:#fff3cd; color:#d35400; padding:10px; border-radius:5px; margin:10px 0; font-weight:bold; text-align:center;">👶 Tiene ${animal.piglets} lechones</div>` : '';
-        let colorDias = animal.alerta === 'roja' ? 'color:red' : (animal.alerta === 'amarilla' ? 'color:orange' : 'color:green');
-        let html = `<div style="text-align:center"><h1 style="margin:0">${animal.id}</h1>${animal.chapeta ? `<h2 style="color:#2980b9; margin:5px;">🏷️ Chapeta: ${animal.chapeta}</h2>` : ''}<span style="background:#2ecc71;color:white;padding:2px 8px;border-radius:10px;">${animal.fase}</span><p style="margin-top:10px; font-weight:bold; ${colorDias}">📅 Lleva ${animal.dias} días en esta etapa</p></div>${infoLechones}<hr><p><strong>Madre:</strong> ${animal.madre || '-'} | <strong>Padre:</strong> ${animal.padre || '-'}</p><p><strong>Notas:</strong> ${animal.notas || '-'}</p>`;
-        if(animal.foto && animal.foto.includes("http")) html += `<img src="${animal.foto}" style="width:100%; border-radius:10px; margin-top:10px;">`;
-        html += `<div style="margin:20px 0;"><button class="btn-edit" onclick="cargarParaEditar('${animal.id}')">✏️ Editar / Agregar Chapeta</button></div>`;
-        html += `<h3 style="border-top:1px solid #eee; padding-top:15px;">📜 Historial</h3><ul class="timeline">`;
-        let miHistorial = historialCompleto.filter(h => h[1] == id).reverse();
-        miHistorial.forEach(evento => { let icono = evento[2] === "PARTO" ? "👶" : (evento[2] === "INGRESO" ? "🟢" : "🔵"); html += `<li><div class="timeline-date">${new Date(evento[0]).toLocaleDateString()}</div><div class="timeline-action">${icono} ${evento[2]} ${evento[3] ? '-> '+evento[3] : ''}</div><div class="timeline-note">${evento[5]}</div></li>`; });
-        html += `</ul>`;
-        document.getElementById('contenedor-detalle').innerHTML = html;
+        let e = inventarioGlobal.find(x => x.id == id);
+        document.getElementById('view-list').style.display='none';
+        document.getElementById('view-detail').style.display='block';
+        
+        // --- LÓGICA DE BOTONES DINÁMICOS ---
+        // Si tiene lechones > 0, mostramos DESTETE. Si no, y está en gestación, mostramos PARTO.
+        let botonExtra = '';
+        if (e.piglets > 0) {
+            botonExtra = `<button class="btn-action btn-destete" onclick="cargarAccion('${e.id}', 'DESTETE')"><i class="fas fa-baby-carriage"></i> Registrar Destete</button>`;
+        } else if (e.fase === 'SALA_SERVICIO' || e.fase === 'GESTACION') {
+            botonExtra = `<button class="btn-action btn-parto" onclick="cargarAccion('${e.id}', 'PARTO')"><i class="fas fa-piggy-bank"></i> Registrar Parto</button>`;
+        }
+
+        document.getElementById('contenedor-detalle').innerHTML = `
+            <div class="card-form">
+                <h2 style="margin:0;">ID: ${e.id}</h2>
+                <p>📍 <b>Puesto:</b> ${e.subpuesto || 'N/A'}</p>
+                <p>🏷️ <b>Chapeta:</b> ${e.chapeta || 'N/A'}</p>
+                <p>👩‍👦 <b>Madre:</b> ${e.madre || 'N/A'}</p>
+                ${e.piglets > 0 ? `<p style="color:#e67e22; font-weight:bold;">🐷 Lechones activos: ${e.piglets}</p>` : ''}
+                
+                <div class="btn-action-group">
+                    <button class="btn-action btn-orange" onclick="cargarAccion('${e.id}', 'OBSERVACION')"><i class="fas fa-edit"></i> Nota</button>
+                    <button class="btn-action btn-blue" onclick="cargarAccion('${e.id}', 'TRASLADO')"><i class="fas fa-exchange-alt"></i> Mover</button>
+                    <button class="btn-action btn-purple" onclick="cargarAccion('${e.id}', 'SERVICIO')"><i class="fas fa-syringe"></i> Inseminar</button>
+                    ${botonExtra}
+                </div>
+                <hr><h4>Historial</h4>
+                ${historialCompleto.filter(h=>h[1]==id).reverse().slice(0,10).map(h=>`<div style="font-size:0.8rem; margin-bottom:5px;">📅 ${new Date(h[0]).toLocaleDateString()} - <b>${h[2]}</b><br>${h[5]}</div>`).join("")}
+            </div>
+        `;
     }
 
-    function cargarParaEditar(id) { let animal = inventarioGlobal.find(a => a.id == id); verTab('registro', document.querySelectorAll('.nav-btn')[1]); document.getElementById('titulo-form').innerText = "Editar " + id; document.getElementById('tatuaje').value = animal.id; document.getElementById('tatuaje').readOnly = true; document.getElementById('tatuaje').style.backgroundColor = "#eee"; document.getElementById('chapeta').value = animal.chapeta || ""; document.getElementById('accion').value = "TRASLADO"; verificarAccion(); document.getElementById('fase').value = animal.fase; document.getElementById('padre').value = animal.padre; document.getElementById('madre').value = animal.madre; document.getElementById('esReproductora').checked = (animal.esRepro === "SI"); }
-    
-    function limpiarFormulario() {
-        document.getElementById('tatuaje').value = ""; document.getElementById('tatuaje').readOnly = false; document.getElementById('tatuaje').style.backgroundColor = "white"; document.getElementById('chapeta').value = ""; document.getElementById('accion').value = "INGRESO"; verificarAccion(); document.getElementById('notas').value = ""; document.getElementById('vivos').value = ""; document.getElementById('muertos').value = ""; document.getElementById('titulo-form').innerText = "Nuevo Movimiento";
-        // Reset a modo individual al entrar
-        cambiarModo('single');
+    function cargarAccion(id, acc) { verTab('registro'); document.getElementById('tatuaje').value = id; document.getElementById('accion').value = acc; verificarAccion(); }
+
+    function verificarAccion() {
+        let acc = document.getElementById('accion').value;
+        let tatId = document.getElementById('tatuaje').value;
+        let animal = inventarioGlobal.find(a => a.id == tatId);
+
+        document.getElementById('section-destete').style.display = (acc === "DESTETE") ? "block" : "none";
+        document.getElementById('section-parto').style.display = (acc === "PARTO") ? "block" : "none";
+        
+        if(acc === "SERVICIO") document.getElementById('fase').value = "SALA_SERVICIO";
+        if(acc === "PARTO") document.getElementById('fase').value = "MATERNIDAD";
+        if(acc === "DESTETE") {
+            document.getElementById('fase').value = "DESCANSO";
+            document.getElementById('subpuesto-lechones').value = "PRECEBO"; 
+            if(animal) {
+                // Rellena automáticamente la cantidad de lechones que tiene registrados
+                document.getElementById('destetados').value = animal.piglets;
+                generarInputsLechones();
+            }
+        }
     }
-    
-    function verificarAccion() { let val = document.getElementById('accion').value; let secParto = document.getElementById('section-parto'); let secFase = document.getElementById('section-fase'); if(val === 'PARTO') { secParto.style.display = 'block'; secFase.style.display = 'none'; } else if(['VENTA','MUERTE'].includes(val)) { secParto.style.display = 'none'; secFase.style.display = 'none'; document.getElementById('fase').value = 'FUERA'; } else { secParto.style.display = 'none'; secFase.style.display = 'block'; } }
-    
-    function procesarFases(lista) { const sel = document.getElementById('fase'); sel.innerHTML = ""; let base = lista && lista.length ? lista : ['PARIDERA','PRECEBO','LEVANTE','ENGORDE']; base.forEach(f => { let o = document.createElement('option'); o.value = f.toUpperCase(); o.text = f; sel.add(o); }); let optF = document.createElement('option'); optF.value = "FUERA"; optF.text = "Fuera"; sel.add(optF); }
-    function agregarNuevaFase() { let n = prompt("Nueva fase:"); if(!n) return; n = n.toUpperCase().trim(); let sel = document.getElementById('fase'); let opt = document.createElement('option'); opt.value = n; opt.text = n; sel.add(opt, sel.options[sel.length-1]); sel.value = n; fetch(URL_SCRIPT, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tipo:"NUEVA_FASE", nombre:n})}); }
-    function procesarMadres(reg) { let sel = document.getElementById('madre'); sel.innerHTML = '<option value="">Madre</option><option value="NA">N/A</option>'; let m = new Set(); reg.forEach(r => { if(r[8]==='SI') m.add(r[1]); }); m.forEach(x => { let o = document.createElement('option'); o.value=x; o.text="Madre "+x; sel.add(o); }); }
-    function procesarFoto() { let f = document.getElementById('fotoInput').files[0]; if(!f)return; let r = new FileReader(); r.readAsDataURL(f); r.onload = e => { let i = new Image(); i.src = e.target.result; i.onload = () => { let c = document.createElement("canvas"); let s = 800/i.width; c.width=800; c.height=i.height*s; c.getContext("2d").drawImage(i,0,0,c.width,c.height); imagenBase64 = c.toDataURL("image/jpeg",0.6).split(",")[1]; document.getElementById('text-foto').innerText = "✅ Foto OK"; } } }
-    function cargarReportes() { let filtro = document.getElementById('filtro-reporte').value; let contenedor = document.getElementById('contenedor-reportes'); contenedor.innerHTML = ""; let salidas = historialCompleto.filter(fila => { let accion = fila[2]; if (filtro === "TODOS") return accion === 'VENTA' || accion === 'MUERTE'; return accion === filtro; }).reverse(); if(salidas.length === 0) { contenedor.innerHTML = "<p style='text-align:center;'>Sin registros recientes.</p>"; return; } salidas.forEach(s => { let color = s[2] === 'VENTA' ? '#27ae60' : '#c0392b'; contenedor.innerHTML += `<div style="background:white; padding:15px; margin-bottom:10px; border-left:5px solid ${color}; border-radius:5px; box-shadow:0 1px 3px rgba(0,0,0,0.1);"><div style="display:flex; justify-content:space-between;"><strong>🐷 ${s[1]}</strong><span style="color:#777; font-size:0.8rem;">${new Date(s[0]).toLocaleDateString()}</span></div><div style="font-weight:bold; margin:5px 0;">${s[2]}</div><div style="color:#555;">${s[5] || '-'}</div></div>`; }); }
-    
-    // GUARDAR INDIVIDUAL
-    function enviarDatos() { let accion = document.getElementById('accion').value; let notasRaw = document.getElementById('notas').value; if (accion === 'PARTO') { let vivos = document.getElementById('vivos').value || 0; let muertos = document.getElementById('muertos').value || 0; notasRaw = `PARTO | Vivos: ${vivos} | Muertos: ${muertos} - ${notasRaw}`; } let d = { tatuaje: document.getElementById('tatuaje').value, chapeta: document.getElementById('chapeta').value, accion: accion, fase: document.getElementById('fase').value, ubicacion: document.getElementById('fase').value, notas: notasRaw, padre: document.getElementById('padre').value, madre: document.getElementById('madre').value, esReproductora: document.getElementById('esReproductora').checked ? "SI" : "NO", imagenBase64: imagenBase64, mimeType: "image/jpeg" }; if(!d.tatuaje) return alert("Falta el Tatuaje (ID)"); let btn = document.getElementById('btnEnviar'); btn.disabled = true; btn.innerText = "Guardando..."; fetch(URL_SCRIPT, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}).then(() => { alert("✅ Guardado"); location.reload(); }).catch(() => { alert("❌ Error"); btn.disabled = false; }); }
-    
-    // OTRAS
-    function buscarCerdo() { let texto = document.getElementById('inputBusqueda').value.toUpperCase(); if (texto.length === 0) { document.getElementById('view-dashboard-summary').style.display = 'block'; document.getElementById('view-list').style.display = 'none'; return; } let resultados = inventarioGlobal.filter(a => a.id.toString().includes(texto) || (a.chapeta && a.chapeta.toString().includes(texto))); document.getElementById('view-dashboard-summary').style.display = 'none'; document.getElementById('view-list').style.display = 'block'; document.getElementById('view-detail').style.display = 'none'; document.getElementById('titulo-lista').innerText = `Resultados: ${resultados.length}`; pintiarLista(resultados); }
+
+    function procesarFases(f) { 
+        let lista = ["SALA_SERVICIO", "GESTACION", "MATERNIDAD", "PRECEBO", "LEVANTE", "ENGORDE", "DESCANSO"].concat(f);
+        let htmlOpciones = lista.map(x=>`<option value="${x}">${x}</option>`).join("");
+        document.getElementById('fase').innerHTML = htmlOpciones;
+        document.getElementById('subpuesto-lechones').innerHTML = htmlOpciones;
+    }
+
+    function agregarFase() {
+        let n = prompt("Nombre de la nueva Ubicación/Fase:");
+        if(n && n.trim() !== "") {
+            let val = n.toUpperCase().trim().replace(/ /g, '_');
+            let o1 = document.createElement("option"); o1.text = val; o1.value = val; o1.selected = true; document.getElementById('fase').add(o1);
+            let o2 = document.createElement("option"); o2.text = val; o2.value = val; document.getElementById('subpuesto-lechones').add(o2);
+        }
+    }
+
+    function generarInputsLechones() {
+        let c = parseInt(document.getElementById('destetados').value) || 0;
+        document.getElementById('contenedor-inputs-lechones').innerHTML = `<div style="display:grid; grid-template-columns: 40px 1fr 1fr 40px; font-size:0.8rem; font-weight:bold; margin-bottom:5px;"><span>#</span><span>ID</span><span>Chap</span><span>OK</span></div>` + 
+        Array.from({length:c}, (_,i)=>`<div class="lechon-item"><span>${i+1}</span><input type="text" class="l-tat" placeholder="ID"><input type="text" class="l-chap" placeholder="N°"><input type="checkbox" class="l-status" checked></div>`).join("");
+    }
+
+    function previewFoto(f) {
+        let r = new FileReader();
+        r.onload = e => { fotoBase64 = e.target.result.split(",")[1]; fotoMime = f.files[0].type; document.getElementById('preview').src = e.target.result; document.getElementById('preview').style.display="block"; };
+        r.readAsDataURL(f.files[0]);
+    }
+
+    function enviarDatos() {
+        let acc = document.getElementById('accion').value;
+        let id = document.getElementById('tatuaje').value;
+        let animal = inventarioGlobal.find(a => a.id == id);
+
+        if(acc === 'TRASLADO' && animal && animal.piglets > 0) {
+            return alert("⛔ ERROR: No puedes mover a esta madre porque tiene lechones. Usa la opción de DESTETE.");
+        }
+
+        let btn = document.getElementById('btnEnviar'); btn.disabled = true; btn.innerText = "Guardando...";
+        let d = { tatuaje: id, chapeta: document.getElementById('chapeta').value, peso: document.getElementById('peso').value, accion: acc, fase: document.getElementById('fase').value, subpuesto: document.getElementById('subpuesto').value, notas: document.getElementById('notas').value, imagenBase64: fotoBase64, mimeType: fotoMime };
+
+        if(acc === "DESTETE") {
+            let subL = document.getElementById('subpuesto-lechones').value;
+            if(!subL) { alert("Debes seleccionar el destino de los lechones"); btn.disabled = false; return; }
+            
+            let lechones = Array.from(document.querySelectorAll('.lechon-item')).filter(r => r.querySelector('.l-status').checked).map(r => ({ tatuaje: r.querySelector('.l-tat').value, chapeta: r.querySelector('.l-chap').value, notas: "Hijo de " + d.tatuaje })).filter(l=>l.tatuaje);
+            let bajas = parseInt(document.getElementById('destetados').value) - lechones.length;
+            d.notas = `DESTETE | Camada: ${document.getElementById('destetados').value} | Efectivos: ${lechones.length} | Bajas: ${bajas} ${d.notas}`;
+            if(lechones.length > 0) fetch(URL_SCRIPT, { method:'POST', body: JSON.stringify({ tipo:"BATCH", comun:{ accion:"INGRESO", fase:"PRECEBO", subpuesto: subL, madre: d.tatuaje }, animales: lechones }) });
+        }
+        
+        if(acc === "PARTO") {
+            d.notas = `PARTO | Vivos: ${document.getElementById('vivos').value} | Muertos: ${document.getElementById('muertos').value} | Peso: ${document.getElementById('peso_nacimiento').value}kg ${d.notas}`;
+        }
+
+        fetch(URL_SCRIPT, { method:'POST', body: JSON.stringify(d) }).then(() => location.reload());
+    }
+
+    function buscarCerdo() {
+        let t = document.getElementById('inputBusqueda').value.toUpperCase();
+        if(!t) { volverAlTablero(); return; }
+        document.getElementById('view-dashboard-summary').style.display='none';
+        document.getElementById('view-list').style.display='block';
+        document.getElementById('contenedor-lista').innerHTML = inventarioGlobal.filter(e => e.id.toString().includes(t) || (e.chapeta && e.chapeta.toString().includes(t))).map(e => `<div class="item-lista" onclick="verDetalle('${e.id}')"><div><b>ID: ${e.id}</b><br><small>${e.fase}</small></div><i class="fas fa-chevron-right"></i></div>`).join("");
+    }
+
+    function limpiarFormulario() { document.getElementById('tatuaje').value = ""; document.getElementById('chapeta').value = ""; document.getElementById('peso').value = ""; document.getElementById('preview').style.display="none"; fotoBase64=""; }
+    function cargarReportes() { let f = document.getElementById('filtro-reporte').value; document.getElementById('contenedor-reportes').innerHTML = historialCompleto.filter(h => f === "TODOS" || h[2] === f).reverse().map(h => `<div class="item-lista"><div><b>${h[1]}</b> - ${h[2]}<br><small>${new Date(h[0]).toLocaleDateString()} - ${h[5]}</small></div></div>`).join("") || "Sin registros."; }
     function volverAlTablero() { document.getElementById('view-list').style.display='none'; document.getElementById('view-dashboard-summary').style.display='block'; }
-    function volverALista() { document.getElementById('view-detail').style.display='none'; if(categoriaActual) verLista(categoriaActual); else document.getElementById('view-list').style.display='block'; }
+    function volverALista() { document.getElementById('view-detail').style.display='none'; document.getElementById('view-list').style.display='block'; }
 </script>
 </body>
 </html>
