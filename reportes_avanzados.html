@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Reportes Granja Pro 📊</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f0f2f5; margin: 0; padding-bottom: 40px; }
+        header { background-color: #2c3e50; color: white; padding: 15px; text-align: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        
+        .container { max-width: 950px; margin: 0 auto; padding: 15px; }
+        
+        /* FILTROS */
+        .filter-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: 600; color: #2c3e50; margin-bottom: 5px; font-size: 0.9rem; }
+        select, input { width: 100%; padding: 12px; border: 1px solid #bdc3c7; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+        
+        /* CHECKBOXES */
+        .checkbox-group { display: flex; flex-direction: column; gap: 10px; margin: 15px 0; }
+        .checkbox-container { display: flex; align-items: center; gap: 10px; background: #fff3cd; padding: 10px; border-radius: 8px; border: 1px solid #ffeeba; }
+        .checkbox-container.blue { background: #e3f2fd; border-color: #bbdefb; }
+        .checkbox-container input { width: 20px; height: 20px; cursor: pointer; }
+        
+        .btn-generate { width: 100%; padding: 15px; background-color: #27ae60; color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .btn-generate:hover { background-color: #219150; }
+
+        /* KPIS */
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 20px; display: none; }
+        .kpi-card { background: white; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border-top: 4px solid #3498db; }
+        .kpi-card h3 { margin: 0; font-size: 0.7rem; color: #7f8c8d; text-transform: uppercase; font-weight: bold; }
+        .kpi-card h1 { margin: 5px 0 0 0; font-size: 1.6rem; color: #2c3e50; }
+
+        /* TABLA */
+        .table-responsive { overflow-x: auto; display: none; margin-bottom: 20px; background: white; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); padding: 10px; }
+        table { width: 100%; border-collapse: collapse; min-width: 500px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background-color: #f8f9fa; color: #2c3e50; font-size: 0.85rem; text-transform: uppercase; }
+        tr:hover { background-color: #f1f1f1; }
+
+        /* GRÁFICOS */
+        .charts-container { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; display: none; }
+        .chart-card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        @media (max-width: 600px) { .charts-container { grid-template-columns: 1fr; } }
+
+        /* TIMELINE */
+        .timeline-item { display: flex; gap: 15px; margin-bottom: 20px; position: relative; animation: fadeIn 0.5s; }
+        .timeline-icon { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; flex-shrink: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 2; }
+        .timeline-content { background: white; padding: 15px; border-radius: 12px; flex: 1; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .timeline-line { position: absolute; left: 20px; top: 40px; bottom: -30px; width: 2px; background: #ddd; z-index: 1; }
+        .timeline-item:last-child .timeline-line { display: none; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+<header>
+    <h2>📊 Estadísticas Granja Pro</h2>
+</header>
+
+<div class="container">
+    
+    <div class="filter-card">
+        <div class="form-group">
+            <label>Tipo de Análisis:</label>
+            <select id="tipoReporte" onchange="cambiarInputBusqueda()">
+                <option value="INSEMINADOR">💉 Rendimiento Inseminador</option>
+                <option value="CERDA">🐷 Historia Clínica (Por Cerda)</option>
+                <option value="PUESTO">📍 Análisis por Corral/Puesto</option>
+                <option value="GENERAL">🏢 Resumen General</option>
+            </select>
+        </div>
+
+        <div class="form-group" id="group-busqueda">
+            <label id="labelBusqueda">Selecciona:</label>
+            <input type="text" id="valorBusqueda" placeholder="Ej. 4151" style="display:none;">
+            <select id="selectOpciones"></select>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-bottom:10px;">
+            <div style="flex:1;">
+                <label>Desde:</label>
+                <input type="date" id="fechaInicio">
+            </div>
+            <div style="flex:1;">
+                <label>Hasta:</label>
+                <input type="date" id="fechaFin">
+            </div>
+        </div>
+
+        <div class="checkbox-group">
+            <div class="checkbox-container blue" id="check-todos-container" style="display:none;">
+                <input type="checkbox" id="verTodosPuestos">
+                <label for="verTodosPuestos" style="color:#1565c0;"><b>Ver tabla de TODOS los puestos</b></label>
+            </div>
+            <div class="checkbox-container">
+                <input type="checkbox" id="ignorarFechas" checked>
+                <label for="ignorarFechas">Ignorar Fechas (Ver todo el historial)</label>
+            </div>
+        </div>
+
+        <button class="btn-generate" onclick="generarReporte()">
+            <i class="fas fa-search"></i> Generar Reporte
+        </button>
+        <div id="loading" style="text-align:center; margin-top:10px; display:none; color:#7f8c8d;">⏳ Conectando...</div>
+    </div>
+
+    <div id="kpiSection" class="kpi-grid"></div>
+
+    <div id="tablaResumenSection" class="table-responsive">
+        <h3 style="margin:0 0 10px 0; color:#34495e;">🏆 Comparativa de Puestos</h3>
+        <table id="tablaResumen">
+            <thead>
+                <tr>
+                    <th>Puesto</th>
+                    <th>Nacidos Vivos</th>
+                    <th>Muertes Totales</th>
+                    <th>Movimientos</th>
+                </tr>
+            </thead>
+            <tbody id="tablaBody"></tbody>
+        </table>
+    </div>
+
+    <div id="chartsSection" class="charts-container">
+        <div class="chart-card"><canvas id="chartDistribucion"></canvas></div>
+        <div class="chart-card"><canvas id="chartTendencia"></canvas></div>
+    </div>
+
+    <h3 id="tituloTimeline" style="display:none; color:#34495e; padding-left:5px;">📜 Registros Encontrados</h3>
+    <div id="resultadosTimeline"></div>
+
+</div>
+
+<script>
+    const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbw9euXc8iHBWtY6FwQUTw8tz17OXhdzhI_JziXHXN3Kj_1DWtMJ3As0AF71IcVXKNphRg/exec";
+    
+    let dbRegistros = [];
+    let listaInseminadores = new Set();
+    let listaPuestos = new Set();
+    let chart1 = null; 
+    let chart2 = null;
+
+    window.onload = () => {
+        document.getElementById('loading').style.display = 'block';
+        fetch(URL_SCRIPT)
+            .then(r => r.json())
+            .then(data => {
+                dbRegistros = data.registros;
+                extraerDatosUnicos(dbRegistros);
+                document.getElementById('loading').style.display = 'none';
+                
+                let hoy = new Date();
+                let inicio = new Date(); 
+                inicio.setMonth(hoy.getMonth() - 6);
+                document.getElementById('fechaFin').value = formatearFechaInput(hoy);
+                document.getElementById('fechaInicio').value = formatearFechaInput(inicio);
+                
+                cambiarInputBusqueda();
+            });
+    };
+
+    function formatearFechaInput(date) { return date.toISOString().split('T')[0]; }
+
+    function extraerDatosUnicos(regs) {
+        listaInseminadores.clear();
+        listaPuestos.clear();
+        regs.forEach(r => {
+            if(r[13] && r[13].toString().trim() !== "") listaInseminadores.add(r[13].toString().toUpperCase().trim()); 
+            if(r[12] && r[12].toString().trim() !== "") listaPuestos.add(r[12].toString().toUpperCase().trim());       
+        });
+    }
+
+    function cambiarInputBusqueda() {
+        let tipo = document.getElementById('tipoReporte').value;
+        let inputTxt = document.getElementById('valorBusqueda');
+        let selectOpt = document.getElementById('selectOpciones');
+        let label = document.getElementById('labelBusqueda');
+        let group = document.getElementById('group-busqueda');
+        let checkTodos = document.getElementById('check-todos-container');
+
+        inputTxt.value = "";
+        group.style.display = "block";
+        checkTodos.style.display = "none";
+        
+        if (tipo === "CERDA") {
+            label.innerText = "Escribe el ID de la Cerda:";
+            inputTxt.style.display = "block";
+            selectOpt.style.display = "none";
+        } else if (tipo === "INSEMINADOR") {
+            label.innerText = "Selecciona Inseminador:";
+            inputTxt.style.display = "none";
+            selectOpt.style.display = "block";
+            llenarSelect(listaInseminadores);
+        } else if (tipo === "PUESTO") {
+            label.innerText = "Selecciona Corral/Puesto:";
+            inputTxt.style.display = "none";
+            selectOpt.style.display = "block";
+            checkTodos.style.display = "flex";
+            llenarSelect(listaPuestos);
+        } else if (tipo === "GENERAL") {
+            group.style.display = "none"; 
+        }
+    }
+
+    function llenarSelect(setDatos) {
+        let s = document.getElementById('selectOpciones');
+        s.innerHTML = "<option value=''>-- Seleccionar --</option>";
+        if(setDatos.size === 0) s.innerHTML += "<option disabled>Sin datos</option>";
+        Array.from(setDatos).sort().forEach(d => s.innerHTML += `<option value="${d}">${d}</option>`);
+    }
+
+    function fechaEnRango(fechaStr, inicioStr, finStr) {
+        let d = new Date(fechaStr);
+        if(isNaN(d.getTime())) return false; 
+        let fechaNum = parseInt(d.toISOString().slice(0,10).replace(/-/g,""));
+        let iniNum = parseInt(inicioStr.replace(/-/g,""));
+        let finNum = parseInt(finStr.replace(/-/g,""));
+        return fechaNum >= iniNum && fechaNum <= finNum;
+    }
+
+    function generarReporte() {
+        let tipo = document.getElementById('tipoReporte').value;
+        let busqueda = "";
+        let ignorarFechas = document.getElementById('ignorarFechas').checked;
+        let verTodosPuestos = document.getElementById('verTodosPuestos').checked;
+        
+        document.getElementById('kpiSection').style.display = 'none';
+        document.getElementById('chartsSection').style.display = 'none';
+        document.getElementById('resultadosTimeline').innerHTML = "";
+        document.getElementById('tablaResumenSection').style.display = 'none';
+
+        // REPORTE TABLA DE TODOS LOS PUESTOS
+        if (tipo === "PUESTO" && verTodosPuestos) {
+            generarTablaResumenPuestos(ignorarFechas);
+            return;
+        }
+
+        if(tipo === "CERDA") busqueda = document.getElementById('valorBusqueda').value.toUpperCase().trim();
+        else if (tipo !== "GENERAL") busqueda = document.getElementById('selectOpciones').value.toUpperCase().trim();
+
+        if(tipo !== "GENERAL" && !busqueda) return alert("⚠️ Selecciona un valor a buscar.");
+
+        let fInicio = document.getElementById('fechaInicio').value;
+        let fFin = document.getElementById('fechaFin').value;
+
+        // FILTRADO
+        let resultados = dbRegistros.filter(row => {
+            if (!ignorarFechas) {
+                if (!fechaEnRango(row[0], fInicio, fFin)) return false;
+            }
+            if (tipo === "CERDA") return row[1].toString().toUpperCase().trim() === busqueda;
+            if (tipo === "INSEMINADOR") {
+                let ins = row[13] ? row[13].toString().toUpperCase().trim() : "";
+                return ins === busqueda;
+            }
+            if (tipo === "PUESTO") {
+                let p = row[12] ? row[12].toString().toUpperCase().trim() : "";
+                return p === busqueda;
+            }
+            return true;
+        });
+
+        // LÓGICA DE KPI
+        let partosRelacionados = [];
+        let muertesRelacionadas = [];
+
+        if (tipo === "INSEMINADOR") {
+            let cerdasInseminadas = new Set(resultados.filter(r => r[2] === "SERVICIO").map(r => r[1]));
+            
+            // Buscar Partos y Muertes de esas cerdas (incluso fuera del rango de fechas del servicio)
+            partosRelacionados = dbRegistros.filter(r => r[2] === "PARTO" && cerdasInseminadas.has(r[1]));
+            muertesRelacionadas = dbRegistros.filter(r => r[2] === "MUERTE" && cerdasInseminadas.has(r[1]));
+            
+            mostrarKPIsInseminador(resultados, partosRelacionados, muertesRelacionadas);
+            renderizarGraficosInseminador(resultados, partosRelacionados); // Gráfico especial
+        } else {
+            mostrarKPIs(resultados, tipo);
+            renderizarGraficosStandard(resultados);
+        }
+
+        renderizarTimeline(resultados);
+        
+        document.getElementById('kpiSection').style.display = 'grid';
+        document.getElementById('chartsSection').style.display = 'grid';
+        document.getElementById('tituloTimeline').style.display = 'block';
+    }
+
+    // --- KPIs INSEMINADOR ---
+    function mostrarKPIsInseminador(registrosFiltrados, partos, muertes) {
+        let totalServicios = registrosFiltrados.filter(r => r[2] === "SERVICIO").length;
+        let totalPartos = partos.length;
+        let madresMuertas = muertes.length;
+        
+        let vivos = 0, nacidosMuertos = 0;
+        partos.forEach(r => {
+            let mVivos = r[5].match(/Vivos: (\d+)/);
+            let mMuertos = r[5].match(/Muertos: (\d+)/);
+            if(mVivos) vivos += parseInt(mVivos[1]);
+            if(mMuertos) nacidosMuertos += parseInt(mMuertos[1]);
+        });
+
+        let efectividad = totalServicios > 0 ? ((totalPartos / totalServicios) * 100).toFixed(1) : 0;
+
+        let html = cardKPI("Servicios", totalServicios, "#8e44ad");
+        html += cardKPI("Partos", totalPartos, "#e67e22");
+        html += cardKPI("Efectividad", efectividad + "%", efectividad > 80 ? "#27ae60" : "#c0392b");
+        html += cardKPI("Nacidos Vivos", vivos, "#27ae60");
+        html += cardKPI("Nacidos Muertos", nacidosMuertos, "#7f8c8d");
+        html += cardKPI("Madres Muertas", madresMuertas, "#c0392b");
+
+        document.getElementById('kpiSection').innerHTML = html;
+    }
+
+    // --- KPIs GENÉRICOS ---
+    function mostrarKPIs(data, tipo) {
+        let kpiHTML = "";
+        let total = data.length;
+
+        if (tipo === "CERDA") {
+            let partos = data.filter(r => r[2] === "PARTO");
+            let totalNacidos = partos.reduce((acc, r) => {
+                let m = r[5] ? r[5].match(/Vivos: (\d+)/) : null;
+                return acc + (m ? parseInt(m[1]) : 0);
+            }, 0);
+            kpiHTML += cardKPI("Eventos", total);
+            kpiHTML += cardKPI("Total Partos", partos.length, "#e67e22");
+            kpiHTML += cardKPI("Nacidos Vivos", totalNacidos, "#27ae60");
+        } 
+        else if (tipo === "PUESTO") {
+            let nacidos = 0;
+            let muertes = 0;
+            data.forEach(r => {
+                if (r[2] === "PARTO") {
+                    let m = r[5].match(/Vivos: (\d+)/);
+                    if (m) nacidos += parseInt(m[1]);
+                    let mm = r[5].match(/Muertos: (\d+)/);
+                    if (mm) muertes += parseInt(mm[1]);
+                }
+                if (r[2] === "MUERTE") muertes++;
+                if (r[2] === "BAJA_LACTANCIA") {
+                    let m = r[5].match(/Cantidad: (\d+)/);
+                    muertes += m ? parseInt(m[1]) : 1;
+                }
+            });
+            kpiHTML += cardKPI("Actividad", total);
+            kpiHTML += cardKPI("Nacidos Aquí", nacidos, "#27ae60");
+            kpiHTML += cardKPI("Mortalidad Total", muertes, "#c0392b");
+        }
+        else { 
+            let muertes = data.filter(r => r[2].includes("MUERTE") || r[2].includes("BAJA")).length;
+            let ventas = data.filter(r => r[2] === "VENTA").length;
+            kpiHTML += cardKPI("Movimientos", total);
+            kpiHTML += cardKPI("Bajas", muertes, "#c0392b");
+            kpiHTML += cardKPI("Ventas", ventas, "#27ae60");
+        }
+        document.getElementById('kpiSection').innerHTML = kpiHTML;
+    }
+
+    function cardKPI(titulo, valor, color="#3498db") {
+        return `<div class="kpi-card" style="border-top-color:${color}"><h3>${titulo}</h3><h1 style="color:${color}">${valor}</h1></div>`;
+    }
+
+    // --- GRÁFICOS PARA INSEMINADOR (Vivos vs Muertos) ---
+    function renderizarGraficosInseminador(servicios, partos) {
+        if(chart1) chart1.destroy();
+        if(chart2) chart2.destroy();
+
+        // 1. Gráfico Calidad de Nacimiento (Vivos vs Muertos)
+        let vivos = 0, muertos = 0;
+        partos.forEach(r => {
+            let mVivos = r[5].match(/Vivos: (\d+)/);
+            let mMuertos = r[5].match(/Muertos: (\d+)/);
+            if(mVivos) vivos += parseInt(mVivos[1]);
+            if(mMuertos) muertos += parseInt(mMuertos[1]);
+        });
+
+        let ctx2 = document.getElementById('chartDistribucion').getContext('2d');
+        chart2 = new Chart(ctx2, {
+            type: 'doughnut',
+            data: {
+                labels: ['Nacidos Vivos', 'Nacidos Muertos'],
+                datasets: [{ data: [vivos, muertos], backgroundColor: ['#2ecc71', '#95a5a6'] }]
+            },
+            options: { plugins: { title: { display: true, text: 'Calidad de Nacimientos' } } }
+        });
+
+        // 2. Gráfico Servicios vs Partos (Barras simples)
+        let ctx1 = document.getElementById('chartTendencia').getContext('2d');
+        chart1 = new Chart(ctx1, {
+            type: 'bar',
+            data: {
+                labels: ['Servicios', 'Partos Efectivos'],
+                datasets: [{
+                    label: 'Cantidad',
+                    data: [servicios.length, partos.length],
+                    backgroundColor: ['#8e44ad', '#e67e22']
+                }]
+            },
+            options: { 
+                scales: { y: { beginAtZero: true } },
+                plugins: { title: { display: true, text: 'Eficiencia Reproductiva' } } 
+            }
+        });
+    }
+
+    // --- GRÁFICOS STANDARD ---
+    function renderizarGraficosStandard(data) {
+        if(chart1) chart1.destroy();
+        if(chart2) chart2.destroy();
+        if (data.length === 0) return;
+
+        let accionesCount = {};
+        data.forEach(r => { accionesCount[r[2]] = (accionesCount[r[2]] || 0) + 1; });
+
+        let ctx2 = document.getElementById('chartDistribucion').getContext('2d');
+        chart2 = new Chart(ctx2, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(accionesCount),
+                datasets: [{ data: Object.values(accionesCount), backgroundColor: ['#3498db', '#e74c3c', '#f1c40f', '#2ecc71', '#9b59b6'] }]
+            },
+            options: { plugins: { title: { display: true, text: 'Distribución de Eventos' } } }
+        });
+
+        // Dummy chart temporal (puedes añadir meses si quieres)
+        let ctx1 = document.getElementById('chartTendencia').getContext('2d');
+        chart1 = new Chart(ctx1, {
+            type: 'bar',
+            data: {
+                labels: ['Total Eventos'],
+                datasets: [{ label: 'Registros', data: [data.length], backgroundColor: '#3498db' }]
+            },
+            options: { plugins: { title: { display: true, text: 'Actividad Total' } } }
+        });
+    }
+
+    function generarTablaResumenPuestos(ignorarFechas) {
+        let fInicio = document.getElementById('fechaInicio').value;
+        let fFin = document.getElementById('fechaFin').value;
+        
+        let stats = {}; 
+
+        dbRegistros.forEach(row => {
+            if (!ignorarFechas && !fechaEnRango(row[0], fInicio, fFin)) return;
+            
+            let p = row[12] ? row[12].toString().toUpperCase().trim() : "SIN_PUESTO";
+            if (!stats[p]) stats[p] = { movimientos: 0, nacidos: 0, muertes: 0 };
+
+            stats[p].movimientos++;
+
+            if (row[2] === "PARTO") {
+                let m = row[5].match(/Vivos: (\d+)/);
+                if (m) stats[p].nacidos += parseInt(m[1]);
+                let mm = row[5].match(/Muertos: (\d+)/);
+                if (mm) stats[p].muertes += parseInt(mm[1]);
+            }
+
+            if (row[2] === "MUERTE") stats[p].muertes++;
+            if (row[2] === "BAJA_LACTANCIA") {
+                let m = row[5].match(/Cantidad: (\d+)/);
+                stats[p].muertes += m ? parseInt(m[1]) : 1;
+            }
+        });
+
+        let html = "";
+        Object.keys(stats).sort().forEach(p => {
+            html += `<tr>
+                <td><b>${p}</b></td>
+                <td><b style="color:#27ae60;">${stats[p].nacidos}</b></td>
+                <td><b style="color:#c0392b;">${stats[p].muertes}</b></td>
+                <td>${stats[p].movimientos}</td>
+            </tr>`;
+        });
+
+        document.getElementById('tablaBody').innerHTML = html;
+        document.getElementById('tablaResumenSection').style.display = 'block';
+    }
+
+    function renderizarTimeline(data) {
+        let container = document.getElementById('resultadosTimeline');
+        if(data.length === 0) {
+            container.innerHTML = "<div style='text-align:center; padding:30px; color:#95a5a6;'>⚠️ No se encontraron registros.</div>";
+            return;
+        }
+        data.sort((a,b) => new Date(b[0]) - new Date(a[0]));
+
+        container.innerHTML = data.map(row => {
+            let d = new Date(row[0]);
+            let fecha = isNaN(d.getTime()) ? "S/F" : d.toLocaleDateString();
+            let color = "#95a5a6"; let icon = "fa-circle";
+            let accion = row[2];
+
+            if(accion === "VENTA") { color = "#27ae60"; icon = "fa-dollar-sign"; }
+            else if(accion.includes("MUERTE") || accion.includes("BAJA")) { color = "#c0392b"; icon = "fa-skull"; }
+            else if(accion === "PARTO") { color = "#d35400"; icon = "fa-baby"; }
+            else if(accion === "SERVICIO") { color = "#8e44ad"; icon = "fa-syringe"; }
+
+            return `
+            <div class="timeline-item">
+                <div class="timeline-line"></div>
+                <div class="timeline-icon" style="background-color:${color}"><i class="fas ${icon}"></i></div>
+                <div class="timeline-content">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                        <b style="color:${color};">${accion}</b>
+                        <small style="color:#7f8c8d;">${fecha}</small>
+                    </div>
+                    <div style="font-weight:bold; color:#2c3e50;">ID: ${row[1]}</div>
+                    <div style="font-size:0.9rem; color:#555;">${row[5] || ''}</div>
+                    <div style="font-size:0.8rem; color:#999; margin-top:5px;">${row[13] ? '💉 '+row[13] : ''}</div>
+                </div>
+            </div>`;
+        }).join("");
+    }
+</script>
+
+</body>
+</html>

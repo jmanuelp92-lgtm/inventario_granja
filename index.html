@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Granja Pro v4.14 🐷</title>
+    <title>Granja Pro v4.22 🐷</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f0f2f5; margin: 0; padding-bottom: 90px; }
@@ -33,11 +33,11 @@
         input, select { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #bdc3c7; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
         .btn-primary { width: 100%; padding: 15px; background-color: #2980b9; color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; margin-top: 25px; cursor: pointer; }
         
-        /* ESTILO LISTA STANDARD */
+        /* ESTILO LISTA */
         .item-lista { background: white; padding: 15px; margin-bottom: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border-left: 5px solid #bdc3c7; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; position: relative; }
         .dot-status { height: 12px; width: 12px; border-radius: 50%; display: inline-block; margin-left: 5px; }
         
-        /* ESTILO HISTORIAL/REPORTES (Timeline) */
+        /* TIMELINE */
         .timeline-item { display: flex; gap: 15px; margin-bottom: 20px; position: relative; }
         .timeline-icon { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; flex-shrink: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 2; }
         .timeline-content { background: white; padding: 15px; border-radius: 12px; flex: 1; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
@@ -73,7 +73,8 @@
 <header>
     <h2>🐷 Granja Manager Pro</h2>
     <div class="search-container">
-        <input type="text" id="inputBusqueda" class="search-box" placeholder="🔍 Tatuaje o Chapeta..." onkeyup="buscarCerdo()">
+        <input type="text" id="inputBusqueda" class="search-box" list="lista-busqueda" placeholder="🔍 Tatuaje o Chapeta..." oninput="buscarCerdo()">
+        <datalist id="lista-busqueda"></datalist>
     </div>
 </header>
 
@@ -112,7 +113,7 @@
         </select>
 
         <label>Tatuaje (ID):</label>
-        <input type="text" id="tatuaje" placeholder="ID del animal">
+        <input type="text" id="tatuaje" list="lista-busqueda" placeholder="ID del animal">
 
         <div style="display:flex; gap:10px;">
             <div style="flex:1;"><label>Chapeta:</label><input type="text" id="chapeta" placeholder="N°"></div>
@@ -125,8 +126,16 @@
                 <select id="fase" style="flex:1"></select>
                 <button class="btn-blue" onclick="agregarFase()" style="width:50px; margin-top:5px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:1.2rem;">+</button>
             </div>
+            
             <label>Sub-Puesto (Jaula/Corral):</label>
-            <input type="text" id="subpuesto" placeholder="Donde se encuentra">
+            <input type="text" id="subpuesto" list="lista-subpuestos" placeholder="Escribe o selecciona...">
+            <datalist id="lista-subpuestos"></datalist>
+        </div>
+
+        <div id="section-servicio" style="display:none;" class="special-section">
+            <h4 style="margin:0 0 10px 0; color:#8e44ad;">Datos de Inseminación</h4>
+            <label>Inseminador:</label>
+            <input type="text" id="inseminador" placeholder="Nombre del operario">
         </div>
 
         <div id="section-parto" style="display:none;" class="special-section">
@@ -167,6 +176,9 @@
 <div id="tab-reportes" class="tab-content">
     <div class="card-form">
         <h3>📋 Historial de Eventos</h3>
+        <button onclick="window.location.href='reportes_avanzados.html'" class="btn-primary" style="background-color: #8e44ad; margin-bottom: 20px;">
+            <i class="fas fa-chart-pie"></i> Ver Estadísticas Avanzadas
+        </button>
         <select id="filtro-reporte" onchange="cargarReportes()">
             <option value="TODOS">Ver Todos</option>
             <option value="VENTA">Ventas</option>
@@ -184,8 +196,7 @@
 </div>
 
 <script>
-    // ✅ ENLACE ACTUALIZADO
-    const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbz3T-6EbtBDg6LZqMbxNFQuvmntEAKkv0gg3btvVfm_-Gi0dZTIv-QMsY2H2oIu_ywJMg/exec";
+    const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbw9euXc8iHBWtY6FwQUTw8tz17OXhdzhI_JziXHXN3Kj_1DWtMJ3As0AF71IcVXKNphRg/exec";
     
     let inventarioGlobal = [], historialCompleto = [], fotoBase64 = "", fotoMime = "";
 
@@ -193,12 +204,40 @@
         fetch(URL_SCRIPT).then(r => r.json()).then(data => {
             historialCompleto = data.registros;
             inventarioGlobal = procesarInventario(data.registros);
+            
             procesarFases(data.fases);
             pintarDashboard(inventarioGlobal);
+            
+            // NUEVO: Llenar las listas de autocompletado
+            llenarListasInteligentes(data.registros);
+
             document.getElementById('loader-dash').style.display='none';
             document.getElementById('view-dashboard-summary').style.display='block';
         });
     };
+
+    // --- FUNCIÓN PARA AUTOCOMPLETADO INTELIGENTE ---
+    function llenarListasInteligentes(registros) {
+        let subpuestos = new Set();
+        let busqueda = new Set();
+
+        registros.forEach(r => {
+            // Columna 12 es Subpuesto
+            if(r[12]) subpuestos.add(r[12].toString().toUpperCase().trim());
+            
+            // Columna 1 es Tatuaje(ID) y Columna 10 es Chapeta
+            if(r[1]) busqueda.add(r[1].toString());
+            if(r[10]) busqueda.add(r[10].toString());
+        });
+
+        // Llenar datalist de Subpuestos
+        let listSub = document.getElementById('lista-subpuestos');
+        listSub.innerHTML = Array.from(subpuestos).sort().map(s => `<option value="${s}">`).join('');
+
+        // Llenar datalist de Búsqueda Principal
+        let listBus = document.getElementById('lista-busqueda');
+        listBus.innerHTML = Array.from(busqueda).sort().map(s => `<option value="${s}">`).join('');
+    }
 
     function verTab(id, btn) {
         document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
@@ -227,12 +266,10 @@
                     if(m) estados[id].piglets = parseInt(m[1]);
                     estados[id].fechaFase = fecha; 
                 }
-                
                 if(acc === "BAJA_LACTANCIA") {
                     let m = r[5].match(/Cantidad: (\d+)/);
                     if(m) estados[id].piglets = Math.max(0, estados[id].piglets - parseInt(m[1]));
                 }
-
                 if(acc === "DESTETE") { estados[id].piglets = 0; estados[id].fechaFase = fecha; }
             }
         });
@@ -250,15 +287,35 @@
         return Math.floor(diff / (1000 * 60 * 60 * 24));
     }
 
+    // --- REGLAS DE TIEMPO AJUSTADAS A TU TABLA ---
     function obtenerColor(dias, fase) {
-        if(fase.includes("GESTACION") && dias > 114) return "#e74c3c"; 
-        if(fase.includes("GESTACION") && dias > 105) return "#f1c40f"; 
-        if(fase.includes("MATERNIDAD") && dias > 28) return "#e74c3c"; 
-        if(fase.includes("MATERNIDAD") && dias > 21) return "#f1c40f"; 
-        if(fase.includes("PRECEBO") && dias > 49) return "#e74c3c"; 
-        if(fase.includes("PRECEBO") && dias > 42) return "#f1c40f"; 
-        if(dias > 90) return "#95a5a6"; 
-        return "#2ecc71";
+        // SALA SERVICIO: Max 30 días
+        if(fase.includes("SALA_SERVICIO")) {
+            if(dias > 30) return "#e74c3c"; // Rojo (Pasado)
+            if(dias > 25) return "#f1c40f"; // Amarillo (Alerta)
+        }
+        // GESTACION: Max 75 días (de estancia)
+        if(fase.includes("GESTACION")) {
+            if(dias > 75) return "#e74c3c";
+            if(dias > 70) return "#f1c40f";
+        }
+        // MATERNIDAD: Max 35 días (de estancia)
+        if(fase.includes("MATERNIDAD")) {
+            if(dias > 35) return "#e74c3c";
+            if(dias > 30) return "#f1c40f";
+        }
+        // DESCANSO: Max 6 días
+        if(fase.includes("DESCANSO")) {
+            if(dias > 6) return "#e74c3c";
+            if(dias > 4) return "#f1c40f";
+        }
+        // PRECEBO (Estándar 49 días)
+        if(fase.includes("PRECEBO")) {
+            if(dias > 49) return "#e74c3c";
+            if(dias > 42) return "#f1c40f";
+        }
+        
+        return "#2ecc71"; // Verde (Todo OK)
     }
 
     function pintarDashboard(inv) {
@@ -293,7 +350,6 @@
 
     function cargarReportes() {
         let f = document.getElementById('filtro-reporte').value;
-        
         let lista = historialCompleto.filter(h => {
             let accion = h[2];
             let notas = h[5] || "";
@@ -375,30 +431,21 @@
                 <p>📍 <b>Puesto:</b> ${e.subpuesto || 'N/A'}</p>
                 <p>🏷️ <b>Chapeta:</b> ${e.chapeta || 'N/A'}</p>
                 <p>👩‍👦 <b>Madre:</b> ${e.madre || 'N/A'}</p>
-                
                 ${e.piglets > 0 ? `
                     <div style="background:#fff3e0; padding:10px; border-radius:8px; border:1px solid #ffe0b2; margin:10px 0; display:flex; justify-content:space-between; align-items:center;">
                         <span style="color:#e67e22; font-weight:bold;">🐷 ${e.piglets} Lechones Vivos</span>
                         <button class="btn-baja-lechon" onclick="cargarAccion('${e.id}', 'BAJA_LACTANCIA')">💀 Baja</button>
-                    </div>
-                ` : ''}
-                
+                    </div>` : ''}
                 <div class="btn-action-group">
                     <button class="btn-action btn-orange" onclick="cargarAccion('${e.id}', 'OBSERVACION')"><i class="fas fa-edit"></i> Nota</button>
                     <button class="btn-action btn-blue" onclick="cargarAccion('${e.id}', 'TRASLADO')"><i class="fas fa-exchange-alt"></i> Mover</button>
                     <button class="btn-action btn-purple" onclick="cargarAccion('${e.id}', 'SERVICIO')"><i class="fas fa-syringe"></i> Inseminar</button>
                     ${botonExtra}
                 </div>
+                <hr><h4>Historial</h4>
+                ${historialCompleto.filter(h=>h[1]==id).reverse().slice(0,10).map(h=>`<div style="font-size:0.8rem; margin-bottom:5px;">📅 ${new Date(h[0]).toLocaleDateString()} - <b>${h[2]}</b><br>${h[5]}</div>`).join("")}
             </div>
         `;
-        let historialHTML = historialCompleto.filter(h=>h[1]==id).reverse().slice(0,10).map(h => {
-             return `<div style="font-size:0.85rem; padding:8px; border-bottom:1px solid #eee;">
-                        <b>${h[2]}</b> <span style="color:#888; float:right">${new Date(h[0]).toLocaleDateString()}</span><br>
-                        ${h[5]}
-                     </div>`;
-        }).join("");
-        
-        document.getElementById('contenedor-detalle').innerHTML += `<div class="card-form" style="margin-top:15px;"><h4>Historial</h4>${historialHTML}</div>`;
     }
 
     function cargarAccion(id, acc) { verTab('registro'); document.getElementById('tatuaje').value = id; document.getElementById('accion').value = acc; verificarAccion(); }
@@ -412,6 +459,7 @@
         document.getElementById('section-parto').style.display = "none";
         document.getElementById('section-baja-lechon').style.display = "none";
         document.getElementById('section-fase').style.display = "block";
+        document.getElementById('section-servicio').style.display = (acc === "SERVICIO") ? "block" : "none";
 
         if(acc === "SERVICIO") document.getElementById('fase').value = "SALA_SERVICIO";
         if(acc === "PARTO") { document.getElementById('fase').value = "MATERNIDAD"; document.getElementById('section-parto').style.display = "block"; }
@@ -469,7 +517,18 @@
         }
 
         let btn = document.getElementById('btnEnviar'); btn.disabled = true; btn.innerText = "Guardando...";
-        let d = { tatuaje: id, chapeta: document.getElementById('chapeta').value, peso: document.getElementById('peso').value, accion: acc, fase: document.getElementById('fase').value, subpuesto: document.getElementById('subpuesto').value, notas: document.getElementById('notas').value, imagenBase64: fotoBase64, mimeType: fotoMime };
+        let d = { 
+            tatuaje: id, 
+            chapeta: document.getElementById('chapeta').value, 
+            peso: document.getElementById('peso').value, 
+            accion: acc, 
+            fase: document.getElementById('fase').value, 
+            subpuesto: document.getElementById('subpuesto').value, 
+            notas: document.getElementById('notas').value, 
+            inseminador: document.getElementById('inseminador').value,
+            imagenBase64: fotoBase64, 
+            mimeType: fotoMime 
+        };
 
         if(acc === "DESTETE") {
             let subL = document.getElementById('subpuesto-lechones').value;
@@ -501,11 +560,17 @@
         document.getElementById('contenedor-lista').innerHTML = inventarioGlobal.filter(e => e.id.toString().includes(t) || (e.chapeta && e.chapeta.toString().includes(t))).map(e => `<div class="item-lista" onclick="verDetalle('${e.id}')" style="border-left: 5px solid ${e.color}"><div><b>ID: ${e.id}</b> <span class="dot-status" style="background-color:${e.color}"></span><br><small>${e.fase}</small></div><i class="fas fa-chevron-right"></i></div>`).join("");
     }
 
-    function limpiarFormulario() { document.getElementById('tatuaje').value = ""; document.getElementById('chapeta').value = ""; document.getElementById('peso').value = ""; document.getElementById('preview').style.display="none"; fotoBase64=""; }
+    function limpiarFormulario() { 
+        document.getElementById('tatuaje').value = ""; 
+        document.getElementById('chapeta').value = ""; 
+        document.getElementById('peso').value = ""; 
+        document.getElementById('inseminador').value = ""; 
+        document.getElementById('preview').style.display="none"; 
+        fotoBase64=""; 
+    }
     function cargarReportes() { 
         let f = document.getElementById('filtro-reporte').value;
-        // Llamada a la funcion de reporte
-        // (La función cargarReportes ya está definida arriba en el script principal)
+        // ... (resto de función cargarReportes igual que antes)
     }
     function volverAlTablero() { document.getElementById('view-list').style.display='none'; document.getElementById('view-dashboard-summary').style.display='block'; }
     function volverALista() { document.getElementById('view-detail').style.display='none'; document.getElementById('view-list').style.display='block'; }
