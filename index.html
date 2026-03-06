@@ -38,9 +38,12 @@ button{background:none;border:none;cursor:pointer;font-family:inherit}
 @keyframes fade-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes pulse-alert{0%{transform:scale(1);box-shadow:0 0 0 0 rgba(220,38,38,.7)}70%{transform:scale(1.15);box-shadow:0 0 0 8px rgba(220,38,38,0)}100%{transform:scale(1);box-shadow:0 0 0 0 rgba(220,38,38,0)}}
+@keyframes marquee {0% { transform: translateX(0); } 100% { transform: translateX(-100%); }}
 .animate-fade-in{animation:fade-in .3s ease}
 .animate-spin{animation:spin 1s linear infinite}
 .animate-pulse-alert{animation:pulse-alert 2s infinite}
+.marquee-container { width: 100%; overflow: hidden; white-space: nowrap; box-sizing: border-box; display: flex; }
+.marquee-text { display: inline-block; padding-left: 100%; animation: marquee 12s linear infinite; will-change: transform; }
 </style>
 </head>
 <body>
@@ -132,7 +135,6 @@ async function syncQueue() {
   
   let somethingSynced = false;
   
-  // Usamos un bucle "while" robusto: siempre revisa si hay tareas nuevas que entraron durante la ejecución.
   while (true) {
     let currentQ = getQueue();
     if (currentQ.length === 0) break;
@@ -143,7 +145,6 @@ async function syncQueue() {
       const res = await fetch(URL_SCRIPT,{method:"POST",redirect:"follow",headers:{"Content-Type":"text/plain;charset=utf-8"},body});
       if(!res.ok) throw new Error("Sync failed");
       
-      // Borrar la tarea completada de la cola
       let updatedQ = getQueue();
       updatedQ = updatedQ.filter(x => x.id !== item.id);
       setQueue(updatedQ);
@@ -177,6 +178,30 @@ function obtenerColor(dias,fase){
   if(fase.includes("LEVANTE")){if(dias>60)return"red";if(dias>50)return"yellow"}
   if(fase.includes("ENGORDE")){if(dias>90)return"red";if(dias>75)return"yellow"}
   return"green";
+}
+
+function obtenerMensajeAlerta(animal){
+  if(animal.color==="green"||!animal.activo) return null;
+  const d=animal.dias;
+  const t=animal.color==="red"?"URGENTE":"ATENCIÓN";
+  if(animal.fase==="REPRODUCTIVA"){
+    switch(animal.subfase){
+      case "REEMPLAZO": return `${t}: Lleva ${d} días en reemplazo. Debes evaluar servicio o descartarla.`;
+      case "SERVIDAS": return `${t}: Lleva ${d} días servida. Debes confirmar su gestación o retorno.`;
+      case "GESTACION": return `${t}: Ya cumplió ${d} días gestando. Debes trasladarla a Maternidad (Parto).`;
+      case "VACIA": return `${t}: Lleva ${d} días vacía. Debes darle servicio urgente.`;
+      case "MATERNIDAD":
+      case "LACTANCIA": return `${t}: Ya cumplió ${d} días lactando. Debes programar el destete.`;
+      case "DESTETE": return `${t}: Lleva ${d} días en destete. Debes trasladarla a otra fase.`;
+      case "DESCANSO": return `${t}: Descanso completado (${d} días). Lista para nuevo servicio.`;
+      default: return `${t}: Excedió los días esperados (${d} días).`;
+    }
+  }else{
+    if(animal.fase.includes("PRECEBO")) return `${t}: Ya cumplió los días en Precebo (${d} días). Debes trasladarla a Levante.`;
+    if(animal.fase.includes("LEVANTE")) return `${t}: Ya cumplió los días en Levante (${d} días). Debes trasladarla a Engorde.`;
+    if(animal.fase.includes("ENGORDE")) return `${t}: Ya cumplió los días en Engorde (${d} días). Lista para Venta.`;
+  }
+  return `${t}: Revisar estado, lleva ${d} días.`;
 }
 
 function calcularSubfase(id,regs){
@@ -446,17 +471,25 @@ function AnimalList({title,animals,onSelect,onBack}){
         const inactive=!a.activo;
         const sfInfo=a.subfase?SUBFASES_REPRODUCTIVA.find(s=>s.key===a.subfase):null;
         const status=inactive?(a.ultimaAccion==="VENTA"?"💰 VENDIDO":"🔴 MUERTO"):"📍 "+(a.subpuesto||"Sin puesto")+" · "+a.fase.replace(/_/g," ")+(sfInfo?" · "+sfInfo.icon+" "+sfInfo.label:"");
-        return React.createElement("div",{key:a.id,onClick:()=>onSelect(a.id),style:{background:"var(--card)",borderRadius:8,padding:14,display:"flex",alignItems:"center",justifyContent:"space-between",borderLeft:"4px solid "+(inactive?"var(--muted-fg)":colorMap[a.color]),boxShadow:"0 1px 4px rgba(0,0,0,.06)",cursor:"pointer",opacity:inactive?.7:1}},
-          React.createElement("div",null,
-            React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8}},
-              React.createElement("span",{style:{fontWeight:700}},"ID: "+a.id),
-              !inactive&&React.createElement("span",{style:{width:10,height:10,borderRadius:"50%",background:colorMap[a.color],display:"inline-block"}}),
-              sfInfo&&!inactive&&React.createElement("span",{style:{fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:4,background:"rgba(45,106,79,.1)",color:"var(--primary)"}},sfInfo.icon+" "+sfInfo.label),
-              inactive&&React.createElement("span",{style:{fontSize:10,fontWeight:700,padding:"2px 6px",borderRadius:4,background:"var(--muted)",color:"var(--muted-fg)"}},a.ultimaAccion==="VENTA"?"VENDIDO":"MUERTO")
+        const msg = obtenerMensajeAlerta(a);
+
+        return React.createElement("div",{key:a.id,onClick:()=>onSelect(a.id),style:{background:"var(--card)",borderRadius:8,padding:14,display:"flex",flexDirection:"column",gap:8,borderLeft:"4px solid "+(inactive?"var(--muted-fg)":colorMap[a.color]),boxShadow:"0 1px 4px rgba(0,0,0,.06)",cursor:"pointer",opacity:inactive?.7:1}},
+          React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center"}},
+            React.createElement("div",null,
+              React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8}},
+                React.createElement("span",{style:{fontWeight:700}},"ID: "+a.id),
+                !inactive&&React.createElement("span",{style:{width:10,height:10,borderRadius:"50%",background:colorMap[a.color],display:"inline-block"}}),
+                sfInfo&&!inactive&&React.createElement("span",{style:{fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:4,background:"rgba(45,106,79,.1)",color:"var(--primary)"}},sfInfo.icon+" "+sfInfo.label),
+                inactive&&React.createElement("span",{style:{fontSize:10,fontWeight:700,padding:"2px 6px",borderRadius:4,background:"var(--muted)",color:"var(--muted-fg)"}},a.ultimaAccion==="VENTA"?"VENDIDO":"MUERTO")
+              ),
+              React.createElement("p",{style:{fontSize:12,color:"var(--muted-fg)",marginTop:2}},status+(!inactive&&a.dias>0?" · ⏱️ "+a.dias+"d":"")+(!inactive&&a.piglets>0?" · 🐷 "+a.piglets:""))
             ),
-            React.createElement("p",{style:{fontSize:12,color:"var(--muted-fg)",marginTop:2}},status+(!inactive&&a.dias>0?" · ⏱️ "+a.dias+"d":"")+(!inactive&&a.piglets>0?" · 🐷 "+a.piglets:""))
+            React.createElement("span",{style:{color:"var(--muted-fg)"}},"›")
           ),
-          React.createElement("span",{style:{color:"var(--muted-fg)"}},"›")
+          
+          msg && React.createElement("div",{className:"marquee-container", style:{padding:"4px 8px", borderRadius:6, background:a.color==="red"?"rgba(220,38,38,.1)":"rgba(212,160,10,.1)", border:"1px solid "+colorMap[a.color]}},
+            React.createElement("span",{className:"marquee-text", style:{fontSize:11, fontWeight:700, color:colorMap[a.color]}}, "⚠️ " + msg)
+          )
         );
       })
     )
@@ -498,6 +531,8 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
   const scoreLabel=sowStats.score>=70?"Excelente":sowStats.score>=40?"Regular":"Bajo rendimiento";
   const btn={cursor:"pointer",borderRadius:8,fontWeight:600,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"10px 0",width:"100%",border:"none"};
   const madurez=sowStats.partos===0?"NULÍPARAS":sowStats.partos===1?"PRIMÍPARAS":sowStats.partos===2?"MULTÍPARAS":"MULTÍPARAS +"+sowStats.partos;
+
+  const alertMsg = obtenerMensajeAlerta(animal);
 
   const handleApplyVacuna=async()=>{
     if(!showDateModal)return;
@@ -556,6 +591,11 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
         React.createElement("h2",{style:{fontSize:24,fontWeight:800}},"ID: "+animal.id),
         React.createElement("span",{style:{background:colorMap[animal.color],color:"#fff",fontSize:11,fontWeight:700,padding:"4px 12px",borderRadius:20}},"⏱️ "+animal.dias+" días")
       ),
+      
+      alertMsg && React.createElement("div",{className:"marquee-container", style:{marginTop:12, padding:"8px 12px", borderRadius:8, background:animal.color==="red"?"rgba(220,38,38,.1)":"rgba(212,160,10,.1)", border:"1px solid "+colorMap[animal.color]}},
+        React.createElement("span",{className:"marquee-text", style:{fontSize:12, fontWeight:700, color:colorMap[animal.color]}}, "⚠️ " + alertMsg)
+      ),
+
       isInactive&&React.createElement("div",{style:{marginTop:12,padding:12,borderRadius:8,background:"rgba(220,38,38,.1)",border:"1px solid rgba(220,38,38,.2)",textAlign:"center"}},
         React.createElement("p",{style:{fontSize:14,fontWeight:700,color:"var(--destructive)"}},animal.ultimaAccion==="VENTA"?"💰 VENDIDO":"🔴 MUERTO"," — No se pueden registrar acciones")
       ),
@@ -797,7 +837,7 @@ function VacunasView({inventario,historial,onRefresh,onSelectAnimal,search}){
       };
       await enviarBatch(payload);
     } catch(e) {
-      alert("Error al procesar. Intenta de nuevo.");
+      alert("Error al procesar.");
     }
     setApplying(null);
   };
