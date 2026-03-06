@@ -249,7 +249,7 @@ function FarmHeader({searchValue,onSearch,onNavigate,activeTab}){
       ),
       React.createElement("div",{style:{marginTop:12,position:"relative"}},
         React.createElement("span",{style:{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",color:"var(--muted-fg)"}},"🔍"),
-        React.createElement("input",{value:searchValue,onChange:e=>onSearch(e.target.value),placeholder:"Buscar por Tatuaje, Chapeta o Madurez...",style:{width:"100%",padding:"10px 16px 10px 36px",borderRadius:20,border:"none",outline:"none",fontSize:14,background:"var(--card)",color:"var(--fg)"}})
+        React.createElement("input",{value:searchValue,onChange:e=>onSearch(e.target.value),placeholder:"Buscar ID, Notas, Acciones o Chapeta...",style:{width:"100%",padding:"10px 16px 10px 36px",borderRadius:20,border:"none",outline:"none",fontSize:14,background:"var(--card)",color:"var(--fg)"}})
       )
     )
   );
@@ -335,10 +335,31 @@ function SubpuestoCards({phase,animals,onSelect,onSelectAll,onBack,onSubfaseClic
 }
 
 function AnimalList({title,animals,onSelect,onBack}){
+  const counts=useMemo(()=>{
+    let act=0,vend=0,muer=0;
+    animals.forEach(a=>{
+      if(a.activo) act++;
+      else if(a.ultimaAccion==="VENTA") vend++;
+      else muer++;
+    });
+    return {act,vend,muer,total:animals.length};
+  },[animals]);
+
   return React.createElement("div",{className:"animate-fade-in"},
     React.createElement("button",{onClick:onBack,style:{display:"flex",alignItems:"center",gap:4,fontSize:14,fontWeight:600,color:"var(--primary)",marginBottom:12}},"← Volver"),
-    React.createElement("h3",{style:{fontSize:18,fontWeight:700,marginBottom:12}},title),
-    animals.length===0?React.createElement("p",{style:{textAlign:"center",color:"var(--muted-fg)",padding:"32px 0"}},"Sin animales en esta fase."):
+    React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}},
+      React.createElement("h3",{style:{fontSize:18,fontWeight:700}},title),
+      React.createElement("span",{style:{fontSize:12,fontWeight:700,color:"var(--muted-fg)",background:"var(--muted)",padding:"4px 8px",borderRadius:12}},counts.total+" resultados")
+    ),
+    
+    // Novedad: Píldoras de conteo general para la búsqueda y listas
+    counts.total>0&&React.createElement("div",{style:{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}},
+      React.createElement("span",{style:{fontSize:11,fontWeight:700,color:"var(--success)",background:"rgba(45,138,86,.1)",padding:"4px 8px",borderRadius:6,border:"1px solid rgba(45,138,86,.2)"}},"🟢 Activas: "+counts.act),
+      counts.vend>0&&React.createElement("span",{style:{fontSize:11,fontWeight:700,color:"#d97706",background:"rgba(217,119,6,.1)",padding:"4px 8px",borderRadius:6,border:"1px solid rgba(217,119,6,.2)"}},"💰 Vendidas: "+counts.vend),
+      counts.muer>0&&React.createElement("span",{style:{fontSize:11,fontWeight:700,color:"var(--destructive)",background:"rgba(220,38,38,.1)",padding:"4px 8px",borderRadius:6,border:"1px solid rgba(220,38,38,.2)"}},"🔴 Muertas: "+counts.muer)
+    ),
+
+    animals.length===0?React.createElement("p",{style:{textAlign:"center",color:"var(--muted-fg)",padding:"32px 0"}},"Sin animales en esta búsqueda/fase."):
     React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:8}},
       animals.map(a=>{
         const inactive=!a.activo;
@@ -563,7 +584,7 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
   );
 }
 
-function VacunasView({inventario,historial,onRefresh,onSelectAnimal}){
+function VacunasView({inventario,historial,onRefresh,onSelectAnimal,search}){
   const[filter,setFilter]=useState("all");
   const[expandedAnimal,setExpandedAnimal]=useState(null);
   const[applying,setApplying]=useState(null);
@@ -599,10 +620,22 @@ function VacunasView({inventario,historial,onRefresh,onSelectAnimal}){
   },[selectas,historial]);
 
   const filtered=useMemo(()=>{
-    if(filter==="pending")return animalStatuses.filter(a=>a.vacunas.some(v=>!v.aplicada));
-    if(filter==="overdue")return animalStatuses.filter(a=>a.overallColor==="red");
-    return animalStatuses;
-  },[animalStatuses,filter]);
+    let list = animalStatuses;
+    if(filter==="pending") list = list.filter(a=>a.vacunas.some(v=>!v.aplicada));
+    if(filter==="overdue") list = list.filter(a=>a.overallColor==="red");
+    
+    // Aplicamos el filtro de búsqueda
+    if(search && search.trim()){
+       const upper = search.toUpperCase();
+       list = list.filter(a => {
+          const hasNotes = historial.some(h => h[1]?.toString()===a.animal.id && ((h[5]||"").toString().toUpperCase().includes(upper) || (h[2]||"").toString().toUpperCase().includes(upper)));
+          return a.animal.id.toString().toUpperCase().includes(upper) || 
+                 (a.animal.chapeta && a.animal.chapeta.toString().toUpperCase().includes(upper)) ||
+                 hasNotes;
+       });
+    }
+    return list;
+  },[animalStatuses,filter,search,historial]);
 
   const sorted=useMemo(()=>{
     const order={red:0,yellow:1,gray:2,green:3};
@@ -610,11 +643,11 @@ function VacunasView({inventario,historial,onRefresh,onSelectAnimal}){
   },[filtered]);
 
   const counts=useMemo(()=>({
-    total:animalStatuses.length,
-    overdue:animalStatuses.filter(a=>a.overallColor==="red").length,
-    pending:animalStatuses.filter(a=>a.vacunas.some(v=>!v.aplicada&&v.color!=="red")).length,
-    complete:animalStatuses.filter(a=>a.vacunas.every(v=>v.aplicada)).length,
-  }),[animalStatuses]);
+    total:filtered.length,
+    overdue:filtered.filter(a=>a.overallColor==="red").length,
+    pending:filtered.filter(a=>a.vacunas.some(v=>!v.aplicada&&v.color!=="red")).length,
+    complete:filtered.filter(a=>a.vacunas.every(v=>v.aplicada)).length,
+  }),[filtered]);
 
   const handleApplyVacuna=async()=>{
     if(!showDateModal) return;
@@ -675,7 +708,7 @@ function VacunasView({inventario,historial,onRefresh,onSelectAnimal}){
     ),
 
     /* Animal list */
-    sorted.length===0?React.createElement("div",{style:{textAlign:"center",padding:"40px 0",color:"var(--muted-fg)",fontSize:14}},"No hay marranas "+(filter==="overdue"?"con vacunas vencidas":filter==="pending"?"con vacunas próximas":"en selecta/reproductiva")):
+    sorted.length===0?React.createElement("div",{style:{textAlign:"center",padding:"40px 0",color:"var(--muted-fg)",fontSize:14}},"No hay resultados o marranas en selecta/reproductiva"):
     React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:8}},
       sorted.map(status=>{
         const isExpanded=expandedAnimal===status.animal.id;
@@ -776,21 +809,37 @@ function ReportsView({historial,search,onSelectAnimal}){
   );
 }
 
-function ResumenView({historial,onSelectAnimal}){
+function ResumenView({historial,onSelectAnimal,search}){
   const hoy=()=>formatDateStr(new Date());
   const hace30=()=>{const d=new Date();d.setDate(d.getDate()-30);return formatDateStr(d)};
   const[desde,setDesde]=useState(hace30);const[hasta,setHasta]=useState(hoy);const[expanded,setExpanded]=useState(null);
   const CATS=[{key:"PARTO",label:"🐷 Nacimientos",color:"#2563eb"},{key:"MUERTE",label:"🔴 Muertes",color:"#dc2626"},{key:"VENTA",label:"💰 Ventas",color:"#d97706"},{key:"INGRESO",label:"📥 Ingresos",color:"var(--success)"},{key:"DESTETE",label:"🥣 Destetes",color:"#7c3aed"},{key:"SERVICIO",label:"💉 Servicios",color:"#db2777"},{key:"BAJA_LACTANCIA",label:"⚠️ Bajas Lactancia",color:"#ea580c"}];
   const{resumen,registrosFiltrados}=useMemo(()=>{
     const counts={};CATS.forEach(c=>counts[c.key]={count:0,detalle:""});const filtered={};CATS.forEach(c=>filtered[c.key]=[]);
-    historial.forEach(h=>{const accion=(h[2]||"").toString().toUpperCase().trim();const fechaStr=extractDateKey(h[0]);
+    
+    const upperSearch = (search||"").toUpperCase().trim();
+
+    historial.forEach(h=>{
+      const accion=(h[2]||"").toString().toUpperCase().trim();
+      const fechaStr=extractDateKey(h[0]);
+      const notas=(h[5]||"").toString().toUpperCase();
+      const id=(h[1]||"").toString().toUpperCase();
+      const chapeta=(h[10]||"").toString().toUpperCase();
+
       if(!fechaStr||fechaStr<desde||fechaStr>hasta)return;
+
+      // Aplicar filtro de búsqueda general
+      if(upperSearch && !id.includes(upperSearch) && !chapeta.includes(upperSearch) && !notas.includes(upperSearch) && !accion.includes(upperSearch)){
+         return;
+      }
+
       if(counts[accion]!==undefined){counts[accion].count++;filtered[accion].push(h);
         if(accion==="PARTO"){const m=(h[5]||"").match(/Vivos:\s*(\d+)/);if(m)counts[accion].detalle=(parseInt(counts[accion].detalle||"0")+parseInt(m[1])).toString()}
         if(accion==="VENTA"){const m=(h[5]||"").match(/Peso:\s*([\d.]+)/);if(m)counts[accion].detalle=(parseFloat(counts[accion].detalle||"0")+parseFloat(m[1])).toFixed(1)}
         if(accion==="BAJA_LACTANCIA"){const m=(h[5]||"").match(/Cantidad:\s*(\d+)/);if(m)counts[accion].detalle=(parseInt(counts[accion].detalle||"0")+parseInt(m[1])).toString()}}});
     return{resumen:counts,registrosFiltrados:filtered};
-  },[historial,desde,hasta]);
+  },[historial,desde,hasta,search]);
+
   const fmtD=d=>{const p=d.split("-");return p[2]+"/"+p[1]+"/"+p[0]};
   const inputS={width:"100%",padding:"8px",borderRadius:8,border:"1px solid var(--input)",background:"var(--card)",color:"var(--fg)",fontSize:14};
 
@@ -1041,7 +1090,40 @@ function App(){
   const getMadurez=useCallback(id=>{const partos=historial.filter(h=>h[1]?.toString()===id&&h[2]==="PARTO").length;if(partos===0)return"NULIPARAS";if(partos===1)return"PRIMIPARAS";if(partos===2)return"MULTIPARAS";return"MULTIPARAS +"+partos},[historial]);
 
   const handleAction=(id,accion)=>{setPrefillId(id);setPrefillAccion(accion);const a=todosAnimales.find(x=>x.id===id)||null;setPrefillAnimal(a);setTab("registro")};
-  const handleSearch=val=>{setSearch(val);if(!val.trim()){setDashView("summary");return}const upper=val.toUpperCase();const filtered=todosAnimales.filter(a=>{const madurez=a.fase==="REPRODUCTIVA"?getMadurez(a.id):"";return a.id.toString().toUpperCase().includes(upper)||(a.chapeta&&a.chapeta.toString().toUpperCase().includes(upper))||madurez.toUpperCase().includes(upper)});setListTitle("Resultados de búsqueda");setListAnimals(filtered);setDashView("list")};
+  
+  // LOGICA GLOBAL DE BÚSQUEDA MODIFICADA
+  const handleSearch=val=>{
+    setSearch(val);
+    if(!val.trim()){
+      if(tab==="dashboard") setDashView("summary");
+      return;
+    }
+    const upper=val.toUpperCase();
+    
+    // 1. Encontrar todos los IDs de animales que tengan notas, observaciones o acciones que coincidan con la búsqueda
+    const matchingIds = new Set();
+    historial.forEach(h => {
+      const notas = (h[5]||"").toString().toUpperCase();
+      const accion = (h[2]||"").toString().toUpperCase();
+      if(notas.includes(upper) || accion.includes(upper)){
+        if(h[1]) matchingIds.add(h[1].toString());
+      }
+    });
+
+    // 2. Filtrar inventario usando ID, Chapeta, o los IDs encontrados en el paso anterior
+    const filtered=todosAnimales.filter(a=>{
+      const madurez=a.fase==="REPRODUCTIVA"?getMadurez(a.id):"";
+      return a.id.toString().toUpperCase().includes(upper)||
+             (a.chapeta&&a.chapeta.toString().toUpperCase().includes(upper))||
+             madurez.toUpperCase().includes(upper)||
+             matchingIds.has(a.id.toString()); // Coincidencia por historial
+    });
+    
+    setListTitle("Resultados de búsqueda");
+    setListAnimals(filtered);
+    if(tab==="dashboard") setDashView("list");
+  };
+
   const handleTabChange=newTab=>{setTab(newTab);if(newTab==="dashboard")setDashView("summary");if(newTab==="registro"){setPrefillId("");setPrefillAccion("INGRESO");setPrefillAnimal(null)}};
   const inputS={width:"100%",padding:"6px 8px",borderRadius:8,border:"1px solid var(--input)",background:"var(--card)",color:"var(--fg)",fontSize:12};
 
@@ -1068,8 +1150,8 @@ function App(){
       ),
       tab==="registro"&&React.createElement(RegistroForm,{inventario:inventario,fasesExtra:fasesExtra,prefillId:prefillId,prefillAccion:prefillAccion,prefillAnimal:prefillAnimal,historial:historial,onSuccess:()=>{loadData();handleTabChange("dashboard")}}),
       tab==="reportes"&&React.createElement(ReportsView,{historial:historial,search:search,onSelectAnimal:id=>{const a=todosAnimales.find(x=>x.id===id);if(a){setSelectedAnimal(a);setTab("dashboard");setDashView("detail")}}}),
-      tab==="resumen"&&React.createElement(ResumenView,{historial:historial,onSelectAnimal:id=>{const a=todosAnimales.find(x=>x.id===id);if(a){setSelectedAnimal(a);setTab("dashboard");setDashView("detail")}}}),
-      tab==="vacunas"&&React.createElement(VacunasView,{inventario:inventario,historial:historial,onRefresh:loadData,onSelectAnimal:id=>{const a=todosAnimales.find(x=>x.id===id);if(a){setSelectedAnimal(a);setTab("dashboard");setDashView("detail")}}})
+      tab==="resumen"&&React.createElement(ResumenView,{historial:historial,search:search,onSelectAnimal:id=>{const a=todosAnimales.find(x=>x.id===id);if(a){setSelectedAnimal(a);setTab("dashboard");setDashView("detail")}}}),
+      tab==="vacunas"&&React.createElement(VacunasView,{inventario:inventario,historial:historial,search:search,onRefresh:loadData,onSelectAnimal:id=>{const a=todosAnimales.find(x=>x.id===id);if(a){setSelectedAnimal(a);setTab("dashboard");setDashView("detail")}}})
     ),
     React.createElement(BottomNav,{active:tab,onChange:handleTabChange})
   );
