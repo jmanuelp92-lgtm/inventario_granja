@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
 <title>🐷 Granja Pro</title>
 <meta name="description" content="Sistema de gestión porcina profesional. Controla inventario, offline sync y más."/>
+
+<meta name="theme-color" content="#2d6a4f"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<link rel="manifest" href="data:application/json;charset=utf-8,%7B%22name%22%3A%22Granja%20Pro%22%2C%22short_name%22%3A%22GranjaPro%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23f5f2eb%22%2C%22theme_color%22%3A%22%232d6a4f%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48dGV4dCB5PSIuOWVtIiBmb250LXNpemU9IjkwIj7wn5C3PC90ZXh0Pjwvc3ZnPg%3D%3D%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%2C%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48dGV4dCB5PSIuOWVtIiBmb250LXNpemU9IjkwIj7wn5C3PC90ZXh0Pjwvc3ZnPg%3D%3D%22%2C%22sizes%22%3A%22512x512%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D" />
+
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -85,14 +91,26 @@ const QUEUE_KEY = "granja_pro_queue";
 function getQueue() { return JSON.parse(localStorage.getItem(QUEUE_KEY)||'[]'); }
 function setQueue(q) { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); window.dispatchEvent(new Event('offline_queue_changed')); }
 
-// Guarda en memoria y delega la subida al sistema en segundo plano
+async function fetchFarmData(){
+  try{
+    if(!navigator.onLine) throw new Error("Offline");
+    const r=await fetch(URL_SCRIPT+"?t="+Date.now(),{cache:"no-store"});
+    const data=await r.json();
+    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+    return data;
+  }catch(e){
+    const cached=localStorage.getItem(CACHE_KEY);
+    if(cached) return JSON.parse(cached);
+    return {registros:[], fases:[]};
+  }
+}
+
 async function enviarRegistro(d){
   const q = getQueue(); 
   q.push({id:Date.now(), tipo:'registro', data:d}); 
   setQueue(q);
-  // Aviso al sistema para actualizar la pantalla instantáneamente
   window.dispatchEvent(new CustomEvent('optimistic_save', {detail: d}));
-  syncQueue(); // Lanza el guardado en internet sin bloquear la pantalla
+  syncQueue();
   return {ok:true};
 }
 
@@ -124,7 +142,7 @@ async function syncQueue() {
       q[i].synced = true;
       somethingSynced = true;
     } catch(e) {
-      break; // Si falla uno, detiene la cola hasta recuperar red
+      break; 
     }
   }
   const newQ = q.filter(item => !item.synced);
@@ -286,7 +304,7 @@ function DateInput({value,onChange,placeholder}){
 
 /* ─── COMPONENTS ─── */
 
-function FarmHeader({searchValue,onSearch,onNavigate,activeTab, isOnline, queueCount, syncing}){
+function FarmHeader({searchValue,onSearch,onNavigate,activeTab, isOnline, queueCount, syncing, onInstall, showInstall}){
   const[menuOpen,setMenuOpen]=useState(false);
   const menuItems=[{id:"vacunas",label:"💉 Vacunas"},{id:"reportes",label:"📋 Reportes"},{id:"resumen",label:"📊 Resumen"}];
   return React.createElement("header",{style:{position:"sticky",top:0,zIndex:40,boxShadow:"0 4px 12px rgba(0,0,0,.15)"},className:"gradient-farm"},
@@ -294,6 +312,7 @@ function FarmHeader({searchValue,onSearch,onNavigate,activeTab, isOnline, queueC
       React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
         React.createElement("h1",{style:{fontSize:20,fontWeight:700,color:"var(--primary-fg)",letterSpacing:1}},"🐷 Granja Pro"),
         React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8}},
+          showInstall && React.createElement("button",{onClick:onInstall,style:{fontSize:11,background:"#2563eb",color:"#fff",padding:"5px 10px",borderRadius:6,fontWeight:700,border:"none",cursor:"pointer",boxShadow:"0 2px 4px rgba(0,0,0,0.2)"}},"📲 Instalar"),
           syncing ? React.createElement("span",{className:"animate-spin",style:{fontSize:14}},"🔄") :
           !isOnline ? React.createElement("span",{style:{fontSize:9,background:"var(--destructive)",color:"#fff",padding:"4px 6px",borderRadius:6,fontWeight:700}},"🔴 Sin red ("+queueCount+")") :
           queueCount > 0 ? React.createElement("span",{style:{fontSize:9,background:"var(--warning)",color:"#000",padding:"4px 6px",borderRadius:6,fontWeight:700}},"📤 Subiendo...") : null,
@@ -839,7 +858,7 @@ function ReportsView({historial,search,onSelectAnimal}){
     ),
     React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}},
       React.createElement("div",null,React.createElement("label",{style:{fontSize:10,fontWeight:600,color:"var(--muted-fg)",textTransform:"uppercase"}},"📍 Puesto"),React.createElement("select",{value:filtroPuesto,onChange:e=>setFiltroPuesto(e.target.value),style:inputS},React.createElement("option",{value:""},"Todos"),subpuestos.map(s=>React.createElement("option",{key:s,value:s},s)))),
-      React.createElement("div",null,React.createElement("label",{style:{fontSize:10,fontWeight:600,color:"var(--muted-fg)",textTransform:"uppercase"}},"👩‍👦 Madre"),React.createElement("select",{value:filtroMadre,onChange:e=>setFiltroMadre(e.target.value),style:inputS},React.createElement("option",{value:""},"Todas"),madres.map(m=>React.createElement("option",{key:m,value:m},m))))
+      React.createElement("div",null,React.createElement("label",{style:{fontSize:10,fontWeight:600,color:"var(--muted-fg)",textTransform:"uppercase"}},"👩‍👦 Madre"),React.createElement("select",{value:filterMadre,onChange:e=>setFiltroMadre(e.target.value),style:inputS},React.createElement("option",{value:""},"Todas"),madres.map(m=>React.createElement("option",{key:m,value:m},m))))
     ),
     compradores.length>0&&React.createElement("div",{style:{marginBottom:8}},React.createElement("label",{style:{fontSize:10,fontWeight:600,color:"var(--muted-fg)",textTransform:"uppercase"}},"🤝 Comprador"),React.createElement("select",{value:filtroComprador,onChange:e=>setFiltroComprador(e.target.value),style:inputS},React.createElement("option",{value:""},"Todos"),compradores.map(c=>React.createElement("option",{key:c,value:c},c)))),
     hasAF&&React.createElement("button",{onClick:clearFilters,style:{fontSize:12,color:"var(--primary)",fontWeight:600,marginBottom:12}},"✕ Limpiar filtros"),
@@ -1008,7 +1027,7 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
         const ld=ef.filter(l=>l.tat).map(l=>({tatuaje:l.tat,chapeta:l.chap,peso:l.peso,notas:"Hijo de "+tatuaje+(l.peso?" | Peso: "+l.peso+"kg":"")}));
         if(ld.length>0)await enviarBatch({comun:{accion:"INGRESO",fase:"PRECEBO",subpuesto:destLechones,madre:tatuaje,fecha:toAppsScriptDate(fechaStr)},animales:ld})}
       
-      const res = await enviarRegistro({tatuaje,chapeta,peso,accion,fase,subpuesto,notas:finalNotas,inseminador,fecha:toAppsScriptDate(fechaStr)});
+      await enviarRegistro({tatuaje,chapeta,peso,accion,fase,subpuesto,notas:finalNotas,inseminador,fecha:toAppsScriptDate(fechaStr)});
       
       setSaving(false);onSuccess();
     }catch(err){alert("Error al guardar: "+(err.message||"Intenta de nuevo."));setSaving(false)}
@@ -1134,14 +1153,13 @@ function App(){
   const[filterPuesto,setFilterPuesto]=useState("");
   const[filterMadre,setFilterMadre]=useState("");
 
-  // Estados de conexión
+  // Estados de conexión e Instalación PWA
   const[isOnline,setIsOnline]=useState(navigator.onLine);
   const[queueCount,setQueueCount]=useState(getQueue().length);
   const[syncing,setSyncing]=useState(false);
+  const[deferredPrompt,setDeferredPrompt]=useState(null);
 
-  // Carga de datos optimizada: Cache primero, luego fondo
   const loadData=useCallback(async(background=false)=>{
-    // 1. Cargar caché inmediatamente si existe
     const cachedStr = localStorage.getItem(CACHE_KEY);
     let hasCache = false;
     if(cachedStr){
@@ -1156,11 +1174,9 @@ function App(){
       }catch(e){}
     }
 
-    // 2. Controlar la pantalla de carga
     if(!background && !hasCache) setLoading(true);
     else setLoading(false);
 
-    // 3. Sincronización silenciosa en segundo plano
     if(navigator.onLine){
       if(hasCache && !background) setSyncing(true);
       try{
@@ -1182,7 +1198,6 @@ function App(){
     }
   },[]);
 
-  // Listeners
   useEffect(()=>{
     loadData();
 
@@ -1193,7 +1208,6 @@ function App(){
     const handleSyncEnd=()=>setSyncing(false);
     const handleSyncAllDone=()=>loadData(true);
 
-    // Inyectar el dato a la vista inmediatamente
     const handleOptimisticSave=(e)=>{
       const d = e.detail;
       setHistorial(prev=>{
@@ -1247,6 +1261,11 @@ function App(){
       });
     };
 
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     window.addEventListener('offline_queue_changed', handleQueueChange);
@@ -1255,6 +1274,7 @@ function App(){
     window.addEventListener('sync_completed_all', handleSyncAllDone);
     window.addEventListener('optimistic_save', handleOptimisticSave);
     window.addEventListener('optimistic_batch', handleOptimisticBatch);
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
     if(navigator.onLine && getQueue().length > 0) syncQueue();
 
@@ -1267,8 +1287,18 @@ function App(){
       window.removeEventListener('sync_completed_all', handleSyncAllDone);
       window.removeEventListener('optimistic_save', handleOptimisticSave);
       window.removeEventListener('optimistic_batch', handleOptimisticBatch);
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
   },[loadData]);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
+  };
 
   const{subpuestos,madres}=useMemo(()=>{const s=new Set(),m=new Set();inventario.forEach(a=>{if(a.subpuesto)s.add(a.subpuesto);if(a.madre)m.add(a.madre)});return{subpuestos:[...s].sort(),madres:[...m].sort()}},[inventario]);
   const filteredInv=useMemo(()=>inventario.filter(a=>{if(filterPuesto&&a.subpuesto!==filterPuesto)return false;if(filterMadre&&a.madre!==filterMadre)return false;return true}),[inventario,filterPuesto,filterMadre]);
@@ -1318,7 +1348,7 @@ function App(){
   const inputS={width:"100%",padding:"6px 8px",borderRadius:8,border:"1px solid var(--input)",background:"var(--card)",color:"var(--fg)",fontSize:12};
 
   return React.createElement("div",{style:{minHeight:"100vh",background:"var(--bg)",paddingBottom:80}},
-    React.createElement(FarmHeader,{searchValue:search,onSearch:handleSearch,onNavigate:handleTabChange,activeTab:tab, isOnline, queueCount, syncing}),
+    React.createElement(FarmHeader,{searchValue:search,onSearch:handleSearch,onNavigate:handleTabChange,activeTab:tab, isOnline, queueCount, syncing, showInstall:!!deferredPrompt, onInstall:handleInstallClick}),
     React.createElement("main",{style:{maxWidth:480,margin:"0 auto",padding:"16px 16px"}},
       tab==="dashboard"&&(loading?
         React.createElement("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",paddingTop:80}},
