@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
 <title>🐷 Granja Pro</title>
+<meta name="description" content="Sistema de gestión porcina profesional. Controla inventario, servicios, partos, destetes y más."/>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -27,6 +28,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .gradient-amber{background:linear-gradient(135deg,var(--secondary),var(--accent))}
 .gradient-purple{background:linear-gradient(135deg,#5b2d8e,#7c3aed)}
 input,select,textarea{font-family:inherit}
+button{background:none;border:none;cursor:pointer;font-family:inherit}
 @keyframes fade-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes pulse-alert{0%{transform:scale(1);box-shadow:0 0 0 0 rgba(220,38,38,.7)}70%{transform:scale(1.15);box-shadow:0 0 0 8px rgba(220,38,38,0)}100%{transform:scale(1);box-shadow:0 0 0 0 rgba(220,38,38,0)}}
@@ -40,392 +42,762 @@ input,select,textarea{font-family:inherit}
 <script type="text/babel">
 const {useState,useEffect,useCallback,useMemo}=React;
 
-const FASES_DEFAULT=["SALA_SERVICIO","GESTACION","MATERNIDAD","PRECEBO","LEVANTE","ENGORDE","DESCANSO"];
+/* ─── CONSTANTS ─── */
+const FASES_DEFAULT=["SALA_SERVICIO","GESTACION","REPRODUCTIVA","PRECEBO","LEVANTE","ENGORDE","DESCANSO"];
+const SUBFASES_REPRODUCTIVA=[
+  {key:"REEMPLAZO",label:"Reemplazo",icon:"🔄"},
+  {key:"SERVIDAS",label:"Servidas",icon:"💉"},
+  {key:"GESTACION",label:"Gestación",icon:"🤰"},
+  {key:"VACIA",label:"Vacía",icon:"⭕"},
+  {key:"MATERNIDAD",label:"Maternidad",icon:"🏥"},
+  {key:"LACTANCIA",label:"Lactancia",icon:"🍼"},
+  {key:"DESTETE",label:"Destete",icon:"🥣"},
+  {key:"DESCANSO",label:"Descanso",icon:"😴"},
+];
+const VACUNA_SCHEDULE=[
+  {key:"PRIMERA_TRIPLE",label:"1ra Dosis Vacuna Triple",icon:"💉",diasDesdeNacimiento:145},
+  {key:"CML",label:"CML",icon:"🧪",diasDesdeVacunaAnterior:{vacuna:"PRIMERA_TRIPLE",dias:15}},
+  {key:"SEGUNDA_TRIPLE",label:"2da Dosis Vacuna Triple",icon:"💉",diasDesdeVacunaAnterior:{vacuna:"CML",dias:8}},
+  {key:"TERCERA_TRIPLE",label:"3ra Dosis Vacuna Triple",icon:"💉",diasDesdeNacimiento:167},
+  {key:"DESPARASITACION",label:"Desparasitación",icon:"🛡️",diasDesdeNacimiento:225},
+];
 const ACCION_CONFIG={
-INGRESO:{icon:"🟢",label:"Ingreso"},SERVICIO:{icon:"💉",label:"Servicio"},
-PARTO:{icon:"🐷",label:"Parto"},DESTETE:{icon:"🥣",label:"Destete"},
-BAJA_LACTANCIA:{icon:"💀",label:"Baja Lechón"},TRASLADO:{icon:"🔵",label:"Traslado"},
-VENTA:{icon:"💰",label:"Venta"},MUERTE:{icon:"🔴",label:"Muerte"},
-OBSERVACION:{icon:"📝",label:"Observación"},
+  INGRESO:{icon:"🟢",label:"Ingreso"},SERVICIO:{icon:"💉",label:"Servicio"},
+  PARTO:{icon:"🐷",label:"Parto"},DESTETE:{icon:"🥣",label:"Destete"},
+  BAJA_LACTANCIA:{icon:"💀",label:"Baja Lechón"},TRASLADO:{icon:"🔵",label:"Traslado"},
+  VENTA:{icon:"💰",label:"Venta"},MUERTE:{icon:"🔴",label:"Muerte"},
+  OBSERVACION:{icon:"📝",label:"Observación"},ENFERMEDAD:{icon:"🏥",label:"Enfermedad"},
+  CONFIRMAR_GESTACION:{icon:"🤰",label:"Confirmar Gestación"},
+  RETORNO_VACIA:{icon:"⭕",label:"Retorno Vacía"},
+  CAMBIAR_SUBFASE:{icon:"🔄",label:"Cambiar Subfase"},
+  VACUNA:{icon:"💉",label:"Vacuna"},
 };
 
-const URL_SCRIPT="https://script.google.com/macros/s/AKfycbzArhmRwQjTemkFY1xP2m0bMUNpEPMWpGoJzHftRYD_JpCbNtoUOrq7fDyzRe1mu6SW/exec";
+const URL_SCRIPT="https://script.google.com/macros/s/AKfycbxnE3BnJ-e6JnkQGTcRgYy6dTfZ7Qyr9aNaGiNFZA6LBs80yy8DTUKLw_do6reHaKyqSw/exec";
+
+/* ─── UTILS ─── */
 function calcularDias(f){if(!f)return 0;return Math.floor((Date.now()-new Date(f).getTime())/864e5)}
+
+function obtenerColorSubfase(dias,subfase){
+  const rules={REEMPLAZO:[90,60],SERVIDAS:[30,25],GESTACION:[114,110],VACIA:[10,5],MATERNIDAD:[28,21],LACTANCIA:[28,21],DESTETE:[5,3],DESCANSO:[7,5]};
+  const r=rules[subfase];
+  if(r){if(dias>r[0])return"red";if(dias>r[1])return"yellow";}
+  return"green";
+}
 function obtenerColor(dias,fase){
-if(fase.includes("SALA_SERVICIO")){if(dias>30)return"red";if(dias>25)return"yellow"}
-if(fase.includes("GESTACION")){if(dias>75)return"red";if(dias>70)return"yellow"}
-if(fase.includes("MATERNIDAD")){if(dias>35)return"red";if(dias>30)return"yellow"}
-if(fase.includes("DESCANSO")){if(dias>6)return"red";if(dias>4)return"yellow"}
-if(fase.includes("PRECEBO")){if(dias>49)return"red";if(dias>42)return"yellow"}
-return"green";
+  if(fase.includes("PRECEBO")){if(dias>49)return"red";if(dias>42)return"yellow"}
+  if(fase.includes("LEVANTE")){if(dias>60)return"red";if(dias>50)return"yellow"}
+  if(fase.includes("ENGORDE")){if(dias>90)return"red";if(dias>75)return"yellow"}
+  return"green";
 }
+
+function calcularSubfase(id,regs){
+  const records=regs.filter(r=>r[1]?.toString()===id);
+  let lServ=-1,lParto=-1,lDest=-1,lConf=-1,lRet=-1,lCamb=-1,cambSf=null,tPartos=0,tServ=0;
+  records.forEach((r,i)=>{
+    const acc=r[2];
+    if(acc==="SERVICIO"){lServ=i;tServ++}
+    if(acc==="PARTO"){lParto=i;tPartos++}
+    if(acc==="DESTETE")lDest=i;
+    if(acc==="CONFIRMAR_GESTACION")lConf=i;
+    if(acc==="RETORNO_VACIA")lRet=i;
+    if(acc==="CAMBIAR_SUBFASE"){lCamb=i;const m=(r[5]||"").match(/Subfase:\s*(\w+)/);if(m)cambSf=m[1]}
+  });
+  const maxIdx=Math.max(lServ,lParto,lDest,lConf,lRet,lCamb);
+  if(lCamb===maxIdx&&cambSf)return{subfase:cambSf,fechaSubfase:records[lCamb]?.[0]?.toString()||""};
+  const lastRec=maxIdx>=0?records[maxIdx]:records[records.length-1];
+  const fecha=lastRec?lastRec[0]?.toString()||"":"";
+  if(lDest>lParto&&lDest>lServ)return{subfase:"DESCANSO",fechaSubfase:records[lDest]?.[0]?.toString()||fecha};
+  if(lRet>lServ&&lRet>lParto)return{subfase:"VACIA",fechaSubfase:records[lRet]?.[0]?.toString()||fecha};
+  if(lConf>lServ&&lConf>lParto)return{subfase:"GESTACION",fechaSubfase:records[lServ]?.[0]?.toString()||fecha};
+  if(lServ>lParto&&lServ>lDest)return{subfase:"SERVIDAS",fechaSubfase:records[lServ]?.[0]?.toString()||fecha};
+  if(lParto>lServ)return{subfase:"LACTANCIA",fechaSubfase:records[lParto]?.[0]?.toString()||fecha};
+  if(tPartos===0&&tServ===0)return{subfase:"REEMPLAZO",fechaSubfase:fecha};
+  return{subfase:"VACIA",fechaSubfase:fecha};
+}
+
 function procesarInventario(regs){
-const estados={};
-regs.forEach(r=>{const id=r[1]?.toString();const acc=r[2];const fase=r[3];const fecha=r[0];if(!id)return;
-if(!estados[id])estados[id]={id,piglets:0,subpuesto:r[12]?.toString()||"",fase:fase||"",chapeta:r[10]?.toString()||"",madre:r[7]?.toString()||"",activo:true,fechaFase:fecha};
-estados[id].ultimaAccion=acc;
-if(acc==="VENTA"||acc==="MUERTE"){estados[id].activo=false;estados[id].fechaFase=fecha}
-else{estados[id].activo=true;const nf=(fase||"").toUpperCase().trim().replace(/ /g,"_");if(estados[id].fase!==nf){estados[id].fase=nf;estados[id].fechaFase=fecha}estados[id].subpuesto=r[12]?.toString()||"";estados[id].chapeta=r[10]?.toString()||"";
-if(acc==="PARTO"){const m=(r[5]||"").match(/Vivos: (\d+)/);if(m)estados[id].piglets=parseInt(m[1]);estados[id].fechaFase=fecha}
-if(acc==="BAJA_LACTANCIA"){const m=(r[5]||"").match(/Cantidad: (\d+)/);if(m)estados[id].piglets=Math.max(0,estados[id].piglets-parseInt(m[1]))}
-if(acc==="DESTETE"){estados[id].piglets=0;estados[id].fechaFase=fecha}}});
-const todos=Object.values(estados).map(e=>{e.dias=calcularDias(e.fechaFase);e.color=e.activo?obtenerColor(e.dias,e.fase):"red";return e});
-return{activos:todos.filter(e=>e.activo),todos};
+  const estados={};
+  regs.forEach(r=>{const id=r[1]?.toString();const acc=r[2];const fase=r[3];const fecha=r[0];if(!id)return;
+  if(!estados[id])estados[id]={id,piglets:0,subpuesto:r[12]?.toString()||"",fase:fase||"",chapeta:r[10]?.toString()||"",madre:r[7]?.toString()||"",activo:true,fechaFase:fecha};
+  estados[id].ultimaAccion=acc;
+  if(acc==="VENTA"||acc==="MUERTE"){estados[id].activo=false;estados[id].fechaFase=fecha}
+  else{estados[id].activo=true;const nf=(fase||"").toUpperCase().trim().replace(/ /g,"_");if(estados[id].fase!==nf){estados[id].fase=nf;estados[id].fechaFase=fecha}estados[id].subpuesto=r[12]?.toString()||"";estados[id].chapeta=r[10]?.toString()||"";
+  if(acc==="PARTO"){const m=(r[5]||"").match(/Vivos: (\d+)/);if(m)estados[id].piglets=parseInt(m[1]);estados[id].fechaFase=fecha}
+  if(acc==="BAJA_LACTANCIA"){const m=(r[5]||"").match(/Cantidad: (\d+)/);if(m)estados[id].piglets=Math.max(0,estados[id].piglets-parseInt(m[1]))}
+  if(acc==="DESTETE"){estados[id].piglets=0;estados[id].fechaFase=fecha}}});
+
+  const todos=Object.values(estados).map(e=>{
+    if(e.activo&&e.fase==="REPRODUCTIVA"){
+      const{subfase,fechaSubfase}=calcularSubfase(e.id,regs);
+      if(e.piglets>0){
+        e.subfase="LACTANCIA";
+        const partoRecs=regs.filter(r=>r[1]?.toString()===e.id&&r[2]==="PARTO");
+        const lastP=partoRecs[partoRecs.length-1];
+        e.fechaFase=lastP?lastP[0]?.toString()||fechaSubfase:fechaSubfase;
+      }else{e.subfase=subfase;e.fechaFase=fechaSubfase}
+      e.dias=calcularDias(e.fechaFase);e.color=obtenerColorSubfase(e.dias,e.subfase);
+    }else{e.dias=calcularDias(e.fechaFase);e.color=e.activo?obtenerColor(e.dias,e.fase):"red"}
+    return e;
+  });
+  return{activos:todos.filter(e=>e.activo),todos};
 }
+
 function buildDashboardData(inv){
-const data={total:0,piglets:0,phases:{}};
-inv.forEach(e=>{data.total++;data.piglets+=(e.piglets||0);if(!data.phases[e.fase])data.phases[e.fase]={count:0,alert:null,subpuestos:{}};data.phases[e.fase].count++;const sub=e.subpuesto||"Sin puesto";data.phases[e.fase].subpuestos[sub]=(data.phases[e.fase].subpuestos[sub]||0)+1;if(e.color==="red")data.phases[e.fase].alert="red";else if(e.color==="yellow"&&data.phases[e.fase].alert!=="red")data.phases[e.fase].alert="yellow"});
-return data;
+  const data={total:0,piglets:0,phases:{}};
+  inv.forEach(e=>{data.total++;data.piglets+=(e.piglets||0);if(!data.phases[e.fase])data.phases[e.fase]={count:0,alert:null,subpuestos:{}};data.phases[e.fase].count++;const sub=e.subpuesto||"Sin puesto";data.phases[e.fase].subpuestos[sub]=(data.phases[e.fase].subpuestos[sub]||0)+1;if(e.color==="red")data.phases[e.fase].alert="red";else if(e.color==="yellow"&&data.phases[e.fase].alert!=="red")data.phases[e.fase].alert="yellow"});
+  return data;
 }
+
 async function fetchFarmData(){const r=await fetch(URL_SCRIPT);return r.json()}
-async function enviarRegistro(d){await fetch(URL_SCRIPT,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(d)})}
-async function enviarBatch(d){await fetch(URL_SCRIPT,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({tipo:"BATCH",...d})})}
+async function enviarRegistro(d){
+  const res=await fetch(URL_SCRIPT,{method:"POST",redirect:"follow",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(d)});
+  const text=await res.text();
+  let json;try{json=JSON.parse(text)}catch{throw new Error("Respuesta inválida del servidor")}
+  if(!res.ok||json.result==="error"||json.ok===false)throw new Error(json.error||"Error HTTP "+res.status);
+  return json;
+}
+async function enviarBatch(d){await fetch(URL_SCRIPT,{method:"POST",redirect:"follow",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({tipo:"BATCH",...d})})}
 
 const colorMap={green:"var(--success)",yellow:"var(--warning)",red:"var(--destructive)"};
 
-function FarmHeader({searchValue,onSearch}){
-return(<header style={{position:"sticky",top:0,zIndex:40,boxShadow:"0 4px 12px rgba(0,0,0,.15)"}} className="gradient-farm">
-<div style={{maxWidth:480,margin:"0 auto",padding:"16px 16px 12px"}}>
-<h1 style={{fontSize:20,fontWeight:700,color:"var(--primary-fg)",letterSpacing:1}}>🐷 Granja Pro</h1>
-<div style={{marginTop:12,position:"relative"}}>
-<span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",color:"var(--muted-fg)"}}>🔍</span>
-<input value={searchValue} onChange={e=>onSearch(e.target.value)} placeholder="Buscar por Tatuaje o Chapeta..." style={{width:"100%",padding:"10px 16px 10px 36px",borderRadius:20,border:"none",outline:"none",fontSize:14,background:"var(--card)",color:"var(--fg)"}}/>
-</div></div></header>);
+function formatDateStr(date){
+  const y=date.getFullYear(),m=String(date.getMonth()+1).padStart(2,"0"),d=String(date.getDate()).padStart(2,"0");
+  return y+"-"+m+"-"+d;
+}
+function extractDateKey(raw){
+  if(!raw)return"";
+  const str=String(raw);
+  const match=str.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if(match)return match[1]+"-"+match[2]+"-"+match[3];
+  const parsed=new Date(str);
+  if(!isNaN(parsed.getTime()))return formatDateStr(parsed);
+  return"";
+}
+function dateKeyToLabel(key){if(!key)return"";const[y,m,d]=key.split("-");return d+"/"+m+"/"+y}
+function toAppsScriptDate(key){return key?key+"T12:00:00":""}
+
+/* ─── DATE INPUT ─── */
+function DateInput({value,onChange,placeholder}){
+  const formatToDisplay=(date)=>{if(!date||isNaN(date.getTime()))return"";const d=String(date.getDate()).padStart(2,"0"),m=String(date.getMonth()+1).padStart(2,"0"),y=date.getFullYear();return d+"/"+m+"/"+y};
+  const parseFromDisplay=(str)=>{const clean=str.replace(/-/g,"/");const match=clean.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);if(!match)return undefined;const day=parseInt(match[1]),month=parseInt(match[2])-1,year=parseInt(match[3]);const date=new Date(year,month,day,12,0,0);if(isNaN(date.getTime())||date.getDate()!==day||date.getMonth()!==month||date.getFullYear()!==year)return undefined;return date};
+  const autoFormat=(raw)=>{const digits=raw.replace(/\D/g,"");if(digits.length<=2)return digits;if(digits.length<=4)return digits.slice(0,2)+"/"+digits.slice(2);return digits.slice(0,2)+"/"+digits.slice(2,4)+"/"+digits.slice(4,8)};
+  const[text,setText]=useState(formatToDisplay(value));
+  const[error,setError]=useState(false);
+  useEffect(()=>{setText(formatToDisplay(value));setError(false)},[value]);
+  const handleChange=(e)=>{const formatted=autoFormat(e.target.value);setText(formatted);if(formatted.length===10){const parsed=parseFromDisplay(formatted);if(parsed){setError(false);onChange(parsed)}else{setError(true);onChange(undefined)}}else{setError(false);if(formatted.length===0)onChange(undefined)}};
+  const handleBlur=()=>{if(text.length>0&&text.length<10)setError(true)};
+  return React.createElement("div",{style:{position:"relative"}},
+    React.createElement("input",{type:"text",inputMode:"numeric",value:text,onChange:handleChange,onBlur:handleBlur,placeholder:placeholder||"dd/mm/aaaa",maxLength:10,
+      style:{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid "+(error?"var(--destructive)":"var(--input)"),background:"var(--bg)",color:"var(--fg)",fontSize:14,outline:"none"}}),
+    error&&React.createElement("p",{style:{fontSize:10,color:"var(--destructive)",marginTop:2}},"Fecha inválida. Formato: dd/mm/aaaa")
+  );
+}
+
+/* ─── COMPONENTS ─── */
+
+function FarmHeader({searchValue,onSearch,onNavigate,activeTab}){
+  const[menuOpen,setMenuOpen]=useState(false);
+  const menuItems=[{id:"vacunas",label:"💉 Vacunas"},{id:"reportes",label:"📋 Reportes"},{id:"resumen",label:"📊 Resumen"}];
+  return React.createElement("header",{style:{position:"sticky",top:0,zIndex:40,boxShadow:"0 4px 12px rgba(0,0,0,.15)"},className:"gradient-farm"},
+    React.createElement("div",{style:{maxWidth:480,margin:"0 auto",padding:"16px 16px 12px"}},
+      React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
+        React.createElement("h1",{style:{fontSize:20,fontWeight:700,color:"var(--primary-fg)",letterSpacing:1}},"🐷 Granja Pro"),
+        React.createElement("button",{onClick:()=>setMenuOpen(!menuOpen),style:{padding:8,borderRadius:8,color:"var(--primary-fg)"}},menuOpen?"✕":"☰")
+      ),
+      menuOpen&&React.createElement("div",{className:"animate-fade-in",style:{marginTop:8,background:"var(--card)",borderRadius:12,boxShadow:"0 4px 20px rgba(0,0,0,.15)",border:"1px solid var(--border)",overflow:"hidden"}},
+        menuItems.map(item=>React.createElement("button",{key:item.id,onClick:()=>{onNavigate(item.id);setMenuOpen(false)},style:{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 16px",fontSize:14,fontWeight:600,color:activeTab===item.id?"var(--primary)":"var(--card-fg)",background:activeTab===item.id?"rgba(45,106,79,.1)":"transparent",borderBottom:"1px solid var(--border)"}},item.label))
+      ),
+      React.createElement("div",{style:{marginTop:12,position:"relative"}},
+        React.createElement("span",{style:{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",color:"var(--muted-fg)"}},"🔍"),
+        React.createElement("input",{value:searchValue,onChange:e=>onSearch(e.target.value),placeholder:"Buscar por Tatuaje, Chapeta o Madurez...",style:{width:"100%",padding:"10px 16px 10px 36px",borderRadius:20,border:"none",outline:"none",fontSize:14,background:"var(--card)",color:"var(--fg)"}})
+      )
+    )
+  );
 }
 
 function BottomNav({active,onChange}){
-const tabs=[{id:"dashboard",icon:"🏠",label:"Inicio"},{id:"registro",icon:"➕",label:"Registro"},{id:"reportes",icon:"📋",label:"Reportes"}];
-return(<nav style={{position:"fixed",bottom:0,left:0,right:0,zIndex:50,background:"var(--card)",borderTop:"1px solid var(--border)",boxShadow:"0 -2px 10px rgba(0,0,0,.05)"}}>
-<div style={{display:"flex",justifyContent:"space-around",alignItems:"center",padding:"8px 0",maxWidth:480,margin:"0 auto"}}>
-{tabs.map(t=>(<button key={t.id} onClick={()=>onChange(t.id)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"6px 16px",borderRadius:8,border:"none",background:"transparent",cursor:"pointer",color:active===t.id?"var(--primary)":"var(--muted-fg)",fontWeight:active===t.id?700:400,fontSize:10}}><span style={{fontSize:22}}>{t.icon}</span><span>{t.label}</span></button>))}
-</div></nav>);
+  const tabs=[{id:"dashboard",icon:"🏠",label:"Inicio"},{id:"registro",icon:"➕",label:"Registro"}];
+  return React.createElement("nav",{style:{position:"fixed",bottom:0,left:0,right:0,zIndex:50,background:"var(--card)",borderTop:"1px solid var(--border)",boxShadow:"0 -2px 10px rgba(0,0,0,.05)"}},
+    React.createElement("div",{style:{display:"flex",justifyContent:"space-around",alignItems:"center",padding:"8px 0",maxWidth:480,margin:"0 auto"}},
+      tabs.map(t=>React.createElement("button",{key:t.id,onClick:()=>onChange(t.id),style:{display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"6px 16px",borderRadius:8,color:active===t.id?"var(--primary)":"var(--muted-fg)",fontWeight:active===t.id?700:400,fontSize:10}},
+        React.createElement("span",{style:{fontSize:22}},t.icon),
+        React.createElement("span",null,t.label)
+      ))
+    )
+  );
 }
 
 function DashboardView({data,onPhaseClick,onSubpuestoClick,onPigletsClick}){
-const[expanded,setExpanded]=useState(null);
-return(<div className="animate-fade-in">
-<div className="gradient-farm" style={{borderRadius:12,padding:20,textAlign:"center",boxShadow:"0 4px 15px rgba(0,0,0,.2)",marginBottom:12}}>
-<p style={{fontSize:10,textTransform:"uppercase",letterSpacing:3,color:"rgba(255,255,255,.7)",fontWeight:600}}>Población Total</p>
-<p style={{fontSize:48,fontWeight:800,color:"var(--primary-fg)",marginTop:4}}>{data.total+data.piglets}</p></div>
-<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-<div onClick={onPigletsClick} className="gradient-amber" style={{borderRadius:12,padding:16,textAlign:"center",boxShadow:"0 2px 8px rgba(0,0,0,.1)",cursor:"pointer"}}>
-<p style={{fontSize:10,textTransform:"uppercase",letterSpacing:2,color:"rgba(255,255,255,.8)",fontWeight:600}}>Lechones Vivos</p>
-<p style={{fontSize:28,fontWeight:700,color:"#fff",marginTop:4}}>{data.piglets}</p></div>
-{Object.entries(data.phases).sort((a,b)=>a[0].localeCompare(b[0])).map(([fase,info])=>{
-const isS=fase.includes("SALA_SERVICIO"),isExp=expanded===fase;
-const subs=Object.entries(info.subpuestos).sort((a,b)=>a[0].localeCompare(b[0]));
-const hasMS=subs.length>1||(subs.length===1&&subs[0][0]!=="Sin puesto");
-return(<div key={fase} style={{position:"relative",borderRadius:12,boxShadow:"0 2px 8px rgba(0,0,0,.08)",gridColumn:isExp?"span 2":"span 1",background:isS?undefined:"var(--card)",border:isS?"none":"1px solid var(--border)"}} className={isS?"gradient-purple":undefined}>
-{info.alert&&<span style={{position:"absolute",top:8,right:8,width:12,height:12,borderRadius:"50%",background:info.alert==="red"?"var(--destructive)":"var(--warning)",border:"2px solid var(--card)"}} className={info.alert==="red"?"animate-pulse-alert":""}/>}
-<div onClick={()=>onPhaseClick(fase)} style={{padding:16,textAlign:"center",cursor:"pointer"}}>
-<p style={{fontSize:10,textTransform:"uppercase",letterSpacing:2,fontWeight:600,color:isS?"rgba(255,255,255,.8)":"var(--muted-fg)"}}>{fase.replace(/_/g," ")}</p>
-<p style={{fontSize:28,fontWeight:700,marginTop:4,color:isS?"#fff":"var(--card-fg)"}}>{info.count}</p></div>
-{hasMS&&<button onClick={e=>{e.stopPropagation();setExpanded(expanded===fase?null:fase)}} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:10,textTransform:"uppercase",letterSpacing:2,fontWeight:600,padding:"6px 0",background:"transparent",border:"none",borderTop:"1px solid "+(isS?"rgba(255,255,255,.2)":"var(--border)"),cursor:"pointer",color:isS?"rgba(255,255,255,.7)":"var(--muted-fg)"}}>📍 {subs.length} puestos {isExp?"▲":"▼"}</button>}
-{isExp&&<div style={{padding:"0 12px 12px"}}>{subs.map(([sub,count])=><div key={sub} onClick={e=>{e.stopPropagation();onSubpuestoClick(fase,sub)}} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",borderRadius:8,marginBottom:4,cursor:"pointer",background:isS?"rgba(255,255,255,.1)":"var(--muted)",fontSize:12}}><span style={{fontWeight:500}}>📍 {sub}</span><span style={{fontWeight:700,fontSize:14}}>{count}</span></div>)}</div>}
-</div>);})}
-</div></div>);
+  const[expanded,setExpanded]=useState(null);
+  return React.createElement("div",{className:"animate-fade-in"},
+    React.createElement("div",{className:"gradient-farm",style:{borderRadius:12,padding:20,textAlign:"center",boxShadow:"0 4px 15px rgba(0,0,0,.2)",marginBottom:12}},
+      React.createElement("p",{style:{fontSize:10,textTransform:"uppercase",letterSpacing:3,color:"rgba(255,255,255,.7)",fontWeight:600}},"Población Total"),
+      React.createElement("p",{style:{fontSize:48,fontWeight:800,color:"var(--primary-fg)",marginTop:4}},data.total+data.piglets)
+    ),
+    React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}},
+      React.createElement("div",{onClick:onPigletsClick,className:"gradient-amber",style:{borderRadius:12,padding:16,textAlign:"center",boxShadow:"0 2px 8px rgba(0,0,0,.1)",cursor:"pointer"}},
+        React.createElement("p",{style:{fontSize:10,textTransform:"uppercase",letterSpacing:2,color:"rgba(255,255,255,.8)",fontWeight:600}},"Lechones Vivos"),
+        React.createElement("p",{style:{fontSize:28,fontWeight:700,color:"#fff",marginTop:4}},data.piglets)
+      ),
+      Object.entries(data.phases).sort((a,b)=>a[0].localeCompare(b[0])).map(([fase,info])=>{
+        const isS=fase.includes("REPRODUCTIVA")||fase.includes("SALA_SERVICIO"),isExp=expanded===fase;
+        const subs=Object.entries(info.subpuestos).sort((a,b)=>a[0].localeCompare(b[0]));
+        const hasMS=subs.length>1||(subs.length===1&&subs[0][0]!=="Sin puesto");
+        const usePurple=fase==="REPRODUCTIVA"||fase.includes("SALA_SERVICIO");
+        return React.createElement("div",{key:fase,style:{position:"relative",borderRadius:12,boxShadow:"0 2px 8px rgba(0,0,0,.08)",gridColumn:isExp?"span 2":"span 1",background:usePurple?undefined:"var(--card)",border:usePurple?"none":"1px solid var(--border)"},className:usePurple?"gradient-purple":undefined},
+          info.alert&&React.createElement("span",{style:{position:"absolute",top:8,right:8,width:12,height:12,borderRadius:"50%",background:info.alert==="red"?"var(--destructive)":"var(--warning)",border:"2px solid var(--card)"},className:info.alert==="red"?"animate-pulse-alert":""}),
+          React.createElement("div",{onClick:()=>onPhaseClick(fase),style:{padding:16,textAlign:"center",cursor:"pointer"}},
+            React.createElement("p",{style:{fontSize:10,textTransform:"uppercase",letterSpacing:2,fontWeight:600,color:usePurple?"rgba(255,255,255,.8)":"var(--muted-fg)"}},fase.replace(/_/g," ")),
+            React.createElement("p",{style:{fontSize:28,fontWeight:700,marginTop:4,color:usePurple?"#fff":"var(--card-fg)"}},info.count)
+          ),
+          hasMS&&React.createElement("button",{onClick:e=>{e.stopPropagation();setExpanded(expanded===fase?null:fase)},style:{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:10,textTransform:"uppercase",letterSpacing:2,fontWeight:600,padding:"6px 0",borderTop:"1px solid "+(usePurple?"rgba(255,255,255,.2)":"var(--border)"),color:usePurple?"rgba(255,255,255,.7)":"var(--muted-fg)"}},"📍 "+subs.length+" puestos "+(isExp?"▲":"▼")),
+          isExp&&React.createElement("div",{style:{padding:"0 12px 12px"}},subs.map(([sub,count])=>React.createElement("div",{key:sub,onClick:e=>{e.stopPropagation();onSubpuestoClick(fase,sub)},style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",borderRadius:8,marginBottom:4,cursor:"pointer",background:usePurple?"rgba(255,255,255,.1)":"var(--muted)",fontSize:12}},React.createElement("span",{style:{fontWeight:500}},"📍 "+sub),React.createElement("span",{style:{fontWeight:700,fontSize:14}},count))))
+        );
+      })
+    )
+  );
 }
 
-function SubpuestoCards({phase,animals,onSelect,onSelectAll,onBack}){
-const groups=useMemo(()=>{const map={};animals.forEach(a=>{const k=a.subpuesto||"Sin puesto";if(!map[k])map[k]={count:0,alerts:0,warnings:0};map[k].count++;if(a.color==="red")map[k].alerts++;if(a.color==="yellow")map[k].warnings++});return Object.entries(map).sort((a,b)=>a[0].localeCompare(b[0]))},[animals]);
-return(<div className="animate-fade-in">
-<button onClick={onBack} style={{display:"flex",alignItems:"center",gap:4,fontSize:14,fontWeight:600,color:"var(--primary)",marginBottom:12,background:"none",border:"none",cursor:"pointer"}}>← Volver</button>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-<h3 style={{fontSize:18,fontWeight:700}}>{phase.replace(/_/g," ")}</h3>
-<span style={{fontSize:13,fontWeight:600,color:"var(--muted-fg)",background:"var(--muted)",padding:"4px 10px",borderRadius:20}}>{animals.length} total</span></div>
-<button onClick={onSelectAll} style={{width:"100%",marginBottom:12,padding:12,borderRadius:12,background:"rgba(45,106,79,.1)",color:"var(--primary)",fontWeight:600,fontSize:14,border:"none",cursor:"pointer"}}>Ver todos ({animals.length})</button>
-<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-{groups.map(([sub,info])=>(<div key={sub} onClick={()=>onSelect(sub)} style={{position:"relative",background:"var(--card)",borderRadius:12,padding:16,border:"1px solid var(--border)",boxShadow:"0 2px 6px rgba(0,0,0,.05)",cursor:"pointer"}}>
-{info.alerts>0&&<span className="animate-pulse-alert" style={{position:"absolute",top:8,right:8,width:12,height:12,borderRadius:"50%",background:"var(--destructive)",border:"2px solid var(--card)"}}/>}
-{info.alerts===0&&info.warnings>0&&<span style={{position:"absolute",top:8,right:8,width:12,height:12,borderRadius:"50%",background:"var(--warning)",border:"2px solid var(--card)"}}/>}
-<div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}><span style={{fontSize:10,fontWeight:700,color:"var(--muted-fg)",textTransform:"uppercase",letterSpacing:1}}>📍 {sub}</span></div>
-<p style={{fontSize:28,fontWeight:700,color:"var(--card-fg)"}}>{info.count}</p>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8}}><span style={{fontSize:10,color:"var(--muted-fg)"}}>animales</span><span style={{color:"var(--muted-fg)"}}>›</span></div>
-</div>))}</div></div>);
+function SubpuestoCards({phase,animals,onSelect,onSelectAll,onBack,onSubfaseClick}){
+  const[viewMode,setViewMode]=useState(phase==="REPRODUCTIVA"?"subfases":"subpuestos");
+  const groups=useMemo(()=>{const map={};animals.forEach(a=>{const k=a.subpuesto||"Sin puesto";if(!map[k])map[k]={count:0,alerts:0,warnings:0};map[k].count++;if(a.color==="red")map[k].alerts++;if(a.color==="yellow")map[k].warnings++});return Object.entries(map).sort((a,b)=>a[0].localeCompare(b[0]))},[animals]);
+  const subfaseGroups=useMemo(()=>{
+    if(phase!=="REPRODUCTIVA")return[];
+    const map={};animals.forEach(a=>{const k=a.subfase||"REEMPLAZO";if(!map[k])map[k]={count:0,alerts:0,warnings:0};map[k].count++;if(a.color==="red")map[k].alerts++;if(a.color==="yellow")map[k].warnings++});
+    return SUBFASES_REPRODUCTIVA.map(sf=>({...sf,count:(map[sf.key]||{count:0}).count,alerts:(map[sf.key]||{alerts:0}).alerts,warnings:(map[sf.key]||{warnings:0}).warnings})).filter(sf=>sf.count>0);
+  },[animals,phase]);
+  const isRepro=phase==="REPRODUCTIVA";
+  const renderCard=(key,label,count,alerts,warnings,onClick)=>React.createElement("div",{key,onClick,style:{position:"relative",background:"var(--card)",borderRadius:12,padding:16,border:"1px solid var(--border)",boxShadow:"0 2px 6px rgba(0,0,0,.05)",cursor:"pointer"}},
+    alerts>0&&React.createElement("span",{className:"animate-pulse-alert",style:{position:"absolute",top:8,right:8,width:12,height:12,borderRadius:"50%",background:"var(--destructive)",border:"2px solid var(--card)"}}),
+    alerts===0&&warnings>0&&React.createElement("span",{style:{position:"absolute",top:8,right:8,width:12,height:12,borderRadius:"50%",background:"var(--warning)",border:"2px solid var(--card)"}}),
+    React.createElement("p",{style:{fontSize:10,fontWeight:700,color:"var(--muted-fg)",textTransform:"uppercase",letterSpacing:1,marginBottom:8}},label),
+    React.createElement("p",{style:{fontSize:28,fontWeight:700,color:"var(--card-fg)"}},count),
+    React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8}},React.createElement("span",{style:{fontSize:10,color:"var(--muted-fg)"}},"animales"),React.createElement("span",{style:{color:"var(--muted-fg)"}},"›"))
+  );
+
+  return React.createElement("div",{className:"animate-fade-in"},
+    React.createElement("button",{onClick:onBack,style:{display:"flex",alignItems:"center",gap:4,fontSize:14,fontWeight:600,color:"var(--primary)",marginBottom:12}},"← Volver"),
+    React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}},
+      React.createElement("h3",{style:{fontSize:18,fontWeight:700}},phase.replace(/_/g," ")),
+      React.createElement("span",{style:{fontSize:13,fontWeight:600,color:"var(--muted-fg)",background:"var(--muted)",padding:"4px 10px",borderRadius:20}},animals.length+" total")
+    ),
+    isRepro&&React.createElement("div",{style:{display:"flex",gap:8,marginBottom:12}},
+      React.createElement("button",{onClick:()=>setViewMode("subfases"),style:{flex:1,padding:"8px 0",borderRadius:8,fontSize:12,fontWeight:700,background:viewMode==="subfases"?"var(--primary)":"var(--muted)",color:viewMode==="subfases"?"var(--primary-fg)":"var(--muted-fg)"}},"🔄 Por Subfase"),
+      React.createElement("button",{onClick:()=>setViewMode("subpuestos"),style:{flex:1,padding:"8px 0",borderRadius:8,fontSize:12,fontWeight:700,background:viewMode==="subpuestos"?"var(--primary)":"var(--muted)",color:viewMode==="subpuestos"?"var(--primary-fg)":"var(--muted-fg)"}},"📍 Por Puesto")
+    ),
+    React.createElement("button",{onClick:onSelectAll,style:{width:"100%",marginBottom:12,padding:12,borderRadius:12,background:"rgba(45,106,79,.1)",color:"var(--primary)",fontWeight:600,fontSize:14}},"Ver todos ("+animals.length+")"),
+    isRepro&&viewMode==="subfases"?React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}},
+      subfaseGroups.map(sf=>renderCard(sf.key,sf.icon+" "+sf.label,sf.count,sf.alerts,sf.warnings,()=>onSubfaseClick&&onSubfaseClick(sf.key)))
+    ):React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}},
+      groups.map(([sub,info])=>renderCard(sub,"📍 "+sub,info.count,info.alerts,info.warnings,()=>onSelect(sub)))
+    )
+  );
 }
 
 function AnimalList({title,animals,onSelect,onBack}){
-return(<div className="animate-fade-in">
-<button onClick={onBack} style={{display:"flex",alignItems:"center",gap:4,fontSize:14,fontWeight:600,color:"var(--primary)",marginBottom:12,background:"none",border:"none",cursor:"pointer"}}>← Volver</button>
-<h3 style={{fontSize:18,fontWeight:700,marginBottom:12}}>{title}</h3>
-{animals.length===0?<p style={{textAlign:"center",color:"var(--muted-fg)",padding:"32px 0"}}>Sin animales en esta fase.</p>:
-<div style={{display:"flex",flexDirection:"column",gap:8}}>
-{animals.map(a=>{const inactive=!a.activo;const status=inactive?(a.ultimaAccion==="VENTA"?"💰 VENDIDO":"🔴 MUERTO"):`📍 ${a.subpuesto||"Sin puesto"} · ${a.fase.replace(/_/g," ")}`;
-return(<div key={a.id} onClick={()=>onSelect(a.id)} style={{background:"var(--card)",borderRadius:8,padding:14,display:"flex",alignItems:"center",justifyContent:"space-between",borderLeft:`4px solid ${inactive?"var(--muted-fg)":colorMap[a.color]}`,boxShadow:"0 1px 4px rgba(0,0,0,.06)",cursor:"pointer",opacity:inactive?.7:1}}>
-<div><div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontWeight:700}}>ID: {a.id}</span>
-{!inactive&&<span style={{width:10,height:10,borderRadius:"50%",background:colorMap[a.color],display:"inline-block"}}/>}
-{inactive&&<span style={{fontSize:10,fontWeight:700,padding:"2px 6px",borderRadius:4,background:"var(--muted)",color:"var(--muted-fg)"}}>{a.ultimaAccion==="VENTA"?"VENDIDO":"MUERTO"}</span>}
-</div><p style={{fontSize:12,color:"var(--muted-fg)",marginTop:2}}>{status}{!inactive&&a.dias>0&&` · ⏱️ ${a.dias}d`}{!inactive&&a.piglets>0&&` · 🐷 ${a.piglets}`}</p></div>
-<span style={{color:"var(--muted-fg)"}}>›</span></div>);})}
-</div>}</div>);
+  return React.createElement("div",{className:"animate-fade-in"},
+    React.createElement("button",{onClick:onBack,style:{display:"flex",alignItems:"center",gap:4,fontSize:14,fontWeight:600,color:"var(--primary)",marginBottom:12}},"← Volver"),
+    React.createElement("h3",{style:{fontSize:18,fontWeight:700,marginBottom:12}},title),
+    animals.length===0?React.createElement("p",{style:{textAlign:"center",color:"var(--muted-fg)",padding:"32px 0"}},"Sin animales en esta fase."):
+    React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:8}},
+      animals.map(a=>{
+        const inactive=!a.activo;
+        const sfInfo=a.subfase?SUBFASES_REPRODUCTIVA.find(s=>s.key===a.subfase):null;
+        const status=inactive?(a.ultimaAccion==="VENTA"?"💰 VENDIDO":"🔴 MUERTO"):"📍 "+(a.subpuesto||"Sin puesto")+" · "+a.fase.replace(/_/g," ")+(sfInfo?" · "+sfInfo.icon+" "+sfInfo.label:"");
+        return React.createElement("div",{key:a.id,onClick:()=>onSelect(a.id),style:{background:"var(--card)",borderRadius:8,padding:14,display:"flex",alignItems:"center",justifyContent:"space-between",borderLeft:"4px solid "+(inactive?"var(--muted-fg)":colorMap[a.color]),boxShadow:"0 1px 4px rgba(0,0,0,.06)",cursor:"pointer",opacity:inactive?.7:1}},
+          React.createElement("div",null,
+            React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8}},
+              React.createElement("span",{style:{fontWeight:700}},"ID: "+a.id),
+              !inactive&&React.createElement("span",{style:{width:10,height:10,borderRadius:"50%",background:colorMap[a.color],display:"inline-block"}}),
+              sfInfo&&!inactive&&React.createElement("span",{style:{fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:4,background:"rgba(45,106,79,.1)",color:"var(--primary)"}},sfInfo.icon+" "+sfInfo.label),
+              inactive&&React.createElement("span",{style:{fontSize:10,fontWeight:700,padding:"2px 6px",borderRadius:4,background:"var(--muted)",color:"var(--muted-fg)"}},a.ultimaAccion==="VENTA"?"VENDIDO":"MUERTO")
+            ),
+            React.createElement("p",{style:{fontSize:12,color:"var(--muted-fg)",marginTop:2}},status+(!inactive&&a.dias>0?" · ⏱️ "+a.dias+"d":"")+(!inactive&&a.piglets>0?" · 🐷 "+a.piglets:""))
+          ),
+          React.createElement("span",{style:{color:"var(--muted-fg)"}},"›")
+        );
+      })
+    )
+  );
 }
 
-function AnimalDetail({animal,historial,allAnimals,onBack,onAction}){
-const animalHistory=historial.filter(h=>h[1]?.toString()===animal.id).reverse().slice(0,20);
-const sowStats=useMemo(()=>{
-const records=historial.filter(h=>h[1]?.toString()===animal.id);
-const partos=records.filter(r=>r[2]==="PARTO"),servicios=records.filter(r=>r[2]==="SERVICIO"),destetes=records.filter(r=>r[2]==="DESTETE"),bajas=records.filter(r=>r[2]==="BAJA_LACTANCIA");
-let totalNV=0,totalNM=0,totalPN=0,totalH=0,totalM=0;const partoDetails=[];
-partos.forEach(p=>{const n=p[5]||"";const mV=n.match(/Vivos:\s*(\d+)/),mMu=n.match(/Muertos:\s*(\d+)/),mP=n.match(/Peso Total:\s*([\d.]+)/),mH=n.match(/Hembras:\s*(\d+)/),mMa=n.match(/Machos:\s*(\d+)/),mPa=n.match(/Padre:\s*([^\s|]+)/);
-const v=mV?parseInt(mV[1]):0,mu=mMu?parseInt(mMu[1]):0,pe=mP?parseFloat(mP[1]):0,h=mH?parseInt(mH[1]):0,ma=mMa?parseInt(mMa[1]):0,pa=mPa?mPa[1]:"";
-totalNV+=v;totalNM+=mu;totalPN+=pe;totalH+=h;totalM+=ma;partoDetails.push({fecha:new Date(p[0]).toLocaleDateString(),vivos:v,muertos:mu,peso:pe,hembras:h,machos:ma,padre:pa})});
-let totalBajas=0;bajas.forEach(b=>{const m=(b[5]||"").match(/Cantidad:\s*(\d+)/);if(m)totalBajas+=parseInt(m[1])});
-const hijos=allAnimals.filter(a=>a.madre===animal.id);
-const promV=partos.length>0?(totalNV/partos.length).toFixed(1):"0";const promP=totalNV>0?(totalPN/totalNV).toFixed(2):"0";
-const mort=totalNV>0?(((totalBajas+totalNM)/(totalNV+totalNM))*100).toFixed(1):"0";
-let score=50;if(partos.length>0)score+=partos.length*5;if(parseFloat(promV)>=10)score+=15;else if(parseFloat(promV)>=8)score+=10;if(parseFloat(mort)<10)score+=15;else if(parseFloat(mort)<20)score+=5;else score-=10;score=Math.min(100,Math.max(0,score));
-return{partos:partos.length,servicios:servicios.length,destetes:destetes.length,totalNacidosVivos:totalNV,totalNacidosMuertos:totalNM,totalBajas,totalHembras:totalH,totalMachos:totalM,promVivos:promV,promPeso:promP,mortalidad:mort,score,partoDetails,hijos:hijos.length,hijosActivos:hijos.filter(a=>a.activo).length};
-},[historial,allAnimals,animal.id]);
+function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
+  const animalHistory=historial.filter(h=>h[1]?.toString()===animal.id).reverse().slice(0,20);
+  const[editingIdx,setEditingIdx]=useState(null);
+  const[editDate,setEditDate]=useState(undefined);
+  const[savingDate,setSavingDate]=useState(false);
 
-const isSow=sowStats.partos>0||sowStats.servicios>0||["SALA_SERVICIO","GESTACION","MATERNIDAD","DESCANSO"].includes(animal.fase);
-const isInactive=!animal.activo;
-const showParto=!isInactive&&animal.piglets===0;
-const showDestete=!isInactive&&animal.piglets>0;
-const scoreColor=sowStats.score>=70?"var(--success)":sowStats.score>=40?"var(--warning)":"var(--destructive)";
-const scoreLabel=sowStats.score>=70?"Excelente":sowStats.score>=40?"Regular":"Bajo rendimiento";
-const btn={border:"none",cursor:"pointer",borderRadius:8,fontWeight:600,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"10px 0",width:"100%"};
+  const sowStats=useMemo(()=>{
+    const records=historial.filter(h=>h[1]?.toString()===animal.id);
+    const partos=records.filter(r=>r[2]==="PARTO"),servicios=records.filter(r=>r[2]==="SERVICIO"),destetes=records.filter(r=>r[2]==="DESTETE"),bajas=records.filter(r=>r[2]==="BAJA_LACTANCIA");
+    let totalNV=0,totalNM=0,totalPN=0,totalH=0,totalM=0;const partoDetails=[];
+    partos.forEach(p=>{const n=p[5]||"";const mV=n.match(/Vivos:\s*(\d+)/),mMu=n.match(/Muertos:\s*(\d+)/),mP=n.match(/Peso Total:\s*([\d.]+)/),mH=n.match(/Hembras:\s*(\d+)/),mMa=n.match(/Machos:\s*(\d+)/),mPa=n.match(/Padre:\s*([^\s|]+)/);
+    const v=mV?parseInt(mV[1]):0,mu=mMu?parseInt(mMu[1]):0,pe=mP?parseFloat(mP[1]):0,h=mH?parseInt(mH[1]):0,ma=mMa?parseInt(mMa[1]):0,pa=mPa?mPa[1]:"";
+    totalNV+=v;totalNM+=mu;totalPN+=pe;totalH+=h;totalM+=ma;partoDetails.push({fecha:dateKeyToLabel(extractDateKey(p[0]))||"-",vivos:v,muertos:mu,peso:pe,hembras:h,machos:ma,padre:pa})});
+    let totalBajas=0;bajas.forEach(b=>{const m=(b[5]||"").match(/Cantidad:\s*(\d+)/);if(m)totalBajas+=parseInt(m[1])});
+    const hijos=allAnimals.filter(a=>a.madre===animal.id);
+    const promV=partos.length>0?(totalNV/partos.length).toFixed(1):"0";const promP=totalNV>0?(totalPN/totalNV).toFixed(2):"0";
+    const mort=totalNV>0?(((totalBajas+totalNM)/(totalNV+totalNM))*100).toFixed(1):"0";
+    let score=50;if(partos.length>0)score+=partos.length*5;if(parseFloat(promV)>=10)score+=15;else if(parseFloat(promV)>=8)score+=10;if(parseFloat(mort)<10)score+=15;else if(parseFloat(mort)<20)score+=5;else score-=10;score=Math.min(100,Math.max(0,score));
+    return{partos:partos.length,servicios:servicios.length,destetes:destetes.length,totalNacidosVivos:totalNV,totalNacidosMuertos:totalNM,totalBajas,totalHembras:totalH,totalMachos:totalM,promVivos:promV,promPeso:promP,mortalidad:mort,score,partoDetails,hijos:hijos.length,hijosActivos:hijos.filter(a=>a.activo).length};
+  },[historial,allAnimals,animal.id]);
 
-return(<div className="animate-fade-in">
-<button onClick={onBack} style={{display:"flex",alignItems:"center",gap:4,fontSize:14,fontWeight:600,color:"var(--primary)",marginBottom:8,background:"none",border:"none",cursor:"pointer"}}>← Volver</button>
+  const isSow=sowStats.partos>0||sowStats.servicios>0||["SALA_SERVICIO","GESTACION","REPRODUCTIVA","DESCANSO"].includes(animal.fase);
+  const isInactive=!animal.activo;
+  const isRepro=animal.fase==="REPRODUCTIVA";
+  const showParto=!isInactive&&isRepro&&animal.subfase==="GESTACION"&&animal.piglets===0;
+  const showDestete=!isInactive&&animal.piglets>0;
+  const scoreColor=sowStats.score>=70?"var(--success)":sowStats.score>=40?"var(--warning)":"var(--destructive)";
+  const scoreLabel=sowStats.score>=70?"Excelente":sowStats.score>=40?"Regular":"Bajo rendimiento";
+  const btn={cursor:"pointer",borderRadius:8,fontWeight:600,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"10px 0",width:"100%",border:"none"};
 
-<div style={{background:"var(--card)",borderRadius:12,padding:20,boxShadow:"0 2px 10px rgba(0,0,0,.08)",border:"1px solid var(--border)",marginBottom:12}}>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-<h2 style={{fontSize:24,fontWeight:800}}>ID: {animal.id}</h2>
-<span style={{background:colorMap[animal.color],color:"#fff",fontSize:11,fontWeight:700,padding:"4px 12px",borderRadius:20}}>⏱️ {animal.dias} días</span></div>
+  // Madurez
+  const madurez=sowStats.partos===0?"NULÍPARAS":sowStats.partos===1?"PRIMÍPARAS":sowStats.partos===2?"MULTÍPARAS":"MULTÍPARAS +"+sowStats.partos;
 
-{isInactive&&(<div style={{marginTop:12,padding:12,borderRadius:8,background:"rgba(220,38,38,.1)",border:"1px solid rgba(220,38,38,.2)",textAlign:"center"}}>
-<p style={{fontSize:14,fontWeight:700,color:"var(--destructive)"}}>{animal.ultimaAccion==="VENTA"?"💰 VENDIDO":"🔴 MUERTO"} — No se pueden registrar acciones</p></div>)}
+  return React.createElement("div",{className:"animate-fade-in",style:{display:"flex",flexDirection:"column",gap:12}},
+    React.createElement("button",{onClick:onBack,style:{display:"flex",alignItems:"center",gap:4,fontSize:14,fontWeight:600,color:"var(--primary)"}},"← Volver"),
 
-<div style={{marginTop:16,fontSize:14,lineHeight:2}}>
-<p>📍 <b>Puesto:</b> {animal.subpuesto||"N/A"}</p><p>🏷️ <b>Chapeta:</b> {animal.chapeta||"N/A"}</p>
-<p>👩‍👦 <b>Madre:</b> {animal.madre||"N/A"}</p><p>📋 <b>Fase:</b> {(animal.fase||"").replace(/_/g," ")||"N/A"}</p></div>
+    /* Main info card */
+    React.createElement("div",{style:{background:"var(--card)",borderRadius:12,padding:20,boxShadow:"0 2px 10px rgba(0,0,0,.08)",border:"1px solid var(--border)"}},
+      React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center"}},
+        React.createElement("h2",{style:{fontSize:24,fontWeight:800}},"ID: "+animal.id),
+        React.createElement("span",{style:{background:colorMap[animal.color],color:"#fff",fontSize:11,fontWeight:700,padding:"4px 12px",borderRadius:20}},"⏱️ "+animal.dias+" días")
+      ),
+      isInactive&&React.createElement("div",{style:{marginTop:12,padding:12,borderRadius:8,background:"rgba(220,38,38,.1)",border:"1px solid rgba(220,38,38,.2)",textAlign:"center"}},
+        React.createElement("p",{style:{fontSize:14,fontWeight:700,color:"var(--destructive)"}},animal.ultimaAccion==="VENTA"?"💰 VENDIDO":"🔴 MUERTO"," — No se pueden registrar acciones")
+      ),
+      React.createElement("div",{style:{marginTop:16,fontSize:14,lineHeight:2}},
+        React.createElement("p",null,"📍 ",React.createElement("b",null,"Puesto:")," ",animal.subpuesto||"N/A"),
+        React.createElement("p",null,"🏷️ ",React.createElement("b",null,"Chapeta:")," ",animal.chapeta||"N/A"),
+        React.createElement("p",null,"👩‍👦 ",React.createElement("b",null,"Madre:")," ",animal.madre||"N/A"),
+        React.createElement("p",null,"📋 ",React.createElement("b",null,"Fase:")," ",(animal.fase||"").replace(/_/g," ")||"N/A"),
+        isRepro&&animal.subfase&&(()=>{
+          const sfInfo=SUBFASES_REPRODUCTIVA.find(s=>s.key===animal.subfase);
+          return React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
+            React.createElement("span",null,"🔄 ",React.createElement("b",null,"Subfase:")),
+            React.createElement("span",{style:{fontWeight:700,color:"var(--primary)"}},sfInfo?sfInfo.icon+" "+sfInfo.label:animal.subfase),
+            React.createElement("span",{style:{color:"var(--muted-fg)",fontSize:12}},"· ⏱️ "+animal.dias+" días"),
+            !isInactive&&React.createElement("button",{onClick:()=>onAction(animal.id,"CAMBIAR_SUBFASE"),style:{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:4,background:"var(--muted)",color:"var(--muted-fg)"}},"✏️ Editar")
+          );
+        })(),
+        isRepro&&React.createElement("p",null,"🐖 ",React.createElement("b",null,"Madurez:")," ",React.createElement("span",{style:{fontWeight:700,color:"var(--primary)"}},madurez)," ",React.createElement("span",{style:{color:"var(--muted-fg)",fontSize:12}},"("+sowStats.partos+" partos)"))
+      ),
+      !isInactive&&animal.piglets>0&&React.createElement("div",{style:{marginTop:12,display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(45,138,86,.1)",border:"1px solid rgba(45,138,86,.2)",borderRadius:8,padding:12}},
+        React.createElement("span",{style:{fontSize:14,fontWeight:700,color:"var(--success)"}},"🐷 "+animal.piglets+" Lechones Vivos"),
+        React.createElement("button",{onClick:()=>onAction(animal.id,"BAJA_LACTANCIA"),style:{...btn,width:"auto",padding:"4px 12px",background:"var(--destructive)",color:"#fff",fontSize:11}},"💀 Baja")
+      ),
+      !isInactive&&React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:20}},
+        React.createElement("button",{onClick:()=>onAction(animal.id,"OBSERVACION"),style:{...btn,background:"var(--secondary)",color:"var(--secondary-fg)"}},"📝 Nota"),
+        React.createElement("button",{onClick:()=>onAction(animal.id,"TRASLADO"),style:{...btn,background:"var(--primary)",color:"var(--primary-fg)"}},"🔄 Mover"),
+        isRepro&&(!animal.subfase||animal.subfase==="REEMPLAZO"||animal.subfase==="VACIA"||animal.subfase==="DESCANSO")&&React.createElement("button",{onClick:()=>onAction(animal.id,"SERVICIO"),style:{...btn,gridColumn:"span 2",color:"#fff"},className:"gradient-purple"},"💉 Inseminar"),
+        isRepro&&animal.subfase==="SERVIDAS"&&React.createElement("button",{onClick:()=>onAction(animal.id,"CONFIRMAR_GESTACION"),style:{...btn,gridColumn:"span 2",background:"var(--success)",color:"var(--success-fg)"}},"✅ Confirmar Preñez"),
+        isRepro&&animal.subfase==="SERVIDAS"&&React.createElement("button",{onClick:()=>onAction(animal.id,"RETORNO_VACIA"),style:{...btn,gridColumn:"span 2",background:"rgba(212,160,10,.2)",color:"var(--warning-fg)",border:"1px solid rgba(212,160,10,.4)"}},"⭕ Retorno Vacía"),
+        showParto&&React.createElement("button",{onClick:()=>onAction(animal.id,"PARTO"),style:{...btn,gridColumn:"span 2",background:"var(--accent)",color:"var(--accent-fg)",padding:"12px 0",fontWeight:700,border:"2px solid var(--accent)"}},"🐷 Registrar Parto"),
+        showDestete&&React.createElement("button",{onClick:()=>onAction(animal.id,"DESTETE"),style:{...btn,gridColumn:"span 2",background:"var(--success)",color:"var(--success-fg)"}},"🥣 Registrar Destete"),
+        React.createElement("button",{onClick:()=>onAction(animal.id,"ENFERMEDAD"),style:{...btn,background:"rgba(220,38,38,.1)",color:"var(--destructive)",border:"1px solid rgba(220,38,38,.3)"}},"🏥 Enfermedad"),
+        React.createElement("button",{onClick:()=>onAction(animal.id,"MUERTE"),style:{...btn,background:"rgba(220,38,38,.1)",color:"var(--destructive)",border:"1px solid rgba(220,38,38,.3)"}},"🔴 Muerte"),
+        React.createElement("button",{onClick:()=>onAction(animal.id,"VENTA"),style:{...btn,gridColumn:"span 2",background:"rgba(212,160,10,.2)",color:"var(--warning-fg)",border:"1px solid rgba(212,160,10,.4)"}},"💰 Venta")
+      )
+    ),
 
-{!isInactive&&animal.piglets>0&&(<div style={{marginTop:12,display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(45,138,86,.1)",border:"1px solid rgba(45,138,86,.2)",borderRadius:8,padding:12}}>
-<span style={{fontSize:14,fontWeight:700,color:"var(--success)"}}>🐷 {animal.piglets} Lechones Vivos</span>
-<button onClick={()=>onAction(animal.id,"BAJA_LACTANCIA")} style={{...btn,width:"auto",padding:"4px 12px",background:"var(--destructive)",color:"#fff",fontSize:11}}>💀 Baja</button></div>)}
+    /* Dashboard stats */
+    isSow&&React.createElement("div",{style:{background:"var(--card)",borderRadius:12,padding:20,boxShadow:"0 2px 10px rgba(0,0,0,.08)",border:"1px solid var(--border)"}},
+      React.createElement("h4",{style:{fontWeight:700,marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}},React.createElement("span",null,"📊 Dashboard de "+animal.id),React.createElement("span",{style:{fontSize:11,fontWeight:700,color:scoreColor}},(sowStats.score>=70?"📈":"📉")+" "+scoreLabel+" ("+sowStats.score+"/100)")),
+      React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}},
+        [{v:sowStats.partos,l:"Partos"},{v:sowStats.totalNacidosVivos,l:"Nacidos V."},{v:sowStats.hijos,l:"Hijos"}].map((s,i)=>React.createElement("div",{key:i,style:{background:"var(--muted)",borderRadius:8,padding:12,textAlign:"center"}},React.createElement("p",{style:{fontSize:24,fontWeight:700}},s.v),React.createElement("p",{style:{fontSize:9,color:"var(--muted-fg)",fontWeight:600,textTransform:"uppercase"}},s.l)))
+      ),
+      React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}},
+        React.createElement("div",{style:{background:"rgba(236,72,153,.1)",border:"1px solid rgba(236,72,153,.2)",borderRadius:8,padding:12,textAlign:"center"}},React.createElement("p",{style:{fontSize:24,fontWeight:700,color:"#db2777"}},sowStats.totalHembras),React.createElement("p",{style:{fontSize:9,fontWeight:600,textTransform:"uppercase",color:"#ec4899"}},"♀ Hembras")),
+        React.createElement("div",{style:{background:"rgba(59,130,246,.1)",border:"1px solid rgba(59,130,246,.2)",borderRadius:8,padding:12,textAlign:"center"}},React.createElement("p",{style:{fontSize:24,fontWeight:700,color:"#2563eb"}},sowStats.totalMachos),React.createElement("p",{style:{fontSize:9,fontWeight:600,textTransform:"uppercase",color:"#3b82f6"}},"♂ Machos"))
+      ),
+      React.createElement("div",{style:{fontSize:14}},
+        [["💉 Servicios",sowStats.servicios],["🐷 Prom. lechones/parto",sowStats.promVivos],["⚖️ Peso prom. nacer",sowStats.promPeso+" kg"],["💀 Nacidos muertos",sowStats.totalNacidosMuertos,"var(--destructive)"],["📉 Bajas lactancia",sowStats.totalBajas,"var(--destructive)"],["☠️ Mortalidad",sowStats.mortalidad+"%",parseFloat(sowStats.mortalidad)>20?"var(--destructive)":parseFloat(sowStats.mortalidad)>10?"var(--warning)":"var(--success)"],["🥣 Destetes",sowStats.destetes],["🐖 Hijos activos",sowStats.hijosActivos,"var(--success)"]].map(([label,val,c],i)=>React.createElement("div",{key:i,style:{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:i<7?"1px solid var(--border)":"none"}},React.createElement("span",{style:{color:"var(--muted-fg)"}},label),React.createElement("span",{style:{fontWeight:700,color:c||"var(--card-fg)"}},val)))
+      ),
+      sowStats.partos>=2&&React.createElement("div",{style:{marginTop:16,padding:12,borderRadius:8,fontSize:12,fontWeight:600,background:sowStats.score>=70?"rgba(45,138,86,.1)":sowStats.score>=40?"rgba(212,160,10,.1)":"rgba(220,38,38,.1)",border:"1px solid",borderColor:sowStats.score>=70?"rgba(45,138,86,.3)":sowStats.score>=40?"rgba(212,160,10,.3)":"rgba(220,38,38,.3)",color:scoreColor}},sowStats.score>=70?"✅ Marrana productiva.":sowStats.score>=40?"⚠️ Rendimiento regular.":"🚨 Bajo rendimiento."),
+      sowStats.partoDetails.length>0&&React.createElement("div",{style:{marginTop:16}},React.createElement("p",{style:{fontSize:10,fontWeight:700,color:"var(--muted-fg)",textTransform:"uppercase",letterSpacing:1,marginBottom:8}},"Historial de Partos"),
+        sowStats.partoDetails.map((p,i)=>React.createElement("div",{key:i,style:{display:"flex",justifyContent:"space-between",alignItems:"center",background:"var(--muted)",borderRadius:8,padding:"8px 12px",marginBottom:4,fontSize:12,flexWrap:"wrap",gap:4}},React.createElement("span",{style:{color:"var(--muted-fg)"}},"📅 "+p.fecha),React.createElement("div",{style:{display:"flex",gap:8,flexWrap:"wrap"}},React.createElement("span",{style:{color:"var(--success)",fontWeight:600}},"🐷 "+p.vivos+"V"),p.muertos>0&&React.createElement("span",{style:{color:"var(--destructive)",fontWeight:600}},"💀 "+p.muertos+"M"),p.hembras>0&&React.createElement("span",{style:{color:"#ec4899",fontWeight:600}},"♀"+p.hembras),p.machos>0&&React.createElement("span",{style:{color:"#3b82f6",fontWeight:600}},"♂"+p.machos),p.padre&&React.createElement("span",{style:{color:"var(--muted-fg)",fontWeight:600}},"🐗 "+p.padre),p.peso>0&&React.createElement("span",{style:{fontWeight:600}},"⚖️ "+p.peso+"kg")))))
+    ),
 
-{!isInactive&&(<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:20}}>
-<button onClick={()=>onAction(animal.id,"OBSERVACION")} style={{...btn,background:"var(--muted)",color:"var(--card-fg)"}}>📝 Nota</button>
-<button onClick={()=>onAction(animal.id,"TRASLADO")} style={{...btn,background:"var(--primary)",color:"var(--primary-fg)"}}>🔄 Mover</button>
-<button onClick={()=>onAction(animal.id,"SERVICIO")} style={{...btn,gridColumn:"span 2",color:"#fff"}} className="gradient-purple">💉 Inseminar</button>
-{showParto&&<button onClick={()=>onAction(animal.id,"PARTO")} style={{...btn,gridColumn:"span 2",background:"var(--accent)",color:"var(--accent-fg)",padding:"12px 0",fontWeight:700,border:"2px solid var(--accent)"}}>🐷 Registrar Parto</button>}
-{showDestete&&<button onClick={()=>onAction(animal.id,"DESTETE")} style={{...btn,gridColumn:"span 2",background:"var(--success)",color:"var(--success-fg)"}}>🥣 Registrar Destete</button>}
-</div>)}
-</div>
-
-{isSow&&(<div style={{background:"var(--card)",borderRadius:12,padding:20,boxShadow:"0 2px 10px rgba(0,0,0,.08)",border:"1px solid var(--border)",marginBottom:12}}>
-<h4 style={{fontWeight:700,marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}><span>📊 Dashboard de {animal.id}</span><span style={{fontSize:11,fontWeight:700,color:scoreColor}}>{sowStats.score>=70?"📈":"📉"} {scoreLabel} ({sowStats.score}/100)</span></h4>
-<div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}}>
-{[{v:sowStats.partos,l:"Partos"},{v:sowStats.totalNacidosVivos,l:"Nacidos V."},{v:sowStats.hijos,l:"Hijos"}].map((s,i)=>(<div key={i} style={{background:"var(--muted)",borderRadius:8,padding:12,textAlign:"center"}}><p style={{fontSize:24,fontWeight:700}}>{s.v}</p><p style={{fontSize:9,color:"var(--muted-fg)",fontWeight:600,textTransform:"uppercase"}}>{s.l}</p></div>))}</div>
-<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
-<div style={{background:"rgba(236,72,153,.1)",border:"1px solid rgba(236,72,153,.2)",borderRadius:8,padding:12,textAlign:"center"}}><p style={{fontSize:24,fontWeight:700,color:"#db2777"}}>{sowStats.totalHembras}</p><p style={{fontSize:9,fontWeight:600,textTransform:"uppercase",color:"#ec4899"}}>♀ Hembras</p></div>
-<div style={{background:"rgba(59,130,246,.1)",border:"1px solid rgba(59,130,246,.2)",borderRadius:8,padding:12,textAlign:"center"}}><p style={{fontSize:24,fontWeight:700,color:"#2563eb"}}>{sowStats.totalMachos}</p><p style={{fontSize:9,fontWeight:600,textTransform:"uppercase",color:"#3b82f6"}}>♂ Machos</p></div></div>
-<div style={{fontSize:14}}>
-{[["💉 Servicios",sowStats.servicios],["🐷 Prom. lechones/parto",sowStats.promVivos],["⚖️ Peso prom. nacer",sowStats.promPeso+" kg"],["💀 Nacidos muertos",sowStats.totalNacidosMuertos,"var(--destructive)"],["📉 Bajas lactancia",sowStats.totalBajas,"var(--destructive)"],["☠️ Mortalidad",sowStats.mortalidad+"%",parseFloat(sowStats.mortalidad)>20?"var(--destructive)":parseFloat(sowStats.mortalidad)>10?"var(--warning)":"var(--success)"],["🥣 Destetes",sowStats.destetes],["🐖 Hijos activos",sowStats.hijosActivos,"var(--success)"]].map(([label,val,c],i)=>(<div key={i} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:i<7?"1px solid var(--border)":"none"}}><span style={{color:"var(--muted-fg)"}}>{label}</span><span style={{fontWeight:700,color:c||"var(--card-fg)"}}>{val}</span></div>))}</div>
-{sowStats.partos>=2&&(<div style={{marginTop:16,padding:12,borderRadius:8,fontSize:12,fontWeight:600,background:sowStats.score>=70?"rgba(45,138,86,.1)":sowStats.score>=40?"rgba(212,160,10,.1)":"rgba(220,38,38,.1)",border:"1px solid",borderColor:sowStats.score>=70?"rgba(45,138,86,.3)":sowStats.score>=40?"rgba(212,160,10,.3)":"rgba(220,38,38,.3)",color:scoreColor}}>{sowStats.score>=70?"✅ Marrana productiva.":sowStats.score>=40?"⚠️ Rendimiento regular.":"🚨 Bajo rendimiento."}</div>)}
-{sowStats.partoDetails.length>0&&(<div style={{marginTop:16}}><p style={{fontSize:10,fontWeight:700,color:"var(--muted-fg)",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Historial de Partos</p>
-{sowStats.partoDetails.map((p,i)=>(<div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"var(--muted)",borderRadius:8,padding:"8px 12px",marginBottom:4,fontSize:12,flexWrap:"wrap",gap:4}}><span style={{color:"var(--muted-fg)"}}>📅 {p.fecha}</span><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><span style={{color:"var(--success)",fontWeight:600}}>🐷 {p.vivos}V</span>{p.muertos>0&&<span style={{color:"var(--destructive)",fontWeight:600}}>💀 {p.muertos}M</span>}{p.hembras>0&&<span style={{color:"#ec4899",fontWeight:600}}>♀{p.hembras}</span>}{p.machos>0&&<span style={{color:"#3b82f6",fontWeight:600}}>♂{p.machos}</span>}{p.padre&&<span style={{color:"var(--muted-fg)",fontWeight:600}}>🐗 {p.padre}</span>}{p.peso>0&&<span style={{fontWeight:600}}>⚖️ {p.peso}kg</span>}</div></div>))}</div>)}
-</div>)}
-
-<div style={{background:"var(--card)",borderRadius:12,padding:20,boxShadow:"0 2px 10px rgba(0,0,0,.08)",border:"1px solid var(--border)"}}>
-<h4 style={{fontWeight:700,marginBottom:12}}>Historial</h4>
-{animalHistory.length===0&&<p style={{fontSize:14,color:"var(--muted-fg)"}}>Sin historial.</p>}
-{animalHistory.map((h,i)=>(<div key={i} style={{fontSize:12,borderLeft:"2px solid var(--border)",paddingLeft:12,paddingTop:4,paddingBottom:4,marginBottom:4}}><span style={{color:"var(--muted-fg)"}}>📅 {new Date(h[0]).toLocaleDateString()}</span> — <b>{h[2]}</b><p style={{color:"var(--muted-fg)",marginTop:2}}>{h[5]}</p></div>))}</div>
-</div>);
+    /* Historial with date editing */
+    React.createElement("div",{style:{background:"var(--card)",borderRadius:12,padding:20,boxShadow:"0 2px 10px rgba(0,0,0,.08)",border:"1px solid var(--border)"}},
+      React.createElement("h4",{style:{fontWeight:700,marginBottom:12}},"Historial"),
+      animalHistory.length===0&&React.createElement("p",{style:{fontSize:14,color:"var(--muted-fg)"}},"Sin historial."),
+      animalHistory.map((h,i)=>{
+        const accionH=(h[2]||"").toString().trim();
+        const isEditing=editingIdx===i;
+        const fechaLabel=dateKeyToLabel(extractDateKey(h[0]))||"-";
+        return React.createElement("div",{key:i,style:{fontSize:12,borderLeft:"2px solid var(--border)",paddingLeft:12,paddingTop:4,paddingBottom:4,marginBottom:4}},
+          React.createElement("div",{style:{display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}},
+            React.createElement("span",{style:{color:"var(--muted-fg)"}},"📅 "+fechaLabel)," — ",React.createElement("b",null,h[2]),
+            React.createElement("button",{onClick:()=>{if(isEditing){setEditingIdx(null)}else{const dk=extractDateKey(h[0]);setEditDate(dk?new Date(dk+"T12:00:00"):undefined);setEditingIdx(i)}},style:{marginLeft:4,color:"var(--primary)",fontSize:12},title:"Editar fecha"},"✏️")
+          ),
+          isEditing&&React.createElement("div",{style:{marginTop:8,padding:12,borderRadius:8,background:"var(--muted)",border:"1px solid var(--border)"}},
+            React.createElement("p",{style:{fontSize:12,fontWeight:600,marginBottom:8}},"📅 Cambiar fecha de este registro:"),
+            React.createElement(DateInput,{value:editDate,onChange:d=>setEditDate(d)}),
+            React.createElement("div",{style:{display:"flex",gap:8,marginTop:8}},
+              React.createElement("button",{onClick:()=>setEditingIdx(null),style:{padding:"6px 12px",borderRadius:6,background:"var(--muted)",color:"var(--card-fg)",fontSize:12,fontWeight:600,border:"1px solid var(--border)"}},"Cancelar"),
+              React.createElement("button",{disabled:!editDate||savingDate,onClick:async()=>{
+                if(!editDate)return;
+                setSavingDate(true);
+                try{
+                  const oldDateKey=extractDateKey(h[0]);
+                  const newDateKey=formatDateStr(editDate);
+                  await enviarRegistro({tipo:"EDITAR_FECHA",tatuaje:animal.id,accion:accionH,fechaOriginal:toAppsScriptDate(oldDateKey),fechaNueva:toAppsScriptDate(newDateKey),notas:(h[5]||"").toString()});
+                  alert("Fecha actualizada correctamente ✅");
+                  setEditingIdx(null);
+                  if(onRefresh)onRefresh();
+                }catch(err){alert("Error al actualizar la fecha")}finally{setSavingDate(false)}
+              },style:{padding:"6px 12px",borderRadius:6,background:"var(--primary)",color:"var(--primary-fg)",fontSize:12,fontWeight:600,opacity:(!editDate||savingDate)?.5:1}},savingDate?"Guardando...":"💾 Guardar")
+            )
+          ),
+          React.createElement("p",{style:{color:"var(--muted-fg)",marginTop:2}},h[5])
+        );
+      })
+    )
+  );
 }
 
 function ReportsView({historial,search,onSelectAnimal}){
-const[filtro,setFiltro]=useState("TODOS");
-const[filtroPuesto,setFiltroPuesto]=useState("");const[filtroMadre,setFiltroMadre]=useState("");
-const[filtroComprador,setFiltroComprador]=useState("");const[filtroFechaDesde,setFiltroFechaDesde]=useState("");const[filtroFechaHasta,setFiltroFechaHasta]=useState("");
-const{subpuestos,madres,compradores}=useMemo(()=>{const subs=new Set(),mads=new Set(),comps=new Set();historial.forEach(h=>{if(h[12])subs.add(h[12].toString().trim());if(h[7])mads.add(h[7].toString().trim());const n=h[5]||"";const cm=n.match(/Comprador: ([^|]+)/);if(cm){const c=cm[1].trim();if(c&&c!=="N/A")comps.add(c)}});return{subpuestos:[...subs].sort(),madres:[...mads].sort(),compradores:[...comps].sort()}},[historial]);
-const lista=historial.filter(h=>{const accion=h[2],notas=h[5]||"",id=h[1]?.toString()||"",chapeta=h[10]?.toString()||"",puesto=h[12]?.toString()||"",madre=h[7]?.toString()||"",fecha=h[0]?new Date(h[0]):null;
-if(search.trim()){const u=search.toUpperCase();if(!(id.toUpperCase().includes(u)||chapeta.toUpperCase().includes(u)||notas.toUpperCase().includes(u)||accion?.toUpperCase().includes(u)||puesto.toUpperCase().includes(u)||madre.toUpperCase().includes(u)))return false}
-let pa=true;if(filtro!=="TODOS"){if(filtro==="MUERTE")pa=accion==="MUERTE"||accion==="BAJA_LACTANCIA"||(accion==="PARTO"&&notas.includes("Muertos:")&&!notas.includes("Muertos: 0"))||(accion==="DESTETE"&&notas.includes("Bajas:")&&!notas.includes("Bajas: 0"));else pa=accion===filtro}
-if(filtroPuesto&&h[12]?.toString().trim().toUpperCase()!==filtroPuesto.toUpperCase())return false;
-if(filtroMadre&&h[7]?.toString().trim().toUpperCase()!==filtroMadre.toUpperCase())return false;
-if(filtroComprador){const cm=notas.match(/Comprador: ([^|]+)/);const c=cm?cm[1].trim():"";if(c.toUpperCase()!==filtroComprador.toUpperCase())return false}
-let fechaStr="";if(accion==="VENTA"){const fm=notas.match(/Fecha:\s*([\d-]+)/);if(fm)fechaStr=fm[1]}
-if(!fechaStr&&fecha)fechaStr=`${fecha.getFullYear()}-${String(fecha.getMonth()+1).padStart(2,"0")}-${String(fecha.getDate()).padStart(2,"0")}`;
-if(fechaStr){if(filtroFechaDesde&&fechaStr<filtroFechaDesde)return false;if(filtroFechaHasta&&fechaStr>filtroFechaHasta)return false}
-return pa});
-const reversed=[...lista].reverse();
-const ventaTotals=useMemo(()=>{if(filtro!=="VENTA")return null;return{count:reversed.filter(h=>h[2]==="VENTA").length}},[filtro,reversed]);
-const hasAF=filtroPuesto||filtroMadre||filtroComprador||filtroFechaDesde||filtroFechaHasta;
-const clearF=()=>{setFiltroPuesto("");setFiltroMadre("");setFiltroComprador("");setFiltroFechaDesde("");setFiltroFechaHasta("")};
-const sel={width:"100%",padding:"8px",borderRadius:8,border:"1px solid var(--input)",background:"var(--bg)",color:"var(--fg)",fontSize:12};
-const filterOpts=[{v:"TODOS",l:"Ver Todos"},{v:"VENTA",l:"💰 Ventas"},{v:"MUERTE",l:"🔴 Muertes"},{v:"PARTO",l:"🐷 Partos"},{v:"DESTETE",l:"🥣 Destetes"},{v:"SERVICIO",l:"💉 Servicios"}];
-return(<div className="animate-fade-in" style={{background:"var(--card)",borderRadius:12,padding:20,boxShadow:"0 2px 10px rgba(0,0,0,.08)",border:"1px solid var(--border)"}}>
-<h3 style={{fontSize:18,fontWeight:700,marginBottom:12}}>📋 Historial de Eventos</h3>
-<select value={filtro} onChange={e=>setFiltro(e.target.value)} style={{...sel,marginBottom:8}}>{filterOpts.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}</select>
-<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-<div><label style={{fontSize:10,fontWeight:600,color:"var(--muted-fg)",textTransform:"uppercase"}}>📅 Desde</label><input type="date" value={filtroFechaDesde} onChange={e=>setFiltroFechaDesde(e.target.value)} style={sel}/></div>
-<div><label style={{fontSize:10,fontWeight:600,color:"var(--muted-fg)",textTransform:"uppercase"}}>📅 Hasta</label><input type="date" value={filtroFechaHasta} onChange={e=>setFiltroFechaHasta(e.target.value)} style={sel}/></div></div>
-<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-<div><label style={{fontSize:10,fontWeight:600,color:"var(--muted-fg)",textTransform:"uppercase"}}>📍 Puesto</label><select value={filtroPuesto} onChange={e=>setFiltroPuesto(e.target.value)} style={sel}><option value="">Todos</option>{subpuestos.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
-<div><label style={{fontSize:10,fontWeight:600,color:"var(--muted-fg)",textTransform:"uppercase"}}>👩‍👦 Madre</label><select value={filtroMadre} onChange={e=>setFiltroMadre(e.target.value)} style={sel}><option value="">Todas</option>{madres.map(m=><option key={m} value={m}>{m}</option>)}</select></div></div>
-{compradores.length>0&&<div style={{marginBottom:8}}><label style={{fontSize:10,fontWeight:600,color:"var(--muted-fg)",textTransform:"uppercase"}}>🤝 Comprador</label><select value={filtroComprador} onChange={e=>setFiltroComprador(e.target.value)} style={sel}><option value="">Todos</option>{compradores.map(c=><option key={c} value={c}>{c}</option>)}</select></div>}
-{hasAF&&<button onClick={clearF} style={{fontSize:12,color:"var(--primary)",fontWeight:600,marginBottom:12,background:"none",border:"none",cursor:"pointer"}}>✕ Limpiar filtros</button>}
-{ventaTotals&&<div style={{marginBottom:16,padding:12,borderRadius:8,background:"rgba(45,138,86,.1)",border:"1px solid rgba(45,138,86,.2)"}}><p style={{fontSize:14,fontWeight:700,color:"var(--success)"}}>💰 Total ventas: {ventaTotals.count}</p></div>}
-<p style={{fontSize:12,color:"var(--muted-fg)",marginBottom:12}}>{reversed.length} registros</p>
-<div>{reversed.length===0?<p style={{textAlign:"center",color:"var(--muted-fg)",padding:"32px 0"}}>Sin registros.</p>:
-reversed.map((h,i)=>{const accion=h[2];const config=ACCION_CONFIG[accion]||ACCION_CONFIG.OBSERVACION;const notas=h[5]||"";
-let fecha="";if(accion==="VENTA"){const fm=notas.match(/Fecha:\s*([\d-]+)/);if(fm){const[y,m,d]=fm[1].split("-");fecha=`${d}/${m}/${y}`}}
-if(!fecha)fecha=new Date(h[0]).toLocaleDateString("es-CO",{year:"numeric",month:"short",day:"numeric"});
-const cv=accion==="VENTA"&&notas.includes("Comprador:")?notas.match(/Comprador: ([^|]+)/)?.[1]?.trim()||"":"";
-const bgC=accion==="VENTA"?"var(--success)":accion==="MUERTE"||accion==="BAJA_LACTANCIA"?"var(--destructive)":accion==="PARTO"?"var(--accent)":accion==="SERVICIO"?"#7c3aed":accion==="DESTETE"?"var(--success)":"var(--primary)";
-return(<div key={i} style={{display:"flex",gap:12,position:"relative",marginBottom:16,cursor:"pointer"}} onClick={()=>onSelectAnimal&&onSelectAnimal(h[1]?.toString())}>
-{i<reversed.length-1&&<div style={{position:"absolute",left:19,top:40,bottom:-16,width:2,background:"var(--border)"}}/>}
-<div style={{width:40,height:40,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0,boxShadow:"0 1px 4px rgba(0,0,0,.1)",zIndex:1,background:bgC,color:"#fff"}}>{config.icon}</div>
-<div style={{background:"var(--muted)",borderRadius:8,padding:12,flex:1}}>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><span style={{fontSize:12,fontWeight:700}}>{accion}</span><span style={{fontSize:10,color:"var(--muted-fg)"}}>{fecha}</span></div>
-<p style={{fontSize:14,fontWeight:700}}>ID: {h[1]}</p>
-{h[12]&&<p style={{fontSize:10,color:"var(--muted-fg)"}}>📍 {h[12]}</p>}
-{h[7]&&<p style={{fontSize:10,color:"var(--muted-fg)"}}>👩‍👦 {h[7]}</p>}
-{accion==="VENTA"&&cv&&cv!=="N/A"&&<p style={{fontSize:12,fontWeight:600,color:"var(--primary)",marginTop:2}}>🤝 {cv}</p>}
-<p style={{fontSize:12,color:"var(--muted-fg)",marginTop:4}}>{notas}</p></div></div>)})}</div></div>);
+  const[filtro,setFiltro]=useState("TODOS");
+  const[filtroPuesto,setFiltroPuesto]=useState("");const[filtroMadre,setFiltroMadre]=useState("");
+  const[filtroComprador,setFiltroComprador]=useState("");const[filtroFechaDesde,setFiltroFechaDesde]=useState("");const[filtroFechaHasta,setFiltroFechaHasta]=useState("");
+  const{subpuestos,madres,compradores}=useMemo(()=>{const subs=new Set(),mads=new Set(),comps=new Set();historial.forEach(h=>{if(h[12])subs.add(h[12].toString().trim());if(h[7])mads.add(h[7].toString().trim());const n=h[5]||"";const cm=n.match(/Comprador: ([^|]+)/);if(cm){const c=cm[1].trim();if(c&&c!=="N/A")comps.add(c)}});return{subpuestos:[...subs].sort(),madres:[...mads].sort(),compradores:[...comps].sort()}},[historial]);
+  const lista=historial.filter(h=>{const accion=h[2],notas=h[5]||"",id=h[1]?.toString()||"",chapeta=h[10]?.toString()||"",puesto=h[12]?.toString()||"",madre=h[7]?.toString()||"",fechaStr=extractDateKey(h[0]);
+    if(search.trim()){const upper=search.toUpperCase();if(!id.toUpperCase().includes(upper)&&!chapeta.toUpperCase().includes(upper)&&!(notas||"").toUpperCase().includes(upper)&&!(accion||"").toUpperCase().includes(upper)&&!puesto.toUpperCase().includes(upper)&&!madre.toUpperCase().includes(upper))return false}
+    let passAction=true;if(filtro!=="TODOS"){if(filtro==="MUERTE")passAction=accion==="MUERTE"||accion==="BAJA_LACTANCIA"||(accion==="PARTO"&&notas.includes("Muertos:")&&!notas.includes("Muertos: 0"))||(accion==="DESTETE"&&notas.includes("Bajas:")&&!notas.includes("Bajas: 0"));else passAction=accion===filtro}
+    if(filtroPuesto&&(h[12]||"").toString().trim().toUpperCase()!==filtroPuesto.toUpperCase())return false;
+    if(filtroMadre&&(h[7]||"").toString().trim().toUpperCase()!==filtroMadre.toUpperCase())return false;
+    if(filtroComprador){const cm=notas.match(/Comprador: ([^|]+)/);const c=cm?cm[1].trim():"";if(c.toUpperCase()!==filtroComprador.toUpperCase())return false}
+    if(fechaStr){if(filtroFechaDesde&&fechaStr<filtroFechaDesde)return false;if(filtroFechaHasta&&fechaStr>filtroFechaHasta)return false}
+    return passAction;
+  });
+  const reversed=[...lista].reverse();
+  const ventaTotals=useMemo(()=>{if(filtro!=="VENTA")return null;return{count:reversed.filter(h=>h[2]==="VENTA").length}},[filtro,reversed]);
+  const hasAF=filtroPuesto||filtroMadre||filtroComprador||filtroFechaDesde||filtroFechaHasta;
+  const clearFilters=()=>{setFiltroPuesto("");setFiltroMadre("");setFiltroComprador("");setFiltroFechaDesde("");setFiltroFechaHasta("")};
+  const sel=React.createElement("select",null);
+  const inputS={width:"100%",padding:"8px",borderRadius:8,border:"1px solid var(--input)",background:"var(--bg)",color:"var(--fg)",fontSize:12};
+
+  return React.createElement("div",{className:"animate-fade-in",style:{background:"var(--card)",borderRadius:12,padding:20,boxShadow:"0 2px 10px rgba(0,0,0,.08)",border:"1px solid var(--border)"}},
+    React.createElement("h3",{style:{fontSize:18,fontWeight:700,marginBottom:12}},"📋 Historial de Eventos"),
+    React.createElement("select",{value:filtro,onChange:e=>setFiltro(e.target.value),style:{...inputS,marginBottom:8,fontSize:14}},
+      [{v:"TODOS",l:"Ver Todos"},{v:"VENTA",l:"💰 Ventas"},{v:"MUERTE",l:"🔴 Muertes"},{v:"PARTO",l:"🐷 Partos"},{v:"DESTETE",l:"🥣 Destetes"},{v:"SERVICIO",l:"💉 Servicios"}].map(o=>React.createElement("option",{key:o.v,value:o.v},o.l))),
+    React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}},
+      React.createElement("div",null,React.createElement("label",{style:{fontSize:10,fontWeight:600,color:"var(--muted-fg)",textTransform:"uppercase"}},"📅 Desde"),React.createElement("input",{type:"date",value:filtroFechaDesde,onChange:e=>setFiltroFechaDesde(e.target.value),style:inputS})),
+      React.createElement("div",null,React.createElement("label",{style:{fontSize:10,fontWeight:600,color:"var(--muted-fg)",textTransform:"uppercase"}},"📅 Hasta"),React.createElement("input",{type:"date",value:filtroFechaHasta,onChange:e=>setFiltroFechaHasta(e.target.value),style:inputS}))
+    ),
+    React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}},
+      React.createElement("div",null,React.createElement("label",{style:{fontSize:10,fontWeight:600,color:"var(--muted-fg)",textTransform:"uppercase"}},"📍 Puesto"),React.createElement("select",{value:filtroPuesto,onChange:e=>setFiltroPuesto(e.target.value),style:inputS},React.createElement("option",{value:""},"Todos"),subpuestos.map(s=>React.createElement("option",{key:s,value:s},s)))),
+      React.createElement("div",null,React.createElement("label",{style:{fontSize:10,fontWeight:600,color:"var(--muted-fg)",textTransform:"uppercase"}},"👩‍👦 Madre"),React.createElement("select",{value:filtroMadre,onChange:e=>setFiltroMadre(e.target.value),style:inputS},React.createElement("option",{value:""},"Todas"),madres.map(m=>React.createElement("option",{key:m,value:m},m))))
+    ),
+    compradores.length>0&&React.createElement("div",{style:{marginBottom:8}},React.createElement("label",{style:{fontSize:10,fontWeight:600,color:"var(--muted-fg)",textTransform:"uppercase"}},"🤝 Comprador"),React.createElement("select",{value:filtroComprador,onChange:e=>setFiltroComprador(e.target.value),style:inputS},React.createElement("option",{value:""},"Todos"),compradores.map(c=>React.createElement("option",{key:c,value:c},c)))),
+    hasAF&&React.createElement("button",{onClick:clearFilters,style:{fontSize:12,color:"var(--primary)",fontWeight:600,marginBottom:12}},"✕ Limpiar filtros"),
+    ventaTotals&&React.createElement("div",{style:{marginBottom:12,padding:12,borderRadius:8,background:"rgba(45,138,86,.1)",border:"1px solid rgba(45,138,86,.2)"}},React.createElement("p",{style:{fontSize:14,fontWeight:700,color:"var(--success)"}},"💰 Total ventas: "+ventaTotals.count)),
+    React.createElement("p",{style:{fontSize:12,color:"var(--muted-fg)",marginBottom:12}},reversed.length+" registros"),
+    reversed.length===0?React.createElement("p",{style:{textAlign:"center",color:"var(--muted-fg)",padding:"32px 0"}},"Sin registros."):
+    React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:16}},
+      reversed.map((h,i)=>{
+        const accion=h[2]||"";const config=ACCION_CONFIG[accion]||ACCION_CONFIG.OBSERVACION;const notas=h[5]||"";const fecha=dateKeyToLabel(extractDateKey(h[0]));
+        const compradorV=accion==="VENTA"&&notas.includes("Comprador:")?(notas.match(/Comprador: ([^|]+)/)||[])[1]?.trim()||"":"";
+        return React.createElement("div",{key:i,style:{display:"flex",gap:12,cursor:"pointer",position:"relative"},onClick:()=>onSelectAnimal&&onSelectAnimal(h[1]?.toString())},
+          i<reversed.length-1&&React.createElement("div",{style:{position:"absolute",left:19,top:40,bottom:-16,width:2,background:"var(--border)"}}),
+          React.createElement("div",{style:{width:40,height:40,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0,boxShadow:"0 1px 3px rgba(0,0,0,.1)",zIndex:1,color:"#fff",background:accion==="VENTA"?"var(--success)":accion==="MUERTE"||accion==="BAJA_LACTANCIA"?"var(--destructive)":accion==="PARTO"?"var(--accent)":"var(--primary)"}},config.icon),
+          React.createElement("div",{style:{background:"var(--muted)",borderRadius:8,padding:12,flex:1}},
+            React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}},
+              React.createElement("span",{style:{fontSize:12,fontWeight:700}},accion),
+              React.createElement("span",{style:{fontSize:10,color:"var(--muted-fg)"}},fecha)
+            ),
+            React.createElement("p",{style:{fontSize:14,fontWeight:700}},"ID: "+h[1]),
+            h[12]&&React.createElement("p",{style:{fontSize:10,color:"var(--muted-fg)"}},"📍 "+h[12]),
+            h[7]&&React.createElement("p",{style:{fontSize:10,color:"var(--muted-fg)"}},"👩‍👦 "+h[7]),
+            compradorV&&compradorV!=="N/A"&&React.createElement("p",{style:{fontSize:12,fontWeight:600,color:"var(--primary)",marginTop:2}},"🤝 "+compradorV),
+            React.createElement("p",{style:{fontSize:12,color:"var(--muted-fg)",marginTop:4}},notas)
+          )
+        );
+      })
+    )
+  );
 }
 
-function RegistroForm({inventario,fasesExtra,prefillId="",prefillAccion="INGRESO",prefillAnimal=null,historial=[],onSuccess}){
-const allFases=[...FASES_DEFAULT,...fasesExtra];
-const[accion,setAccion]=useState(prefillAccion);const[tatuaje,setTatuaje]=useState(prefillId);
-const[chapeta,setChapeta]=useState(prefillAnimal?.chapeta||"");const[peso,setPeso]=useState("");
-const[fase,setFase]=useState(prefillAnimal?.fase||allFases[0]);const[subpuesto,setSubpuesto]=useState(prefillAnimal?.subpuesto||"");
-const[notas,setNotas]=useState("");const[comprador,setComprador]=useState("");const[inseminador,setInseminador]=useState("");
-const[padre,setPadre]=useState("");const[vivos,setVivos]=useState("");const[muertos,setMuertos]=useState("");
-const[cantBaja,setCantBaja]=useState("1");const[causaBaja,setCausaBaja]=useState("");
-const[destetados,setDestetados]=useState("");const[destLechones,setDestLechones]=useState("PRECEBO");
-const[lechones,setLechones]=useState([]);const[partoLechones,setPartoLechones]=useState([]);
-const[semanaNac,setSemanaNac]=useState("");const[saving,setSaving]=useState(false);
-const[fechaEvento,setFechaEvento]=useState(new Date().toISOString().split("T")[0]);
+function ResumenView({historial,onSelectAnimal}){
+  const hoy=()=>formatDateStr(new Date());
+  const hace30=()=>{const d=new Date();d.setDate(d.getDate()-30);return formatDateStr(d)};
+  const[desde,setDesde]=useState(hace30);const[hasta,setHasta]=useState(hoy);const[expanded,setExpanded]=useState(null);
+  const CATS=[{key:"PARTO",label:"🐷 Nacimientos",color:"#2563eb"},{key:"MUERTE",label:"🔴 Muertes",color:"#dc2626"},{key:"VENTA",label:"💰 Ventas",color:"#d97706"},{key:"INGRESO",label:"📥 Ingresos",color:"var(--success)"},{key:"DESTETE",label:"🥣 Destetes",color:"#7c3aed"},{key:"SERVICIO",label:"💉 Servicios",color:"#db2777"},{key:"BAJA_LACTANCIA",label:"⚠️ Bajas Lactancia",color:"#ea580c"}];
+  const{resumen,registrosFiltrados}=useMemo(()=>{
+    const counts={};CATS.forEach(c=>counts[c.key]={count:0,detalle:""});const filtered={};CATS.forEach(c=>filtered[c.key]=[]);
+    historial.forEach(h=>{const accion=(h[2]||"").toString().toUpperCase().trim();const fechaStr=extractDateKey(h[0]);
+      if(!fechaStr||fechaStr<desde||fechaStr>hasta)return;
+      if(counts[accion]!==undefined){counts[accion].count++;filtered[accion].push(h);
+        if(accion==="PARTO"){const m=(h[5]||"").match(/Vivos:\s*(\d+)/);if(m)counts[accion].detalle=(parseInt(counts[accion].detalle||"0")+parseInt(m[1])).toString()}
+        if(accion==="VENTA"){const m=(h[5]||"").match(/Peso:\s*([\d.]+)/);if(m)counts[accion].detalle=(parseFloat(counts[accion].detalle||"0")+parseFloat(m[1])).toFixed(1)}
+        if(accion==="BAJA_LACTANCIA"){const m=(h[5]||"").match(/Cantidad:\s*(\d+)/);if(m)counts[accion].detalle=(parseInt(counts[accion].detalle||"0")+parseInt(m[1])).toString()}}});
+    return{resumen:counts,registrosFiltrados:filtered};
+  },[historial,desde,hasta]);
+  const fmtD=d=>{const p=d.split("-");return p[2]+"/"+p[1]+"/"+p[0]};
+  const inputS={width:"100%",padding:"8px",borderRadius:8,border:"1px solid var(--input)",background:"var(--card)",color:"var(--fg)",fontSize:14};
 
-const lastPeso=useMemo(()=>{if(!prefillAnimal||!historial.length)return"";const records=historial.filter(h=>h[1]?.toString()===prefillAnimal.id).reverse();for(const r of records){const n=r[5]||"";const m=n.match(/Peso:\s*([\d.]+)\s*kg/);if(m)return m[1];if(r[4]&&parseFloat(r[4])>0)return r[4].toString()}return""},[prefillAnimal,historial]);
+  if(expanded){
+    const cat=CATS.find(c=>c.key===expanded);const regs=registrosFiltrados[expanded]||[];
+    return React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:12}},
+      React.createElement("button",{onClick:()=>setExpanded(null),style:{display:"flex",alignItems:"center",gap:4,fontSize:14,fontWeight:600,color:"var(--primary)"}},"← Volver al Resumen"),
+      React.createElement("h2",{style:{fontSize:18,fontWeight:700}},cat?.label||expanded),
+      React.createElement("p",{style:{fontSize:12,color:"var(--muted-fg)"}},fmtD(desde)+" → "+fmtD(hasta)+" · "+regs.length+" registros"),
+      regs.length===0?React.createElement("p",{style:{fontSize:14,color:"var(--muted-fg)",textAlign:"center",padding:"32px 0"}},"Sin registros"):
+      React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:8}},regs.map((h,i)=>React.createElement("div",{key:i,onClick:()=>onSelectAnimal&&onSelectAnimal(h[1]?.toString()),style:{padding:12,borderRadius:8,background:"var(--card)",border:"1px solid var(--border)",cursor:"pointer"}},
+        React.createElement("div",{style:{display:"flex",justifyContent:"space-between"}},React.createElement("span",{style:{fontWeight:700,fontSize:14}},"🐷 "+h[1]),React.createElement("span",{style:{fontSize:12,color:"var(--muted-fg)"}},fmtD(extractDateKey(h[0])))),
+        h[5]&&React.createElement("p",{style:{fontSize:12,color:"var(--muted-fg)",marginTop:4}},h[5])
+      )))
+    );
+  }
 
-const handleAccionChange=val=>{setAccion(val);if(val==="SERVICIO")setFase("SALA_SERVICIO");if(val==="PARTO")setFase("MATERNIDAD");
-if(val==="DESTETE"){setFase("DESCANSO");setDestLechones("PRECEBO");const a=inventario.find(a=>a.id===tatuaje);if(a){setDestetados(String(a.piglets));setLechones(Array.from({length:a.piglets},(_,i)=>({tat:`${tatuaje}-${i+1}`,chap:"",peso:"",ok:true})))}}
-if(val==="BAJA_LACTANCIA")setFase("MATERNIDAD")};
-const handleDestetadosChange=val=>{setDestetados(val);const n=parseInt(val)||0;setLechones(Array.from({length:n},()=>({tat:"",chap:"",peso:"",ok:true})))};
-
-const handleSubmit=async()=>{const animal=inventario.find(a=>a.id===tatuaje);if(accion==="TRASLADO"&&animal&&animal.piglets>0){alert("No puedes mover a esta madre porque tiene lechones.");return}
-setSaving(true);let fn=notas;
-if(accion==="PARTO"){const pt=partoLechones.reduce((s,l)=>s+(parseFloat(l.peso)||0),0);const hembras=partoLechones.filter(l=>l.sexo==="H").length;const machos=partoLechones.filter(l=>l.sexo==="M").length;const det=partoLechones.map((l,i)=>`L${i+1}:${l.peso||0}kg(${l.sexo})`).join(", ");fn=`PARTO | Vivos: ${vivos} | Muertos: ${muertos} | Hembras: ${hembras} | Machos: ${machos} | Semana: ${semanaNac} | Madre: ${tatuaje} | Padre: ${padre||"N/A"} | Peso Total: ${pt.toFixed(1)}kg | Detalle: ${det} ${notas}`}
-if(accion==="BAJA_LACTANCIA")fn=`BAJA LACTANCIA | Cantidad: ${cantBaja} | Causa: ${causaBaja||"Desconocida"} ${notas}`;
-if(accion==="VENTA")fn=`VENTA | Fecha: ${fechaEvento} | Comprador: ${comprador||"N/A"} | Peso: ${peso}kg ${notas}`;
-if(accion==="DESTETE"){const ef=lechones.filter(l=>l.ok);const bajas=lechones.length-ef.length;const pt=ef.reduce((s,l)=>s+(parseFloat(l.peso)||0),0);fn=`DESTETE | Camada: ${destetados} | Efectivos: ${ef.length} | Bajas: ${bajas} | Peso Total: ${pt}kg ${notas}`;const ld=ef.filter(l=>l.tat).map(l=>({tatuaje:l.tat,chapeta:l.chap,peso:l.peso,notas:"Hijo de "+tatuaje+(l.peso?` | Peso: ${l.peso}kg`:"")}));if(ld.length>0)await enviarBatch({comun:{accion:"INGRESO",fase:"PRECEBO",subpuesto:destLechones,madre:tatuaje,fecha:fechaEvento},animales:ld})}
-await enviarRegistro({tatuaje,chapeta,peso,accion,fase,subpuesto,notas:fn,inseminador,fecha:fechaEvento});
-alert("✅ Registro guardado");setSaving(false);onSuccess()};
-
-const inp={width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid var(--input)",background:"var(--bg)",color:"var(--fg)",fontSize:14,outline:"none"};
-const lbl={display:"block",fontSize:14,fontWeight:600,marginTop:16,marginBottom:4};
-return(<div className="animate-fade-in" style={{background:"var(--card)",borderRadius:12,padding:20,boxShadow:"0 2px 10px rgba(0,0,0,.08)",border:"1px solid var(--border)"}}>
-<h3 style={{fontSize:18,fontWeight:700,marginBottom:8}}>Nuevo Registro</h3>
-{prefillAnimal&&(<div style={{marginBottom:12,padding:12,borderRadius:8,background:"rgba(45,106,79,.1)",border:"1px solid rgba(45,106,79,.2)",fontSize:12}}>
-<p style={{fontWeight:700,color:"var(--primary)",fontSize:14}}>📋 Datos: {prefillAnimal.id}</p>
-<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,marginTop:4}}>
-<span>📍 Puesto: <b>{prefillAnimal.subpuesto||"N/A"}</b></span><span>🏷️ Chapeta: <b>{prefillAnimal.chapeta||"N/A"}</b></span>
-<span>📋 Fase: <b>{(prefillAnimal.fase||"").replace(/_/g," ")||"N/A"}</b></span><span>⚖️ Últ. peso: <b>{lastPeso?`${lastPeso} kg`:"N/A"}</b></span></div></div>)}
-<label style={lbl}>Acción</label>
-<select value={accion} onChange={e=>handleAccionChange(e.target.value)} style={inp}>
-<option value="INGRESO">🟢 Ingreso</option><option value="SERVICIO">💉 Servicio</option><option value="PARTO">🐷 Parto</option><option value="DESTETE">🥣 Destete</option><option value="BAJA_LACTANCIA">💀 Baja Lechón</option><option value="TRASLADO">🔵 Traslado</option><option value="VENTA">💰 Venta</option><option value="MUERTE">🔴 Muerte</option><option value="OBSERVACION">📝 Observación</option></select>
-<label style={lbl}>📅 Fecha del evento</label><input type="date" value={fechaEvento} onChange={e=>setFechaEvento(e.target.value)} style={inp}/>
-<label style={lbl}>Tatuaje (ID)</label><input value={tatuaje} onChange={e=>setTatuaje(e.target.value)} placeholder="ID del animal" style={inp}/>
-<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-<div><label style={lbl}>Chapeta</label><input value={chapeta} onChange={e=>setChapeta(e.target.value)} placeholder="N°" style={inp}/></div>
-<div><label style={lbl}>Peso (kg)</label><input type="number" value={peso} onChange={e=>setPeso(e.target.value)} placeholder="0.0" style={inp}/></div></div>
-{accion!=="BAJA_LACTANCIA"&&<><label style={lbl}>Ubicación / Fase</label><select value={fase} onChange={e=>setFase(e.target.value)} style={inp}>{allFases.map(f=><option key={f} value={f}>{f}</option>)}</select>
-<label style={lbl}>Sub-Puesto</label><input value={subpuesto} onChange={e=>setSubpuesto(e.target.value)} placeholder="Jaula/Corral" style={inp}/></>}
-
-{accion==="SERVICIO"&&(<div style={{marginTop:16,padding:16,borderRadius:8,background:"var(--muted)",border:"1px solid var(--border)"}}><h4 style={{fontSize:14,fontWeight:700,marginBottom:8}}>💉 Inseminación</h4><label style={lbl}>Inseminador</label><input value={inseminador} onChange={e=>setInseminador(e.target.value)} placeholder="Nombre" style={inp}/></div>)}
-
-{accion==="PARTO"&&(<div style={{marginTop:16,padding:16,borderRadius:8,background:"var(--muted)",border:"1px solid var(--border)"}}>
-<h4 style={{fontSize:14,fontWeight:700,marginBottom:8}}>🐷 Registro de Camada</h4>
-<label style={lbl}>🐗 Padre (Verraco / Dosis)</label><input value={padre} onChange={e=>setPadre(e.target.value)} placeholder="ID del padre o dosis" style={inp}/>
-<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-<div><label style={lbl}>Vivos</label><input type="number" value={vivos} onChange={e=>{setVivos(e.target.value);const n=parseInt(e.target.value)||0;setPartoLechones(Array.from({length:n},()=>({peso:"",sexo:"H"})))}} style={inp}/></div>
-<div><label style={lbl}>Muertos</label><input type="number" value={muertos} onChange={e=>setMuertos(e.target.value)} style={inp}/></div></div>
-<label style={lbl}>Semana de Nacimiento</label><input value={semanaNac} onChange={e=>setSemanaNac(e.target.value)} placeholder="Ej. S10" style={inp}/>
-{partoLechones.length>0&&(<div style={{marginTop:12}}>
-<p style={{fontSize:10,fontWeight:700,color:"var(--muted-fg)",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Peso individual</p>
-{partoLechones.map((l,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:8,background:"var(--bg)",borderRadius:6,padding:6,border:"1px solid var(--border)",marginBottom:4}}>
-<span style={{fontSize:12,color:"var(--muted-fg)",width:20,textAlign:"center",fontWeight:600}}>{i+1}</span>
-<span style={{fontSize:10,color:"var(--muted-fg)",flexShrink:0}}>{tatuaje?`${semanaNac||"?"}-${tatuaje}-${i+1}`:`L${i+1}`}</span>
-<input type="number" value={l.peso} onChange={e=>{const c=[...partoLechones];c[i]={...c[i],peso:e.target.value};setPartoLechones(c)}} placeholder="kg" style={{fontSize:12,padding:"4px 8px",borderRadius:4,border:"1px solid var(--input)",background:"var(--bg)",width:60,minWidth:0}}/>
-<button type="button" onClick={()=>{const c=[...partoLechones];c[i]={...c[i],sexo:"H"};setPartoLechones(c)}} style={{fontSize:12,padding:"4px 8px",borderRadius:4,fontWeight:700,border:"none",cursor:"pointer",background:l.sexo==="H"?"#ec4899":"var(--muted)",color:l.sexo==="H"?"#fff":"var(--muted-fg)"}}>♀ H</button>
-<button type="button" onClick={()=>{const c=[...partoLechones];c[i]={...c[i],sexo:"M"};setPartoLechones(c)}} style={{fontSize:12,padding:"4px 8px",borderRadius:4,fontWeight:700,border:"none",cursor:"pointer",background:l.sexo==="M"?"#3b82f6":"var(--muted)",color:l.sexo==="M"?"#fff":"var(--muted-fg)"}}>♂ M</button>
-</div>))}
-<div style={{marginTop:8,display:"flex",justifyContent:"space-between",fontSize:12,fontWeight:600}}>
-<div style={{display:"flex",gap:12}}><span style={{color:"#ec4899"}}>♀ {partoLechones.filter(l=>l.sexo==="H").length}</span><span style={{color:"#3b82f6"}}>♂ {partoLechones.filter(l=>l.sexo==="M").length}</span></div>
-<span style={{color:"var(--primary)"}}>Peso: {partoLechones.reduce((s,l)=>s+(parseFloat(l.peso)||0),0).toFixed(1)} kg</span></div></div>)}
-</div>)}
-
-{accion==="BAJA_LACTANCIA"&&(<div style={{marginTop:16,padding:16,borderRadius:8,background:"rgba(220,38,38,.1)",border:"1px solid rgba(220,38,38,.2)"}}><h4 style={{fontSize:14,fontWeight:700,color:"var(--destructive)",marginBottom:8}}>💀 Baja de Lechón</h4><label style={lbl}>Cantidad</label><input type="number" value={cantBaja} onChange={e=>setCantBaja(e.target.value)} style={inp}/><label style={lbl}>Causa</label><input value={causaBaja} onChange={e=>setCausaBaja(e.target.value)} placeholder="Ej. Aplastamiento" style={inp}/></div>)}
-
-{accion==="DESTETE"&&(<div style={{marginTop:16,padding:16,borderRadius:8,background:"rgba(45,138,86,.1)",border:"1px solid rgba(45,138,86,.2)"}}>
-<h4 style={{fontSize:14,fontWeight:700,color:"var(--success)",marginBottom:8}}>🥣 Movimiento de Lechones</h4>
-{tatuaje&&<div style={{marginBottom:12,padding:8,borderRadius:8,background:"rgba(45,106,79,.1)",border:"1px solid rgba(45,106,79,.2)",fontSize:12}}><p style={{fontWeight:600,color:"var(--primary)"}}>🐷 Madre: {tatuaje}</p></div>}
-<label style={lbl}>Cant. Destetados</label><input type="number" value={destetados} onChange={e=>handleDestetadosChange(e.target.value)} style={inp}/>
-<label style={lbl}>Destino</label><select value={destLechones} onChange={e=>setDestLechones(e.target.value)} style={inp}>{allFases.map(f=><option key={f} value={f}>{f}</option>)}</select>
-{lechones.length>0&&(<div style={{marginTop:12}}>
-<div style={{display:"grid",gridTemplateColumns:"24px 1fr 1fr 60px 28px",gap:4,fontSize:10,fontWeight:700,color:"var(--muted-fg)"}}><span>#</span><span>ID</span><span>Chap</span><span>Peso</span><span>OK</span></div>
-{lechones.map((l,i)=>(<div key={i} style={{display:"grid",gridTemplateColumns:"24px 1fr 1fr 60px 28px",gap:4,alignItems:"center",background:"var(--bg)",borderRadius:4,padding:4,border:"1px solid var(--border)",marginBottom:2}}>
-<span style={{fontSize:12,textAlign:"center",color:"var(--muted-fg)"}}>{i+1}</span>
-<input value={l.tat} onChange={e=>{const c=[...lechones];c[i]={...c[i],tat:e.target.value};setLechones(c)}} placeholder="ID" style={{fontSize:12,padding:"4px 6px",borderRadius:4,border:"1px solid var(--input)",background:"var(--bg)",minWidth:0}}/>
-<input value={l.chap} onChange={e=>{const c=[...lechones];c[i]={...c[i],chap:e.target.value};setLechones(c)}} placeholder="N°" style={{fontSize:12,padding:"4px 6px",borderRadius:4,border:"1px solid var(--input)",background:"var(--bg)",minWidth:0}}/>
-<input type="number" value={l.peso} onChange={e=>{const c=[...lechones];c[i]={...c[i],peso:e.target.value};setLechones(c)}} placeholder="kg" style={{fontSize:12,padding:"4px 6px",borderRadius:4,border:"1px solid var(--input)",background:"var(--bg)",minWidth:0}}/>
-<input type="checkbox" checked={l.ok} onChange={e=>{const c=[...lechones];c[i]={...c[i],ok:e.target.checked};setLechones(c)}} style={{width:16,height:16,margin:"0 auto",cursor:"pointer"}}/>
-</div>))}
-{lechones.some(l=>l.peso)&&<div style={{marginTop:8,fontSize:12,fontWeight:600,color:"var(--success)",textAlign:"right"}}>Peso: {lechones.reduce((s,l)=>s+(parseFloat(l.peso)||0),0).toFixed(1)} kg</div>}
-</div>)}</div>)}
-
-{accion==="VENTA"&&(<div style={{marginTop:16,padding:16,borderRadius:8,background:"rgba(45,138,86,.1)",border:"1px solid rgba(45,138,86,.2)"}}><h4 style={{fontSize:14,fontWeight:700,color:"var(--success)",marginBottom:8}}>💰 Datos de Venta</h4><label style={lbl}>Comprador</label><input value={comprador} onChange={e=>setComprador(e.target.value)} placeholder="Nombre" style={inp}/><p style={{fontSize:12,color:"var(--muted-fg)",marginTop:8}}>Fecha de venta: <b>{fechaEvento}</b></p></div>)}
-
-<label style={lbl}>Notas</label><input value={notas} onChange={e=>setNotas(e.target.value)} placeholder="Observaciones" style={inp}/>
-<button onClick={handleSubmit} disabled={saving} style={{width:"100%",marginTop:24,padding:12,borderRadius:8,background:"var(--primary)",color:"var(--primary-fg)",fontWeight:700,fontSize:16,border:"none",cursor:"pointer",opacity:saving?.5:1}}>{saving?"Guardando...":"Guardar 💾"}</button>
-</div>);
+  return React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:16}},
+    React.createElement("h2",{style:{fontSize:18,fontWeight:700}},"📊 Resumen por Período"),
+    React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}},
+      React.createElement("div",null,React.createElement("label",{style:{fontSize:10,fontWeight:700,color:"var(--muted-fg)",textTransform:"uppercase"}},"Desde"),React.createElement("input",{type:"date",value:desde,onChange:e=>setDesde(e.target.value),style:inputS})),
+      React.createElement("div",null,React.createElement("label",{style:{fontSize:10,fontWeight:700,color:"var(--muted-fg)",textTransform:"uppercase"}},"Hasta"),React.createElement("input",{type:"date",value:hasta,onChange:e=>setHasta(e.target.value),style:inputS}))
+    ),
+    React.createElement("p",{style:{fontSize:12,color:"var(--muted-fg)",textAlign:"center"}},fmtD(desde)+" → "+fmtD(hasta)),
+    React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}},
+      CATS.map(cat=>{const data=resumen[cat.key];if(!data)return null;
+        return React.createElement("div",{key:cat.key,onClick:()=>data.count>0&&setExpanded(cat.key),style:{background:"var(--card)",borderRadius:12,padding:12,border:"1px solid var(--border)",boxShadow:"0 2px 6px rgba(0,0,0,.05)",cursor:data.count>0?"pointer":"default"}},
+          React.createElement("p",{style:{fontSize:11,color:"var(--muted-fg)",fontWeight:500,marginBottom:4}},cat.label),
+          React.createElement("p",{style:{fontSize:28,fontWeight:800,color:cat.color}},data.count),
+          cat.key==="PARTO"&&data.detalle&&React.createElement("p",{style:{fontSize:10,color:"var(--muted-fg)",marginTop:2}},"🐽 "+data.detalle+" lechones vivos"),
+          cat.key==="VENTA"&&data.detalle&&parseFloat(data.detalle)>0&&React.createElement("p",{style:{fontSize:10,color:"var(--muted-fg)",marginTop:2}},"⚖️ "+data.detalle+" kg total"),
+          cat.key==="BAJA_LACTANCIA"&&data.detalle&&React.createElement("p",{style:{fontSize:10,color:"var(--muted-fg)",marginTop:2}},"🐽 "+data.detalle+" lechones perdidos"),
+          data.count>0&&React.createElement("p",{style:{fontSize:9,color:"var(--primary)",marginTop:4,fontWeight:600}},"Toca para ver detalle →")
+        );
+      })
+    )
+  );
 }
 
+function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnimal,historial,onSuccess}){
+  const allFases=[...new Set([...FASES_DEFAULT,...fasesExtra])];
+  const[accion,setAccion]=useState(prefillAccion||"INGRESO");
+  const[tatuaje,setTatuaje]=useState(prefillId||"");
+  const[chapeta,setChapeta]=useState(prefillAnimal?.chapeta||"");
+  const[peso,setPeso]=useState("");
+  const[fase,setFase]=useState(prefillAnimal?.fase||allFases[0]);
+  const[subpuesto,setSubpuesto]=useState(prefillAnimal?.subpuesto||"");
+  const[notas,setNotas]=useState("");
+  const[comprador,setComprador]=useState("");
+  const[inseminador,setInseminador]=useState("");
+  const[padre,setPadre]=useState("");
+  const[vivos,setVivos]=useState("");
+  const[muertos,setMuertos]=useState("");
+  const[cantBaja,setCantBaja]=useState("1");
+  const[causaBaja,setCausaBaja]=useState("");
+  const[destetados,setDestetados]=useState("");
+  const[destLechones,setDestLechones]=useState("PRECEBO");
+  const[lechones,setLechones]=useState([]);
+  const[partoLechones,setPartoLechones]=useState([]);
+  const[semanaNac,setSemanaNac]=useState("");
+  const[saving,setSaving]=useState(false);
+  const[fechaEvento,setFechaEvento]=useState(prefillAccion==="INGRESO"?undefined:new Date());
+  const[nuevaSubfase,setNuevaSubfase]=useState(prefillAnimal?.subfase||"REEMPLAZO");
+  const inputS={width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid var(--input)",background:"var(--bg)",color:"var(--fg)",fontSize:14,outline:"none"};
+  const labelS={display:"block",fontSize:14,fontWeight:600,marginTop:16,marginBottom:4};
+
+  const handleAccionChange=val=>{setAccion(val);
+    if(val==="SERVICIO")setFase("SALA_SERVICIO");if(val==="PARTO"||val==="CONFIRMAR_GESTACION"||val==="RETORNO_VACIA"||val==="CAMBIAR_SUBFASE"||val==="BAJA_LACTANCIA")setFase("REPRODUCTIVA");
+    if(val==="DESTETE"){setFase("DESCANSO");setDestLechones("PRECEBO");const a=inventario.find(a=>a.id===tatuaje);if(a){setDestetados(String(a.piglets));setLechones(Array.from({length:a.piglets},(_,i)=>({tat:tatuaje+"-"+(i+1),chap:"",peso:"",ok:true})))}}
+  };
+
+  const handleSubmit=async()=>{
+    if(!tatuaje.trim()){alert("El campo Tatuaje (ID) es obligatorio");return}
+    if(!fechaEvento){alert("Debes seleccionar la fecha");return}
+    const animal=inventario.find(a=>a.id===tatuaje);
+    if(accion==="TRASLADO"&&animal&&animal.piglets>0){alert("No puedes mover: tiene lechones. Usa DESTETE.");return}
+    setSaving(true);
+    try{
+      let finalNotas=notas;const fechaStr=formatDateStr(fechaEvento);
+      if(accion==="PARTO"){const ptc=partoLechones.reduce((s,l)=>s+(parseFloat(l.peso)||0),0);const h=partoLechones.filter(l=>l.sexo==="H").length;const m=partoLechones.filter(l=>l.sexo==="M").length;const det=partoLechones.map((l,i)=>"L"+(i+1)+":"+(l.peso||0)+"kg("+l.sexo+")").join(", ");finalNotas="PARTO | Vivos: "+vivos+" | Muertos: "+muertos+" | Hembras: "+h+" | Machos: "+m+" | Semana: "+semanaNac+" | Madre: "+tatuaje+" | Padre: "+(padre||"N/A")+" | Peso Total: "+ptc.toFixed(1)+"kg | Detalle: "+det+" "+notas}
+      if(accion==="CONFIRMAR_GESTACION")finalNotas="GESTACIÓN CONFIRMADA | "+notas;
+      if(accion==="RETORNO_VACIA")finalNotas="RETORNO VACÍA | "+notas;
+      if(accion==="CAMBIAR_SUBFASE")finalNotas="CAMBIAR SUBFASE | Subfase: "+nuevaSubfase+" | "+notas;
+      if(accion==="BAJA_LACTANCIA")finalNotas="BAJA LACTANCIA | Cantidad: "+cantBaja+" | Causa: "+(causaBaja||"Desconocida")+" "+notas;
+      if(accion==="VENTA")finalNotas="VENTA | Comprador: "+(comprador||"N/A")+" | Peso: "+peso+"kg "+notas;
+      if(accion==="DESTETE"){const ef=lechones.filter(l=>l.ok);const bj=lechones.length-ef.length;const pt=ef.reduce((s,l)=>s+(parseFloat(l.peso)||0),0);finalNotas="DESTETE | Camada: "+destetados+" | Efectivos: "+ef.length+" | Bajas: "+bj+" | Peso Total: "+pt+"kg "+notas;
+        const ld=ef.filter(l=>l.tat).map(l=>({tatuaje:l.tat,chapeta:l.chap,peso:l.peso,notas:"Hijo de "+tatuaje+(l.peso?" | Peso: "+l.peso+"kg":"")}));
+        if(ld.length>0)await enviarBatch({comun:{accion:"INGRESO",fase:"PRECEBO",subpuesto:destLechones,madre:tatuaje,fecha:fechaStr},animales:ld})}
+      await enviarRegistro({tatuaje,chapeta,peso,accion,fase,subpuesto,notas:finalNotas,inseminador,fecha:fechaStr});
+      alert("Registro guardado correctamente ✅");setSaving(false);onSuccess();
+    }catch(err){alert("Error al guardar: "+(err.message||"Intenta de nuevo."));setSaving(false)}
+  };
+
+  return React.createElement("div",{className:"animate-fade-in",style:{background:"var(--card)",borderRadius:12,padding:20,boxShadow:"0 2px 10px rgba(0,0,0,.08)",border:"1px solid var(--border)"}},
+    React.createElement("h3",{style:{fontSize:18,fontWeight:700,marginBottom:8}},"Nuevo Registro"),
+    prefillAnimal&&React.createElement("div",{style:{marginBottom:12,padding:12,borderRadius:8,background:"rgba(45,106,79,.1)",border:"1px solid rgba(45,106,79,.2)",fontSize:12}},
+      React.createElement("p",{style:{fontWeight:700,color:"var(--primary)",fontSize:14}},"📋 Animal: "+prefillAnimal.id),
+      React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,marginTop:4}},
+        React.createElement("span",null,"📍 Puesto: ",React.createElement("b",null,prefillAnimal.subpuesto||"N/A")),
+        React.createElement("span",null,"🏷️ Chapeta: ",React.createElement("b",null,prefillAnimal.chapeta||"N/A")),
+        React.createElement("span",null,"📋 Fase: ",React.createElement("b",null,(prefillAnimal.fase||"").replace(/_/g," ")||"N/A"))
+      )
+    ),
+    prefillAccion!=="INGRESO"&&React.createElement(React.Fragment,null,
+      React.createElement("label",{style:labelS},"Acción"),
+      React.createElement("div",{style:{...inputS,background:"var(--muted)",cursor:"default"}},(ACCION_CONFIG[accion]||{}).icon+" "+(ACCION_CONFIG[accion]||{}).label||accion)
+    ),
+    React.createElement("label",{style:labelS},"📅 Fecha del evento *"),
+    React.createElement(DateInput,{value:fechaEvento,onChange:d=>setFechaEvento(d)}),
+    React.createElement("label",{style:labelS},"Tatuaje (ID)"),
+    React.createElement("input",{value:tatuaje,onChange:e=>setTatuaje(e.target.value),placeholder:"ID del animal",style:inputS}),
+    React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}},
+      React.createElement("div",null,React.createElement("label",{style:labelS},"Chapeta"),React.createElement("input",{value:chapeta,onChange:e=>setChapeta(e.target.value),placeholder:"N°",style:inputS})),
+      React.createElement("div",null,React.createElement("label",{style:labelS},"Peso (kg)"),React.createElement("input",{type:"number",value:peso,onChange:e=>setPeso(e.target.value),placeholder:"0.0",style:inputS}))
+    ),
+    accion!=="BAJA_LACTANCIA"&&React.createElement(React.Fragment,null,
+      React.createElement("label",{style:labelS},"Ubicación / Fase"),
+      React.createElement("select",{value:fase,onChange:e=>setFase(e.target.value),style:inputS},allFases.map(f=>React.createElement("option",{key:f,value:f},f))),
+      React.createElement("label",{style:labelS},"Sub-Puesto"),
+      React.createElement("input",{value:subpuesto,onChange:e=>setSubpuesto(e.target.value),placeholder:"Jaula/Corral",style:inputS})
+    ),
+    accion==="SERVICIO"&&React.createElement("div",{style:{marginTop:16,padding:16,borderRadius:8,background:"var(--muted)",border:"1px solid var(--border)"}},
+      React.createElement("h4",{style:{fontSize:14,fontWeight:700,marginBottom:8}},"💉 Datos de Inseminación"),
+      React.createElement("label",{style:labelS},"Inseminador"),
+      React.createElement("input",{value:inseminador,onChange:e=>setInseminador(e.target.value),placeholder:"Nombre",style:inputS})
+    ),
+    accion==="CAMBIAR_SUBFASE"&&React.createElement("div",{style:{marginTop:16,padding:16,borderRadius:8,background:"rgba(45,106,79,.1)",border:"1px solid rgba(45,106,79,.2)"}},
+      React.createElement("h4",{style:{fontSize:14,fontWeight:700,color:"var(--primary)",marginBottom:8}},"🔄 Cambiar Subfase"),
+      React.createElement("label",{style:labelS},"Nueva Subfase"),
+      React.createElement("select",{value:nuevaSubfase,onChange:e=>setNuevaSubfase(e.target.value),style:inputS},SUBFASES_REPRODUCTIVA.map(sf=>React.createElement("option",{key:sf.key,value:sf.key},sf.icon+" "+sf.label)))
+    ),
+    accion==="PARTO"&&React.createElement("div",{style:{marginTop:16,padding:16,borderRadius:8,background:"var(--muted)",border:"1px solid var(--border)"}},
+      React.createElement("h4",{style:{fontSize:14,fontWeight:700,marginBottom:8}},"🐷 Registro de Camada"),
+      React.createElement("label",{style:labelS},"🐗 Padre (Verraco / Dosis)"),
+      React.createElement("input",{value:padre,onChange:e=>setPadre(e.target.value),placeholder:"ID del padre",style:inputS}),
+      React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}},
+        React.createElement("div",null,React.createElement("label",{style:labelS},"Vivos"),React.createElement("input",{type:"number",value:vivos,onChange:e=>{setVivos(e.target.value);const n=parseInt(e.target.value)||0;setPartoLechones(Array.from({length:n},()=>({peso:"",sexo:"H"})))},style:inputS})),
+        React.createElement("div",null,React.createElement("label",{style:labelS},"Muertos"),React.createElement("input",{type:"number",value:muertos,onChange:e=>setMuertos(e.target.value),style:inputS}))
+      ),
+      React.createElement("label",{style:labelS},"Semana de Nacimiento"),
+      React.createElement("input",{value:semanaNac,onChange:e=>setSemanaNac(e.target.value),placeholder:"Ej. S10",style:inputS}),
+      partoLechones.length>0&&React.createElement("div",{style:{marginTop:12}},
+        React.createElement("p",{style:{fontSize:10,fontWeight:700,color:"var(--muted-fg)",textTransform:"uppercase",letterSpacing:1,marginBottom:8}},"Peso individual"),
+        partoLechones.map((l,i)=>React.createElement("div",{key:i,style:{display:"flex",alignItems:"center",gap:8,marginBottom:4,background:"var(--bg)",borderRadius:6,padding:6,border:"1px solid var(--border)"}},
+          React.createElement("span",{style:{fontSize:12,color:"var(--muted-fg)",width:20,textAlign:"center",fontWeight:600}},i+1),
+          React.createElement("span",{style:{fontSize:11,color:"var(--muted-fg)",flexShrink:0}},tatuaje?(semanaNac||"?")+"-"+tatuaje+"-"+(i+1):"Lechón "+(i+1)),
+          React.createElement("input",{type:"number",value:l.peso,onChange:e=>{const c=[...partoLechones];c[i]={...c[i],peso:e.target.value};setPartoLechones(c)},placeholder:"kg",style:{width:60,padding:"4px 8px",borderRadius:4,border:"1px solid var(--input)",fontSize:12,background:"var(--bg)"}}),
+          React.createElement("button",{onClick:()=>{const c=[...partoLechones];c[i]={...c[i],sexo:"H"};setPartoLechones(c)},style:{padding:"4px 8px",borderRadius:4,fontSize:12,fontWeight:700,background:l.sexo==="H"?"#ec4899":"var(--muted)",color:l.sexo==="H"?"#fff":"var(--muted-fg)"}},"♀ H"),
+          React.createElement("button",{onClick:()=>{const c=[...partoLechones];c[i]={...c[i],sexo:"M"};setPartoLechones(c)},style:{padding:"4px 8px",borderRadius:4,fontSize:12,fontWeight:700,background:l.sexo==="M"?"#3b82f6":"var(--muted)",color:l.sexo==="M"?"#fff":"var(--muted-fg)"}},"♂ M")
+        )),
+        React.createElement("div",{style:{marginTop:8,display:"flex",justifyContent:"space-between",fontSize:12,fontWeight:600}},
+          React.createElement("div",{style:{display:"flex",gap:12}},
+            React.createElement("span",{style:{color:"#ec4899"}},"♀ "+partoLechones.filter(l=>l.sexo==="H").length),
+            React.createElement("span",{style:{color:"#3b82f6"}},"♂ "+partoLechones.filter(l=>l.sexo==="M").length)
+          ),
+          React.createElement("span",{style:{color:"var(--primary)"}},"Peso: "+partoLechones.reduce((s,l)=>s+(parseFloat(l.peso)||0),0).toFixed(1)+" kg")
+        )
+      )
+    ),
+    accion==="BAJA_LACTANCIA"&&React.createElement("div",{style:{marginTop:16,padding:16,borderRadius:8,background:"rgba(220,38,38,.1)",border:"1px solid rgba(220,38,38,.2)"}},
+      React.createElement("h4",{style:{fontSize:14,fontWeight:700,color:"var(--destructive)",marginBottom:8}},"💀 Baja de Lechón"),
+      React.createElement("label",{style:labelS},"Cantidad"),
+      React.createElement("input",{type:"number",value:cantBaja,onChange:e=>setCantBaja(e.target.value),style:inputS}),
+      React.createElement("label",{style:labelS},"Causa"),
+      React.createElement("input",{value:causaBaja,onChange:e=>setCausaBaja(e.target.value),placeholder:"Ej. Aplastamiento",style:inputS})
+    ),
+    accion==="DESTETE"&&React.createElement("div",{style:{marginTop:16,padding:16,borderRadius:8,background:"rgba(45,138,86,.1)",border:"1px solid rgba(45,138,86,.2)"}},
+      React.createElement("h4",{style:{fontSize:14,fontWeight:700,color:"var(--success)",marginBottom:8}},"🥣 Movimiento de Lechones"),
+      React.createElement("label",{style:labelS},"Cant. Destetados"),
+      React.createElement("input",{type:"number",value:destetados,onChange:e=>{setDestetados(e.target.value);const n=parseInt(e.target.value)||0;setLechones(Array.from({length:n},()=>({tat:"",chap:"",peso:"",ok:true})))},style:inputS}),
+      React.createElement("label",{style:labelS},"Destino Lechones"),
+      React.createElement("select",{value:destLechones,onChange:e=>setDestLechones(e.target.value),style:inputS},allFases.map(f=>React.createElement("option",{key:f,value:f},f))),
+      lechones.length>0&&React.createElement("div",{style:{marginTop:12}},
+        lechones.map((l,i)=>React.createElement("div",{key:i,style:{display:"grid",gridTemplateColumns:"24px 1fr 1fr 60px 28px",gap:4,alignItems:"center",background:"var(--bg)",borderRadius:4,padding:4,marginBottom:4,border:"1px solid var(--border)"}},
+          React.createElement("span",{style:{fontSize:12,textAlign:"center",color:"var(--muted-fg)"}},i+1),
+          React.createElement("input",{value:l.tat,onChange:e=>{const c=[...lechones];c[i]={...c[i],tat:e.target.value};setLechones(c)},placeholder:"ID",style:{fontSize:12,padding:"4px 6px",borderRadius:4,border:"1px solid var(--input)",background:"var(--bg)",minWidth:0}}),
+          React.createElement("input",{value:l.chap,onChange:e=>{const c=[...lechones];c[i]={...c[i],chap:e.target.value};setLechones(c)},placeholder:"Chap",style:{fontSize:12,padding:"4px 6px",borderRadius:4,border:"1px solid var(--input)",background:"var(--bg)",minWidth:0}}),
+          React.createElement("input",{type:"number",value:l.peso,onChange:e=>{const c=[...lechones];c[i]={...c[i],peso:e.target.value};setLechones(c)},placeholder:"kg",style:{fontSize:12,padding:"4px 6px",borderRadius:4,border:"1px solid var(--input)",background:"var(--bg)",minWidth:0}}),
+          React.createElement("input",{type:"checkbox",checked:l.ok,onChange:e=>{const c=[...lechones];c[i]={...c[i],ok:e.target.checked};setLechones(c)},style:{width:16,height:16,cursor:"pointer",margin:"0 auto"}})
+        ))
+      )
+    ),
+    accion==="VENTA"&&React.createElement("div",{style:{marginTop:16,padding:16,borderRadius:8,background:"rgba(45,138,86,.1)",border:"1px solid rgba(45,138,86,.2)"}},
+      React.createElement("h4",{style:{fontSize:14,fontWeight:700,color:"var(--success)",marginBottom:8}},"💰 Datos de Venta"),
+      React.createElement("label",{style:labelS},"Comprador"),
+      React.createElement("input",{value:comprador,onChange:e=>setComprador(e.target.value),placeholder:"Nombre",style:inputS})
+    ),
+    React.createElement("label",{style:labelS},"Notas"),
+    React.createElement("input",{value:notas,onChange:e=>setNotas(e.target.value),placeholder:"Observaciones",style:inputS}),
+    React.createElement("button",{onClick:handleSubmit,disabled:saving,style:{width:"100%",marginTop:24,padding:"14px 0",borderRadius:8,background:"var(--primary)",color:"var(--primary-fg)",fontWeight:700,fontSize:16,opacity:saving?.5:1}},(saving?"Guardando...":"Guardar 💾"))
+  );
+}
+
+/* ─── APP ─── */
 function App(){
-const[currentPhase,setCurrentPhase]=useState("");const[tab,setTab]=useState("dashboard");const[dashView,setDashView]=useState("summary");
-const[inventario,setInventario]=useState([]);const[todosAnimales,setTodosAnimales]=useState([]);const[historial,setHistorial]=useState([]);
-const[fasesExtra,setFasesExtra]=useState([]);const[loading,setLoading]=useState(true);const[search,setSearch]=useState("");
-const[listTitle,setListTitle]=useState("");const[listAnimals,setListAnimals]=useState([]);const[selectedAnimal,setSelectedAnimal]=useState(null);
-const[prefillId,setPrefillId]=useState("");const[prefillAccion,setPrefillAccion]=useState("INGRESO");const[prefillAnimal,setPrefillAnimal]=useState(null);
-const[filterPuesto,setFilterPuesto]=useState("");const[filterMadre,setFilterMadre]=useState("");
+  const[tab,setTab]=useState("dashboard");
+  const[dashView,setDashView]=useState("summary");
+  const[inventario,setInventario]=useState([]);
+  const[todosAnimales,setTodosAnimales]=useState([]);
+  const[historial,setHistorial]=useState([]);
+  const[fasesExtra,setFasesExtra]=useState([]);
+  const[loading,setLoading]=useState(true);
+  const[search,setSearch]=useState("");
+  const[currentPhase,setCurrentPhase]=useState("");
+  const[listTitle,setListTitle]=useState("");
+  const[listAnimals,setListAnimals]=useState([]);
+  const[selectedAnimal,setSelectedAnimal]=useState(null);
+  const[prefillId,setPrefillId]=useState("");
+  const[prefillAccion,setPrefillAccion]=useState("INGRESO");
+  const[prefillAnimal,setPrefillAnimal]=useState(null);
+  const[filterPuesto,setFilterPuesto]=useState("");
+  const[filterMadre,setFilterMadre]=useState("");
 
-const loadData=useCallback(async()=>{setLoading(true);try{const data=await fetchFarmData();setHistorial(data.registros);const r=procesarInventario(data.registros);setInventario(r.activos);setTodosAnimales(r.todos);setFasesExtra(data.fases||[])}catch(e){console.error("Error:",e)}setLoading(false)},[]);
-useEffect(()=>{loadData()},[loadData]);
-const{subpuestos,madres}=useMemo(()=>{const s=new Set(),m=new Set();inventario.forEach(a=>{if(a.subpuesto)s.add(a.subpuesto);if(a.madre)m.add(a.madre)});return{subpuestos:[...s].sort(),madres:[...m].sort()}},[inventario]);
-const filteredInv=useMemo(()=>inventario.filter(a=>{if(filterPuesto&&a.subpuesto!==filterPuesto)return false;if(filterMadre&&a.madre!==filterMadre)return false;return true}),[inventario,filterPuesto,filterMadre]);
-const dashData=buildDashboardData(filteredInv);
-const handlePhaseClick=p=>{setCurrentPhase(p);setListTitle(p.replace(/_/g," "));setDashView("subpuestos")};
-const handleSubpuestoClick=(p,s)=>{const sub=s==="Sin puesto"?"":s;setListTitle(`${p.replace(/_/g," ")} · 📍 ${s}`);setListAnimals(filteredInv.filter(a=>a.fase===p&&(a.subpuesto||"")===(sub||"")));setDashView("list")};
-const handlePigletsClick=()=>{setListTitle("Lechones");setListAnimals(filteredInv.filter(a=>a.piglets>0));setDashView("list")};
-const handleSelectAnimal=id=>{const a=todosAnimales.find(x=>x.id===id);if(a){setSelectedAnimal(a);setDashView("detail")}};
-const handleAction=(id,accion)=>{setPrefillId(id);setPrefillAccion(accion);setPrefillAnimal(todosAnimales.find(a=>a.id===id)||null);setTab("registro")};
-const handleSearch=val=>{setSearch(val);if(!val.trim()){setDashView("summary");return}const u=val.toUpperCase();setListTitle("Resultados");setListAnimals(todosAnimales.filter(a=>a.id.toString().toUpperCase().includes(u)||(a.chapeta&&a.chapeta.toString().toUpperCase().includes(u))));setDashView("list")};
-const handleTabChange=t=>{setTab(t);if(t==="dashboard")setDashView("summary");if(t==="registro"){setPrefillId("");setPrefillAccion("INGRESO");setPrefillAnimal(null)}};
+  const loadData=useCallback(async()=>{setLoading(true);try{const data=await fetchFarmData();setHistorial(data.registros);const result=procesarInventario(data.registros);setInventario(result.activos);setTodosAnimales(result.todos);setFasesExtra(data.fases||[])}catch(e){console.error("Error loading data:",e)}setLoading(false)},[]);
+  useEffect(()=>{loadData()},[loadData]);
 
-return(<div style={{minHeight:"100vh",background:"var(--bg)",paddingBottom:80}}>
-<FarmHeader searchValue={search} onSearch={handleSearch}/>
-<main style={{maxWidth:480,margin:"0 auto",padding:16}}>
-{tab==="dashboard"&&<>{loading?<div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"80px 0"}}><div style={{width:40,height:40,border:"4px solid var(--primary)",borderTopColor:"transparent",borderRadius:"50%"}} className="animate-spin"/><p style={{marginTop:12,fontSize:14,color:"var(--muted-fg)"}}>Sincronizando...</p></div>:<>
-{dashView==="summary"&&<>
-<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
-<div><label style={{fontSize:9,fontWeight:700,color:"var(--muted-fg)",textTransform:"uppercase",letterSpacing:1}}>📍 Puesto</label><select value={filterPuesto} onChange={e=>setFilterPuesto(e.target.value)} style={{width:"100%",padding:"6px 8px",borderRadius:8,border:"1px solid var(--input)",background:"var(--card)",color:"var(--fg)",fontSize:12}}><option value="">Todos</option>{subpuestos.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
-<div><label style={{fontSize:9,fontWeight:700,color:"var(--muted-fg)",textTransform:"uppercase",letterSpacing:1}}>👩‍👦 Madre</label><select value={filterMadre} onChange={e=>setFilterMadre(e.target.value)} style={{width:"100%",padding:"6px 8px",borderRadius:8,border:"1px solid var(--input)",background:"var(--card)",color:"var(--fg)",fontSize:12}}><option value="">Todas</option>{madres.map(m=><option key={m} value={m}>{m}</option>)}</select></div></div>
-{(filterPuesto||filterMadre)&&<button onClick={()=>{setFilterPuesto("");setFilterMadre("")}} style={{fontSize:12,color:"var(--primary)",fontWeight:600,marginBottom:12,background:"none",border:"none",cursor:"pointer"}}>✕ Limpiar filtros</button>}
-<DashboardView data={dashData} onPhaseClick={handlePhaseClick} onSubpuestoClick={handleSubpuestoClick} onPigletsClick={handlePigletsClick}/></>}
-{dashView==="subpuestos"&&<SubpuestoCards phase={currentPhase} animals={filteredInv.filter(a=>a.fase===currentPhase)} onSelect={s=>handleSubpuestoClick(currentPhase,s)} onSelectAll={()=>{setListTitle(currentPhase.replace(/_/g," "));setListAnimals(filteredInv.filter(a=>a.fase===currentPhase));setDashView("list")}} onBack={()=>setDashView("summary")}/>}
-{dashView==="list"&&<AnimalList title={listTitle} animals={listAnimals} onSelect={handleSelectAnimal} onBack={()=>{if(currentPhase)setDashView("subpuestos");else{setDashView("summary");setSearch("")}}}/>}
-{dashView==="detail"&&selectedAnimal&&<AnimalDetail animal={selectedAnimal} historial={historial} allAnimals={todosAnimales} onBack={()=>setDashView("list")} onAction={handleAction}/>}
-</>}</>}
-{tab==="registro"&&<RegistroForm inventario={inventario} fasesExtra={fasesExtra} prefillId={prefillId} prefillAccion={prefillAccion} prefillAnimal={prefillAnimal} historial={historial} onSuccess={()=>{loadData();handleTabChange("dashboard")}}/>}
-{tab==="reportes"&&<ReportsView historial={historial} search={search} onSelectAnimal={id=>{const a=todosAnimales.find(x=>x.id===id);if(a){setSelectedAnimal(a);setTab("dashboard");setDashView("detail")}}}/>}
-</main>
-<BottomNav active={tab} onChange={handleTabChange}/>
-</div>);
+  const{subpuestos,madres}=useMemo(()=>{const s=new Set(),m=new Set();inventario.forEach(a=>{if(a.subpuesto)s.add(a.subpuesto);if(a.madre)m.add(a.madre)});return{subpuestos:[...s].sort(),madres:[...m].sort()}},[inventario]);
+  const filteredInv=useMemo(()=>inventario.filter(a=>{if(filterPuesto&&a.subpuesto!==filterPuesto)return false;if(filterMadre&&a.madre!==filterMadre)return false;return true}),[inventario,filterPuesto,filterMadre]);
+  const dashboardData=buildDashboardData(filteredInv);
+
+  const handlePhaseClick=phase=>{setCurrentPhase(phase);setListTitle(phase.replace(/_/g," "));setDashView("subpuestos")};
+  const handleSubpuestoClick=(phase,subpuesto)=>{const sub=subpuesto==="Sin puesto"?"":subpuesto;setListTitle(phase.replace(/_/g," ")+" · 📍 "+subpuesto);setListAnimals(filteredInv.filter(a=>a.fase===phase&&(a.subpuesto||"")===(sub||"")));setDashView("list")};
+  const handleSubfaseClick=subfase=>{const labels={REEMPLAZO:"🔄 Reemplazo",SERVIDAS:"💉 Servidas",GESTACION:"🤰 Gestación",VACIA:"⭕ Vacía",MATERNIDAD:"🏥 Maternidad",LACTANCIA:"🍼 Lactancia",DESTETE:"🥣 Destete",DESCANSO:"😴 Descanso"};setListTitle("REPRODUCTIVA · "+(labels[subfase]||subfase));setListAnimals(filteredInv.filter(a=>a.fase==="REPRODUCTIVA"&&a.subfase===subfase));setDashView("list")};
+  const handlePigletsClick=()=>{setListTitle("Lechones");setListAnimals(filteredInv.filter(a=>a.piglets>0));setDashView("list")};
+  const handleSelectAnimal=id=>{const a=todosAnimales.find(x=>x.id===id);if(a){setSelectedAnimal(a);setDashView("detail")}};
+
+  const getMadurez=useCallback(id=>{const partos=historial.filter(h=>h[1]?.toString()===id&&h[2]==="PARTO").length;if(partos===0)return"NULIPARAS";if(partos===1)return"PRIMIPARAS";if(partos===2)return"MULTIPARAS";return"MULTIPARAS +"+partos},[historial]);
+
+  const handleAction=(id,accion)=>{setPrefillId(id);setPrefillAccion(accion);const a=todosAnimales.find(x=>x.id===id)||null;setPrefillAnimal(a);setTab("registro")};
+  const handleSearch=val=>{setSearch(val);if(!val.trim()){setDashView("summary");return}const upper=val.toUpperCase();const filtered=todosAnimales.filter(a=>{const madurez=a.fase==="REPRODUCTIVA"?getMadurez(a.id):"";return a.id.toString().toUpperCase().includes(upper)||(a.chapeta&&a.chapeta.toString().toUpperCase().includes(upper))||madurez.toUpperCase().includes(upper)});setListTitle("Resultados de búsqueda");setListAnimals(filtered);setDashView("list")};
+  const handleTabChange=newTab=>{setTab(newTab);if(newTab==="dashboard")setDashView("summary");if(newTab==="registro"){setPrefillId("");setPrefillAccion("INGRESO");setPrefillAnimal(null)}};
+  const inputS={width:"100%",padding:"6px 8px",borderRadius:8,border:"1px solid var(--input)",background:"var(--card)",color:"var(--fg)",fontSize:12};
+
+  return React.createElement("div",{style:{minHeight:"100vh",background:"var(--bg)",paddingBottom:80}},
+    React.createElement(FarmHeader,{searchValue:search,onSearch:handleSearch,onNavigate:handleTabChange,activeTab:tab}),
+    React.createElement("main",{style:{maxWidth:480,margin:"0 auto",padding:"16px 16px"}},
+      tab==="dashboard"&&(loading?
+        React.createElement("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",paddingTop:80}},
+          React.createElement("div",{style:{width:40,height:40,border:"4px solid var(--primary)",borderTopColor:"transparent",borderRadius:"50%"},className:"animate-spin"}),
+          React.createElement("p",{style:{marginTop:12,fontSize:14,color:"var(--muted-fg)"}},"Sincronizando datos...")
+        ):React.createElement(React.Fragment,null,
+          dashView==="summary"&&React.createElement(React.Fragment,null,
+            React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}},
+              React.createElement("div",null,React.createElement("label",{style:{fontSize:9,fontWeight:700,color:"var(--muted-fg)",textTransform:"uppercase",letterSpacing:1}},"📍 Puesto"),React.createElement("select",{value:filterPuesto,onChange:e=>setFilterPuesto(e.target.value),style:inputS},React.createElement("option",{value:""},"Todos"),subpuestos.map(s=>React.createElement("option",{key:s,value:s},s)))),
+              React.createElement("div",null,React.createElement("label",{style:{fontSize:9,fontWeight:700,color:"var(--muted-fg)",textTransform:"uppercase",letterSpacing:1}},"👩‍👦 Madre"),React.createElement("select",{value:filterMadre,onChange:e=>setFilterMadre(e.target.value),style:inputS},React.createElement("option",{value:""},"Todas"),madres.map(m=>React.createElement("option",{key:m,value:m},m))))
+            ),
+            (filterPuesto||filterMadre)&&React.createElement("button",{onClick:()=>{setFilterPuesto("");setFilterMadre("")},style:{fontSize:12,color:"var(--primary)",fontWeight:600,marginBottom:12}},"✕ Limpiar filtros"),
+            React.createElement(DashboardView,{data:dashboardData,onPhaseClick:handlePhaseClick,onSubpuestoClick:handleSubpuestoClick,onPigletsClick:handlePigletsClick})
+          ),
+          dashView==="subpuestos"&&React.createElement(SubpuestoCards,{phase:currentPhase,animals:filteredInv.filter(a=>a.fase===currentPhase),onSelect:sub=>handleSubpuestoClick(currentPhase,sub),onSelectAll:()=>{setListTitle(currentPhase.replace(/_/g," "));setListAnimals(filteredInv.filter(a=>a.fase===currentPhase));setDashView("list")},onBack:()=>setDashView("summary"),onSubfaseClick:handleSubfaseClick}),
+          dashView==="list"&&React.createElement(AnimalList,{title:listTitle,animals:listAnimals,onSelect:handleSelectAnimal,onBack:()=>{if(currentPhase)setDashView("subpuestos");else{setDashView("summary");setSearch("")}}}),
+          dashView==="detail"&&selectedAnimal&&React.createElement(AnimalDetail,{animal:selectedAnimal,historial:historial,allAnimals:todosAnimales,onBack:()=>setDashView("list"),onAction:handleAction,onRefresh:loadData})
+        )
+      ),
+      tab==="registro"&&React.createElement(RegistroForm,{inventario:inventario,fasesExtra:fasesExtra,prefillId:prefillId,prefillAccion:prefillAccion,prefillAnimal:prefillAnimal,historial:historial,onSuccess:()=>{loadData();handleTabChange("dashboard")}}),
+      tab==="reportes"&&React.createElement(ReportsView,{historial:historial,search:search,onSelectAnimal:id=>{const a=todosAnimales.find(x=>x.id===id);if(a){setSelectedAnimal(a);setTab("dashboard");setDashView("detail")}}}),
+      tab==="resumen"&&React.createElement(ResumenView,{historial:historial,onSelectAnimal:id=>{const a=todosAnimales.find(x=>x.id===id);if(a){setSelectedAnimal(a);setTab("dashboard");setDashView("detail")}}})
+    ),
+    React.createElement(BottomNav,{active:tab,onChange:handleTabChange})
+  );
 }
-ReactDOM.render(React.createElement(App),document.getElementById("root"));
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
 </body>
 </html>
