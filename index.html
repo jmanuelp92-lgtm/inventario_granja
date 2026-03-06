@@ -85,20 +85,6 @@ const QUEUE_KEY = "granja_pro_queue";
 function getQueue() { return JSON.parse(localStorage.getItem(QUEUE_KEY)||'[]'); }
 function setQueue(q) { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); window.dispatchEvent(new Event('offline_queue_changed')); }
 
-async function fetchFarmData(){
-  try{
-    if(!navigator.onLine) throw new Error("Offline");
-    const r=await fetch(URL_SCRIPT+"?t="+Date.now(),{cache:"no-store"});
-    const data=await r.json();
-    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
-    return data;
-  }catch(e){
-    const cached=localStorage.getItem(CACHE_KEY);
-    if(cached) return JSON.parse(cached);
-    return {registros:[], fases:[]};
-  }
-}
-
 // Guarda en memoria y delega la subida al sistema en segundo plano
 async function enviarRegistro(d){
   const q = getQueue(); 
@@ -498,7 +484,6 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
       setShowDateModal(null);
       setVacunaNotas("");
       setApplyingVacuna(null);
-      // No alert needed, UI updates instantly
     }catch(e){alert("Error al registrar vacuna"); setApplyingVacuna(null);}
   };
 
@@ -1023,7 +1008,7 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
         const ld=ef.filter(l=>l.tat).map(l=>({tatuaje:l.tat,chapeta:l.chap,peso:l.peso,notas:"Hijo de "+tatuaje+(l.peso?" | Peso: "+l.peso+"kg":"")}));
         if(ld.length>0)await enviarBatch({comun:{accion:"INGRESO",fase:"PRECEBO",subpuesto:destLechones,madre:tatuaje,fecha:toAppsScriptDate(fechaStr)},animales:ld})}
       
-      await enviarRegistro({tatuaje,chapeta,peso,accion,fase,subpuesto,notas:finalNotas,inseminador,fecha:toAppsScriptDate(fechaStr)});
+      const res = await enviarRegistro({tatuaje,chapeta,peso,accion,fase,subpuesto,notas:finalNotas,inseminador,fecha:toAppsScriptDate(fechaStr)});
       
       setSaving(false);onSuccess();
     }catch(err){alert("Error al guardar: "+(err.message||"Intenta de nuevo."));setSaving(false)}
@@ -1149,25 +1134,55 @@ function App(){
   const[filterPuesto,setFilterPuesto]=useState("");
   const[filterMadre,setFilterMadre]=useState("");
 
+  // Estados de conexión
   const[isOnline,setIsOnline]=useState(navigator.onLine);
   const[queueCount,setQueueCount]=useState(getQueue().length);
   const[syncing,setSyncing]=useState(false);
 
-  // Carga de datos principal. Si background=true, no pone la pantalla en blanco
+  // Carga de datos optimizada: Cache primero, luego fondo
   const loadData=useCallback(async(background=false)=>{
-    if(!background) setLoading(true);
-    try{
-      const data=await fetchFarmData();
-      setHistorial(data.registros);
-      const result=procesarInventario(data.registros);
-      setInventario(result.activos);
-      setTodosAnimales(result.todos);
-      setFasesExtra(data.fases||[]);
-    }catch(e){}
-    setLoading(false);
+    // 1. Cargar caché inmediatamente si existe
+    const cachedStr = localStorage.getItem(CACHE_KEY);
+    let hasCache = false;
+    if(cachedStr){
+      try{
+        const data = JSON.parse(cachedStr);
+        setHistorial(data.registros || []);
+        const result = procesarInventario(data.registros || []);
+        setInventario(result.activos);
+        setTodosAnimales(result.todos);
+        setFasesExtra(data.fases || []);
+        hasCache = true;
+      }catch(e){}
+    }
+
+    // 2. Controlar la pantalla de carga
+    if(!background && !hasCache) setLoading(true);
+    else setLoading(false);
+
+    // 3. Sincronización silenciosa en segundo plano
+    if(navigator.onLine){
+      if(hasCache && !background) setSyncing(true);
+      try{
+        const r = await fetch(URL_SCRIPT+"?t="+Date.now(),{cache:"no-store"});
+        if(!r.ok) throw new Error("Network error");
+        const data = await r.json();
+        localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+        
+        setHistorial(data.registros);
+        const result = procesarInventario(data.registros);
+        setInventario(result.activos);
+        setTodosAnimales(result.todos);
+        setFasesExtra(data.fases || []);
+      }catch(e){
+        console.error("Fallo fetch de fondo", e);
+      }
+      setSyncing(false);
+      setLoading(false);
+    }
   },[]);
 
-  // Efecto principal para escuchar conexión y la cola offline
+  // Listeners
   useEffect(()=>{
     loadData();
 
@@ -1176,9 +1191,9 @@ function App(){
     const handleQueueChange=()=>setQueueCount(getQueue().length);
     const handleSyncStart=()=>setSyncing(true);
     const handleSyncEnd=()=>setSyncing(false);
-    const handleSyncAllDone=()=>loadData(true); // Refresca en silencio al terminar todo
+    const handleSyncAllDone=()=>loadData(true);
 
-    // Insertar el registro localmente al instante para no hacer esperar al usuario
+    // Inyectar el dato a la vista inmediatamente
     const handleOptimisticSave=(e)=>{
       const d = e.detail;
       setHistorial(prev=>{
