@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
 <title>🐷 Granja Pro</title>
-<meta name="description" content="Sistema de gestión porcina profesional. Controla inventario, servicios, partos, destetes y más."/>
+<meta name="description" content="Sistema de gestión porcina profesional. Controla inventario, offline sync y más."/>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -78,6 +78,80 @@ const ACCION_CONFIG={
 
 const URL_SCRIPT="https://script.google.com/macros/s/AKfycbxnE3BnJ-e6JnkQGTcRgYy6dTfZ7Qyr9aNaGiNFZA6LBs80yy8DTUKLw_do6reHaKyqSw/exec";
 
+/* ─── OFFLINE & OPTIMISTIC SYNC SYSTEM ─── */
+const CACHE_KEY = "granja_pro_cache";
+const QUEUE_KEY = "granja_pro_queue";
+
+function getQueue() { return JSON.parse(localStorage.getItem(QUEUE_KEY)||'[]'); }
+function setQueue(q) { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); window.dispatchEvent(new Event('offline_queue_changed')); }
+
+async function fetchFarmData(){
+  try{
+    if(!navigator.onLine) throw new Error("Offline");
+    const r=await fetch(URL_SCRIPT+"?t="+Date.now(),{cache:"no-store"});
+    const data=await r.json();
+    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+    return data;
+  }catch(e){
+    const cached=localStorage.getItem(CACHE_KEY);
+    if(cached) return JSON.parse(cached);
+    return {registros:[], fases:[]};
+  }
+}
+
+// Guarda en memoria y delega la subida al sistema en segundo plano
+async function enviarRegistro(d){
+  const q = getQueue(); 
+  q.push({id:Date.now(), tipo:'registro', data:d}); 
+  setQueue(q);
+  // Aviso al sistema para actualizar la pantalla instantáneamente
+  window.dispatchEvent(new CustomEvent('optimistic_save', {detail: d}));
+  syncQueue(); // Lanza el guardado en internet sin bloquear la pantalla
+  return {ok:true};
+}
+
+async function enviarBatch(d){
+  const q = getQueue(); 
+  q.push({id:Date.now(), tipo:'batch', data:d}); 
+  setQueue(q);
+  window.dispatchEvent(new CustomEvent('optimistic_batch', {detail: d}));
+  syncQueue();
+  return {ok:true};
+}
+
+let isSyncing = false;
+async function syncQueue() {
+  if(!navigator.onLine || isSyncing) return false;
+  let q = getQueue();
+  if(q.length === 0) return true;
+  
+  isSyncing = true;
+  window.dispatchEvent(new Event('sync_started'));
+  
+  let somethingSynced = false;
+  for(let i=0; i<q.length; i++) {
+    const item = q[i];
+    try {
+      const body = item.tipo === 'batch' ? JSON.stringify({tipo:"BATCH", ...item.data}) : JSON.stringify(item.data);
+      const res = await fetch(URL_SCRIPT,{method:"POST",redirect:"follow",headers:{"Content-Type":"text/plain;charset=utf-8"},body});
+      if(!res.ok) throw new Error("Sync failed");
+      q[i].synced = true;
+      somethingSynced = true;
+    } catch(e) {
+      break; // Si falla uno, detiene la cola hasta recuperar red
+    }
+  }
+  const newQ = q.filter(item => !item.synced);
+  setQueue(newQ);
+  isSyncing = false;
+  window.dispatchEvent(new Event('sync_ended'));
+  
+  if (somethingSynced && newQ.length === 0) {
+     window.dispatchEvent(new Event('sync_completed_all'));
+  }
+  return true;
+}
+
 /* ─── UTILS ─── */
 function calcularDias(f){if(!f)return 0;return Math.floor((Date.now()-new Date(f).getTime())/864e5)}
 
@@ -120,6 +194,7 @@ function calcularSubfase(id,regs){
 }
 
 function procesarInventario(regs){
+  if(!regs||!regs.length) return {activos:[], todos:[]};
   const estados={};
   regs.forEach(r=>{const id=r[1]?.toString();const acc=r[2];const fase=r[3];const fecha=r[0];if(!id)return;
   if(!estados[id])estados[id]={id,piglets:0,subpuesto:r[12]?.toString()||"",fase:fase||"",chapeta:r[10]?.toString()||"",madre:r[7]?.toString()||"",activo:true,fechaFase:fecha};
@@ -151,16 +226,6 @@ function buildDashboardData(inv){
   inv.forEach(e=>{data.total++;data.piglets+=(e.piglets||0);if(!data.phases[e.fase])data.phases[e.fase]={count:0,alert:null,subpuestos:{}};data.phases[e.fase].count++;const sub=e.subpuesto||"Sin puesto";data.phases[e.fase].subpuestos[sub]=(data.phases[e.fase].subpuestos[sub]||0)+1;if(e.color==="red")data.phases[e.fase].alert="red";else if(e.color==="yellow"&&data.phases[e.fase].alert!=="red")data.phases[e.fase].alert="yellow"});
   return data;
 }
-
-async function fetchFarmData(){const r=await fetch(URL_SCRIPT+"?t="+Date.now(),{cache:"no-store"});return r.json()}
-async function enviarRegistro(d){
-  const res=await fetch(URL_SCRIPT,{method:"POST",redirect:"follow",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(d)});
-  const text=await res.text();
-  let json;try{json=JSON.parse(text)}catch{throw new Error("Respuesta inválida del servidor")}
-  if(!res.ok||json.result==="error"||json.ok===false)throw new Error(json.error||"Error HTTP "+res.status);
-  return json;
-}
-async function enviarBatch(d){await fetch(URL_SCRIPT,{method:"POST",redirect:"follow",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({tipo:"BATCH",...d})})}
 
 const colorMap={green:"var(--success)",yellow:"var(--warning)",red:"var(--destructive)"};
 
@@ -235,14 +300,19 @@ function DateInput({value,onChange,placeholder}){
 
 /* ─── COMPONENTS ─── */
 
-function FarmHeader({searchValue,onSearch,onNavigate,activeTab}){
+function FarmHeader({searchValue,onSearch,onNavigate,activeTab, isOnline, queueCount, syncing}){
   const[menuOpen,setMenuOpen]=useState(false);
   const menuItems=[{id:"vacunas",label:"💉 Vacunas"},{id:"reportes",label:"📋 Reportes"},{id:"resumen",label:"📊 Resumen"}];
   return React.createElement("header",{style:{position:"sticky",top:0,zIndex:40,boxShadow:"0 4px 12px rgba(0,0,0,.15)"},className:"gradient-farm"},
     React.createElement("div",{style:{maxWidth:480,margin:"0 auto",padding:"16px 16px 12px"}},
       React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
         React.createElement("h1",{style:{fontSize:20,fontWeight:700,color:"var(--primary-fg)",letterSpacing:1}},"🐷 Granja Pro"),
-        React.createElement("button",{onClick:()=>setMenuOpen(!menuOpen),style:{padding:8,borderRadius:8,color:"var(--primary-fg)"}},menuOpen?"✕":"☰")
+        React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8}},
+          syncing ? React.createElement("span",{className:"animate-spin",style:{fontSize:14}},"🔄") :
+          !isOnline ? React.createElement("span",{style:{fontSize:9,background:"var(--destructive)",color:"#fff",padding:"4px 6px",borderRadius:6,fontWeight:700}},"🔴 Sin red ("+queueCount+")") :
+          queueCount > 0 ? React.createElement("span",{style:{fontSize:9,background:"var(--warning)",color:"#000",padding:"4px 6px",borderRadius:6,fontWeight:700}},"📤 Subiendo...") : null,
+          React.createElement("button",{onClick:()=>setMenuOpen(!menuOpen),style:{padding:8,borderRadius:8,color:"var(--primary-fg)"}},menuOpen?"✕":"☰")
+        )
       ),
       menuOpen&&React.createElement("div",{className:"animate-fade-in",style:{marginTop:8,background:"var(--card)",borderRadius:12,boxShadow:"0 4px 20px rgba(0,0,0,.15)",border:"1px solid var(--border)",overflow:"hidden"}},
         menuItems.map(item=>React.createElement("button",{key:item.id,onClick:()=>{onNavigate(item.id);setMenuOpen(false)},style:{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 16px",fontSize:14,fontWeight:600,color:activeTab===item.id?"var(--primary)":"var(--card-fg)",background:activeTab===item.id?"rgba(45,106,79,.1)":"transparent",borderBottom:"1px solid var(--border)"}},item.label))
@@ -424,12 +494,12 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
     try{
       const notaString = vacunaNotas.trim() ? "Tipo: "+vacunaKey+" | "+label+" | "+vacunaNotas : "Tipo: "+vacunaKey+" | "+label;
       await enviarRegistro({fecha:toAppsScriptDate(formatDateStr(selectedDate)),tatuaje:animal.id,accion:"VACUNA",fase:animal.fase||"REPRODUCTIVA",subpuesto:animal.subpuesto||"",chapeta:animal.chapeta||"",notas:notaString});
-      alert("✅ "+label+" aplicada a "+animal.id);
+      
       setShowDateModal(null);
       setVacunaNotas("");
-      await new Promise(r=>setTimeout(r,1500));
-      if(onRefresh)onRefresh();
-    }catch(e){alert("Error al registrar vacuna")}finally{setApplyingVacuna(null)}
+      setApplyingVacuna(null);
+      // No alert needed, UI updates instantly
+    }catch(e){alert("Error al registrar vacuna"); setApplyingVacuna(null);}
   };
 
   return React.createElement("div",{className:"animate-fade-in",style:{display:"flex",flexDirection:"column",gap:12}},
@@ -574,7 +644,7 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
                   const oldDateKey=extractDateKey(h[0]);
                   const newDateKey=formatDateStr(editDate);
                   await enviarRegistro({tipo:"EDITAR_FECHA",tatuaje:animal.id,accion:accionH,fechaOriginal:toAppsScriptDate(oldDateKey),fechaNueva:toAppsScriptDate(newDateKey),notas:(h[5]||"").toString()});
-                  alert("Fecha actualizada correctamente ✅");
+                  
                   setEditingIdx(null);
                   if(onRefresh)onRefresh();
                 }catch(err){alert("Error al actualizar la fecha")}finally{setSavingDate(false)}
@@ -661,13 +731,11 @@ function VacunasView({inventario,historial,onRefresh,onSelectAnimal,search}){
     try{
       const notaString = vacunaNotas.trim() ? "Tipo: "+vacunaKey+" | "+label+" | "+vacunaNotas : "Tipo: "+vacunaKey+" | "+label;
       await enviarRegistro({tipo:"REGISTRO",fecha:toAppsScriptDate(formatDateStr(selectedDate)),tatuaje:animalId,accion:"VACUNA",fase:"REPRODUCTIVA",notas:notaString});
-      alert("✅ "+label+" aplicada a "+animalId);
-      await new Promise(r=>setTimeout(r,1500));
-      onRefresh();
+      
       setShowDateModal(null);
       setVacunaNotas("");
-    }catch(e){alert("Error al registrar vacuna")}
-    setApplying(null);
+      setApplying(null);
+    }catch(e){alert("Error al registrar vacuna"); setApplying(null);}
   };
 
   const colorBg={red:"var(--destructive)",yellow:"var(--warning)",green:"var(--success)",gray:"rgba(107,122,107,.3)"};
@@ -836,7 +904,6 @@ function ResumenView({historial,onSelectAnimal,search}){
 
       if(!fechaStr||fechaStr<desde||fechaStr>hasta)return;
 
-      // Aplicar filtro de búsqueda general
       if(upperSearch && !id.includes(upperSearch) && !chapeta.includes(upperSearch) && !notas.includes(upperSearch) && !accion.includes(upperSearch)){
          return;
       }
@@ -958,7 +1025,7 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
       
       await enviarRegistro({tatuaje,chapeta,peso,accion,fase,subpuesto,notas:finalNotas,inseminador,fecha:toAppsScriptDate(fechaStr)});
       
-      alert("Registro guardado correctamente ✅");setSaving(false);onSuccess();
+      setSaving(false);onSuccess();
     }catch(err){alert("Error al guardar: "+(err.message||"Intenta de nuevo."));setSaving(false)}
   };
 
@@ -1082,8 +1149,111 @@ function App(){
   const[filterPuesto,setFilterPuesto]=useState("");
   const[filterMadre,setFilterMadre]=useState("");
 
-  const loadData=useCallback(async()=>{setLoading(true);try{const data=await fetchFarmData();setHistorial(data.registros);const result=procesarInventario(data.registros);setInventario(result.activos);setTodosAnimales(result.todos);setFasesExtra(data.fases||[])}catch(e){console.error("Error loading data:",e)}setLoading(false)},[]);
-  useEffect(()=>{loadData()},[loadData]);
+  const[isOnline,setIsOnline]=useState(navigator.onLine);
+  const[queueCount,setQueueCount]=useState(getQueue().length);
+  const[syncing,setSyncing]=useState(false);
+
+  // Carga de datos principal. Si background=true, no pone la pantalla en blanco
+  const loadData=useCallback(async(background=false)=>{
+    if(!background) setLoading(true);
+    try{
+      const data=await fetchFarmData();
+      setHistorial(data.registros);
+      const result=procesarInventario(data.registros);
+      setInventario(result.activos);
+      setTodosAnimales(result.todos);
+      setFasesExtra(data.fases||[]);
+    }catch(e){}
+    setLoading(false);
+  },[]);
+
+  // Efecto principal para escuchar conexión y la cola offline
+  useEffect(()=>{
+    loadData();
+
+    const handleOnline=()=>{ setIsOnline(true); syncQueue(); };
+    const handleOffline=()=>setIsOnline(false);
+    const handleQueueChange=()=>setQueueCount(getQueue().length);
+    const handleSyncStart=()=>setSyncing(true);
+    const handleSyncEnd=()=>setSyncing(false);
+    const handleSyncAllDone=()=>loadData(true); // Refresca en silencio al terminar todo
+
+    // Insertar el registro localmente al instante para no hacer esperar al usuario
+    const handleOptimisticSave=(e)=>{
+      const d = e.detail;
+      setHistorial(prev=>{
+        const next = [...prev, [
+          d.fecha || new Date().toISOString(),
+          d.tatuaje || "",
+          d.accion || "",
+          d.fase || "",
+          "",
+          d.notas || "",
+          "",
+          d.madre || "",
+          "",
+          "",
+          d.chapeta || "",
+          "",
+          d.subpuesto || ""
+        ]];
+        const result = procesarInventario(next);
+        setInventario(result.activos);
+        setTodosAnimales(result.todos);
+        return next;
+      });
+    };
+
+    const handleOptimisticBatch=(e)=>{
+      const {comun, animales} = e.detail;
+      setHistorial(prev=>{
+        const next = [...prev];
+        animales.forEach(a=>{
+           next.push([
+             comun.fecha || new Date().toISOString(),
+             a.tatuaje || "",
+             comun.accion || "",
+             comun.fase || "",
+             "",
+             a.notas || "",
+             "",
+             comun.madre || "",
+             "",
+             "",
+             a.chapeta || "",
+             "",
+             comun.subpuesto || ""
+           ]);
+        });
+        const result = procesarInventario(next);
+        setInventario(result.activos);
+        setTodosAnimales(result.todos);
+        return next;
+      });
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('offline_queue_changed', handleQueueChange);
+    window.addEventListener('sync_started', handleSyncStart);
+    window.addEventListener('sync_ended', handleSyncEnd);
+    window.addEventListener('sync_completed_all', handleSyncAllDone);
+    window.addEventListener('optimistic_save', handleOptimisticSave);
+    window.addEventListener('optimistic_batch', handleOptimisticBatch);
+
+    if(navigator.onLine && getQueue().length > 0) syncQueue();
+
+    return ()=>{
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('offline_queue_changed', handleQueueChange);
+      window.removeEventListener('sync_started', handleSyncStart);
+      window.removeEventListener('sync_ended', handleSyncEnd);
+      window.removeEventListener('sync_completed_all', handleSyncAllDone);
+      window.removeEventListener('optimistic_save', handleOptimisticSave);
+      window.removeEventListener('optimistic_batch', handleOptimisticBatch);
+    };
+  },[loadData]);
 
   const{subpuestos,madres}=useMemo(()=>{const s=new Set(),m=new Set();inventario.forEach(a=>{if(a.subpuesto)s.add(a.subpuesto);if(a.madre)m.add(a.madre)});return{subpuestos:[...s].sort(),madres:[...m].sort()}},[inventario]);
   const filteredInv=useMemo(()=>inventario.filter(a=>{if(filterPuesto&&a.subpuesto!==filterPuesto)return false;if(filterMadre&&a.madre!==filterMadre)return false;return true}),[inventario,filterPuesto,filterMadre]);
@@ -1099,7 +1269,6 @@ function App(){
 
   const handleAction=(id,accion)=>{setPrefillId(id);setPrefillAccion(accion);const a=todosAnimales.find(x=>x.id===id)||null;setPrefillAnimal(a);setTab("registro")};
   
-  // LOGICA GLOBAL DE BÚSQUEDA MODIFICADA
   const handleSearch=val=>{
     setSearch(val);
     if(!val.trim()){
@@ -1108,7 +1277,6 @@ function App(){
     }
     const upper=val.toUpperCase();
     
-    // 1. Encontrar todos los IDs de animales que tengan notas, observaciones o acciones que coincidan con la búsqueda
     const matchingIds = new Set();
     historial.forEach(h => {
       const notas = (h[5]||"").toString().toUpperCase();
@@ -1118,13 +1286,12 @@ function App(){
       }
     });
 
-    // 2. Filtrar inventario usando ID, Chapeta, o los IDs encontrados en el paso anterior
     const filtered=todosAnimales.filter(a=>{
       const madurez=a.fase==="REPRODUCTIVA"?getMadurez(a.id):"";
       return a.id.toString().toUpperCase().includes(upper)||
              (a.chapeta&&a.chapeta.toString().toUpperCase().includes(upper))||
              madurez.toUpperCase().includes(upper)||
-             matchingIds.has(a.id.toString()); // Coincidencia por historial
+             matchingIds.has(a.id.toString());
     });
     
     setListTitle("Resultados de búsqueda");
@@ -1136,7 +1303,7 @@ function App(){
   const inputS={width:"100%",padding:"6px 8px",borderRadius:8,border:"1px solid var(--input)",background:"var(--card)",color:"var(--fg)",fontSize:12};
 
   return React.createElement("div",{style:{minHeight:"100vh",background:"var(--bg)",paddingBottom:80}},
-    React.createElement(FarmHeader,{searchValue:search,onSearch:handleSearch,onNavigate:handleTabChange,activeTab:tab}),
+    React.createElement(FarmHeader,{searchValue:search,onSearch:handleSearch,onNavigate:handleTabChange,activeTab:tab, isOnline, queueCount, syncing}),
     React.createElement("main",{style:{maxWidth:480,margin:"0 auto",padding:"16px 16px"}},
       tab==="dashboard"&&(loading?
         React.createElement("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",paddingTop:80}},
@@ -1153,13 +1320,13 @@ function App(){
           ),
           dashView==="subpuestos"&&React.createElement(SubpuestoCards,{phase:currentPhase,animals:filteredInv.filter(a=>a.fase===currentPhase),onSelect:sub=>handleSubpuestoClick(currentPhase,sub),onSelectAll:()=>{setListTitle(currentPhase.replace(/_/g," "));setListAnimals(filteredInv.filter(a=>a.fase===currentPhase));setDashView("list")},onBack:()=>setDashView("summary"),onSubfaseClick:handleSubfaseClick}),
           dashView==="list"&&React.createElement(AnimalList,{title:listTitle,animals:listAnimals,onSelect:handleSelectAnimal,onBack:()=>{if(currentPhase)setDashView("subpuestos");else{setDashView("summary");setSearch("")}}}),
-          dashView==="detail"&&selectedAnimal&&React.createElement(AnimalDetail,{animal:selectedAnimal,historial:historial,allAnimals:todosAnimales,onBack:()=>setDashView("list"),onAction:handleAction,onRefresh:loadData})
+          dashView==="detail"&&selectedAnimal&&React.createElement(AnimalDetail,{animal:selectedAnimal,historial:historial,allAnimals:todosAnimales,onBack:()=>setDashView("list"),onAction:handleAction,onRefresh:()=>loadData(true)})
         )
       ),
-      tab==="registro"&&React.createElement(RegistroForm,{inventario:inventario,fasesExtra:fasesExtra,prefillId:prefillId,prefillAccion:prefillAccion,prefillAnimal:prefillAnimal,historial:historial,onSuccess:()=>{loadData();handleTabChange("dashboard")}}),
+      tab==="registro"&&React.createElement(RegistroForm,{inventario:inventario,fasesExtra:fasesExtra,prefillId:prefillId,prefillAccion:prefillAccion,prefillAnimal:prefillAnimal,historial:historial,onSuccess:()=>{handleTabChange("dashboard")}}),
       tab==="reportes"&&React.createElement(ReportsView,{historial:historial,search:search,onSelectAnimal:id=>{const a=todosAnimales.find(x=>x.id===id);if(a){setSelectedAnimal(a);setTab("dashboard");setDashView("detail")}}}),
       tab==="resumen"&&React.createElement(ResumenView,{historial:historial,search:search,onSelectAnimal:id=>{const a=todosAnimales.find(x=>x.id===id);if(a){setSelectedAnimal(a);setTab("dashboard");setDashView("detail")}}}),
-      tab==="vacunas"&&React.createElement(VacunasView,{inventario:inventario,historial:historial,search:search,onRefresh:loadData,onSelectAnimal:id=>{const a=todosAnimales.find(x=>x.id===id);if(a){setSelectedAnimal(a);setTab("dashboard");setDashView("detail")}}})
+      tab==="vacunas"&&React.createElement(VacunasView,{inventario:inventario,historial:historial,search:search,onRefresh:()=>loadData(true),onSelectAnimal:id=>{const a=todosAnimales.find(x=>x.id===id);if(a){setSelectedAnimal(a);setTab("dashboard");setDashView("detail")}}})
     ),
     React.createElement(BottomNav,{active:tab,onChange:handleTabChange})
   );
