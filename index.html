@@ -407,12 +407,29 @@ function DashboardView({data,onPhaseClick,onSubpuestoClick,onPigletsClick}){
 
 function SubpuestoCards({phase,animals,onSelect,onSelectAll,onBack,onSubfaseClick}){
   const[viewMode,setViewMode]=useState(phase==="REPRODUCTIVA"?"subfases":"subpuestos");
-  const groups=useMemo(()=>{const map={};animals.forEach(a=>{const k=a.subpuesto||"Sin puesto";if(!map[k])map[k]={count:0,alerts:0,warnings:0};map[k].count++;if(a.color==="red")map[k].alerts++;if(a.color==="yellow")map[k].warnings++});return Object.entries(map).sort((a,b)=>a[0].localeCompare(b[0]))},[animals]);
+  
+  const groups=useMemo(()=>{
+    const map={};
+    animals.forEach(a=>{
+      const k=a.subpuesto||"Sin puesto";
+      if(!map[k])map[k]={count:0,alerts:0,warnings:0};
+      map[k].count++;
+      if(a.color==="red")map[k].alerts++;
+      if(a.color==="yellow")map[k].warnings++;
+    });
+    return Object.entries(map).sort((a,b)=>{
+      if(b[1].alerts!==a[1].alerts)return b[1].alerts-a[1].alerts;
+      if(b[1].warnings!==a[1].warnings)return b[1].warnings-a[1].warnings;
+      return a[0].localeCompare(b[0],undefined,{numeric:true});
+    });
+  },[animals]);
+
   const subfaseGroups=useMemo(()=>{
     if(phase!=="REPRODUCTIVA")return[];
     const map={};animals.forEach(a=>{const k=a.subfase||"REEMPLAZO";if(!map[k])map[k]={count:0,alerts:0,warnings:0};map[k].count++;if(a.color==="red")map[k].alerts++;if(a.color==="yellow")map[k].warnings++});
     return SUBFASES_REPRODUCTIVA.map(sf=>({...sf,count:(map[sf.key]||{count:0}).count,alerts:(map[sf.key]||{alerts:0}).alerts,warnings:(map[sf.key]||{warnings:0}).warnings})).filter(sf=>sf.count>0);
   },[animals,phase]);
+
   const isRepro=phase==="REPRODUCTIVA";
   const renderCard=(key,label,count,alerts,warnings,onClick)=>React.createElement("div",{key,onClick,style:{position:"relative",background:"var(--card)",borderRadius:12,padding:16,border:"1px solid var(--border)",boxShadow:"0 2px 6px rgba(0,0,0,.05)",cursor:"pointer"}},
     alerts>0&&React.createElement("span",{className:"animate-pulse-alert",style:{position:"absolute",top:8,right:8,width:12,height:12,borderRadius:"50%",background:"var(--destructive)",border:"2px solid var(--card)"}}),
@@ -452,6 +469,17 @@ function AnimalList({title,animals,onSelect,onBack}){
     return {act,vend,muer,total:animals.length};
   },[animals]);
 
+  const sortedAnimals = useMemo(()=>{
+    const order={red:0, yellow:1, green:2};
+    return [...animals].sort((a,b)=>{
+      if(a.activo !== b.activo) return a.activo ? -1 : 1; 
+      const oA = order[a.color] ?? 3;
+      const oB = order[b.color] ?? 3;
+      if(oA !== oB) return oA - oB; 
+      return a.id.toString().localeCompare(b.id.toString(), undefined, {numeric: true});
+    });
+  }, [animals]);
+
   return React.createElement("div",{className:"animate-fade-in"},
     React.createElement("button",{onClick:onBack,style:{display:"flex",alignItems:"center",gap:4,fontSize:14,fontWeight:600,color:"var(--primary)",marginBottom:12}},"← Volver"),
     React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}},
@@ -465,9 +493,9 @@ function AnimalList({title,animals,onSelect,onBack}){
       counts.muer>0&&React.createElement("span",{style:{fontSize:11,fontWeight:700,color:"var(--destructive)",background:"rgba(220,38,38,.1)",padding:"4px 8px",borderRadius:6,border:"1px solid rgba(220,38,38,.2)"}},"🔴 Muertas: "+counts.muer)
     ),
 
-    animals.length===0?React.createElement("p",{style:{textAlign:"center",color:"var(--muted-fg)",padding:"32px 0"}},"Sin animales en esta búsqueda/fase."):
+    sortedAnimals.length===0?React.createElement("p",{style:{textAlign:"center",color:"var(--muted-fg)",padding:"32px 0"}},"Sin animales en esta búsqueda/fase."):
     React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:8}},
-      animals.map(a=>{
+      sortedAnimals.map(a=>{
         const inactive=!a.activo;
         const sfInfo=a.subfase?SUBFASES_REPRODUCTIVA.find(s=>s.key===a.subfase):null;
         const status=inactive?(a.ultimaAccion==="VENTA"?"💰 VENDIDO":"🔴 MUERTO"):"📍 "+(a.subpuesto||"Sin puesto")+" · "+a.fase.replace(/_/g," ")+(sfInfo?" · "+sfInfo.icon+" "+sfInfo.label:"");
@@ -796,7 +824,11 @@ function VacunasView({inventario,historial,onRefresh,onSelectAnimal,search}){
 
   const sorted=useMemo(()=>{
     const order={red:0,yellow:1,gray:2,green:3};
-    return[...filtered].sort((a,b)=>order[a.overallColor]-order[b.overallColor]);
+    return[...filtered].sort((a,b)=>{
+      const diff = order[a.overallColor]-order[b.overallColor];
+      if(diff !== 0) return diff;
+      return a.animal.id.toString().localeCompare(b.animal.id.toString(), undefined, {numeric: true});
+    });
   },[filtered]);
 
   const counts=useMemo(()=>({
@@ -965,7 +997,7 @@ function ReportsView({historial,search,onSelectAnimal}){
     ),
     React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}},
       React.createElement("div",null,React.createElement("label",{style:{fontSize:10,fontWeight:600,color:"var(--muted-fg)",textTransform:"uppercase"}},"📍 Puesto"),React.createElement("select",{value:filtroPuesto,onChange:e=>setFiltroPuesto(e.target.value),style:inputS},React.createElement("option",{value:""},"Todos"),subpuestos.map(s=>React.createElement("option",{key:s,value:s},s)))),
-      React.createElement("div",null,React.createElement("label",{style:{fontSize:10,fontWeight:600,color:"var(--muted-fg)",textTransform:"uppercase"}},"👩‍👦 Madre"),React.createElement("select",{value:filterMadre,onChange:e=>setFilterMadre(e.target.value),style:inputS},React.createElement("option",{value:""},"Todas"),madres.map(m=>React.createElement("option",{key:m,value:m},m))))
+      React.createElement("div",null,React.createElement("label",{style:{fontSize:10,fontWeight:600,color:"var(--muted-fg)",textTransform:"uppercase"}},"👩‍👦 Madre"),React.createElement("select",{value:filtroMadre,onChange:e=>setFiltroMadre(e.target.value),style:inputS},React.createElement("option",{value:""},"Todas"),madres.map(m=>React.createElement("option",{key:m,value:m},m))))
     ),
     compradores.length>0&&React.createElement("div",{style:{marginBottom:8}},React.createElement("label",{style:{fontSize:10,fontWeight:600,color:"var(--muted-fg)",textTransform:"uppercase"}},"🤝 Comprador"),React.createElement("select",{value:filtroComprador,onChange:e=>setFiltroComprador(e.target.value),style:inputS},React.createElement("option",{value:""},"Todos"),compradores.map(c=>React.createElement("option",{key:c,value:c},c)))),
     hasAF&&React.createElement("button",{onClick:clearFilters,style:{fontSize:12,color:"var(--primary)",fontWeight:600,marginBottom:12}},"✕ Limpiar filtros"),
@@ -1076,6 +1108,7 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
   const[notas,setNotas]=useState("");
   const[comprador,setComprador]=useState("");
   const[inseminador,setInseminador]=useState("");
+  const[dosis,setDosis]=useState("");
   const[padre,setPadre]=useState("");
   const[vivos,setVivos]=useState("");
   const[muertos,setMuertos]=useState("");
@@ -1134,6 +1167,8 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
         const ld=ef.filter(l=>l.tat).map(l=>({tatuaje:l.tat,chapeta:l.chap,peso:l.peso,notas:"Hijo de "+tatuaje+(l.peso?" | Peso: "+l.peso+"kg":"")}));
         if(ld.length>0)await enviarBatch({comun:{accion:"INGRESO",fase:"PRECEBO",subpuesto:destLechones,madre:tatuaje,fecha:toAppsScriptDate(fechaStr)},animales:ld})}
       
+      if(accion==="SERVICIO" && dosis) finalNotas = "Dosis: " + dosis + (notas ? " | " + notas : "");
+
       const res = await enviarRegistro({tatuaje,chapeta,peso,accion,fase,subpuesto,notas:finalNotas,inseminador,fecha:toAppsScriptDate(fechaStr)});
       
       setSaving(false);onSuccess();
@@ -1170,8 +1205,16 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
     ),
     accion==="SERVICIO"&&React.createElement("div",{style:{marginTop:16,padding:16,borderRadius:8,background:"var(--muted)",border:"1px solid var(--border)"}},
       React.createElement("h4",{style:{fontSize:14,fontWeight:700,marginBottom:8}},"💉 Datos de Inseminación"),
-      React.createElement("label",{style:labelS},"Inseminador"),
-      React.createElement("input",{value:inseminador,onChange:e=>setInseminador(e.target.value),placeholder:"Nombre",style:inputS})
+      React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}},
+        React.createElement("div",null,
+          React.createElement("label",{style:labelS},"Inseminador"),
+          React.createElement("input",{value:inseminador,onChange:e=>setInseminador(e.target.value),placeholder:"Nombre",style:inputS})
+        ),
+        React.createElement("div",null,
+          React.createElement("label",{style:labelS},"Dosis / Verraco"),
+          React.createElement("input",{value:dosis,onChange:e=>setDosis(e.target.value),placeholder:"Ej. Lote 123",style:inputS})
+        )
+      )
     ),
     accion==="CAMBIAR_SUBFASE"&&React.createElement("div",{style:{marginTop:16,padding:16,borderRadius:8,background:"rgba(45,106,79,.1)",border:"1px solid rgba(45,106,79,.2)"}},
       React.createElement("h4",{style:{fontSize:14,fontWeight:700,color:"var(--primary)",marginBottom:8}},"🔄 Cambiar Subfase"),
