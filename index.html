@@ -67,7 +67,7 @@ const VACUNA_SCHEDULE=[
   {key:"PRIMERA_TRIPLE",label:"1ra Dosis Vacuna Triple",icon:"💉",diasDesdeNacimiento:145},
   {key:"CML",label:"CML",icon:"🧪",diasDesdeVacunaAnterior:{vacuna:"PRIMERA_TRIPLE",dias:15}},
   {key:"SEGUNDA_TRIPLE",label:"2da Dosis Vacuna Triple",icon:"💉",diasDesdeVacunaAnterior:{vacuna:"CML",dias:8}},
-  {key:"TERCERA_TRIPLE",label:"3ra Dosis Vacuna Triple",icon:"💉",diasDesdeNacimiento:167},
+  {key:"TERCERA_TRIPLE",label:"3ra Dosis Vacuna Triple",icon:"💉",diasDesdeNacimiento:210},
   {key:"INICIO_RECELO",label:"Inicio Recelo",icon:"🐽",diasDesdeNacimiento:170},
   {key:"DESPARASITACION",label:"Desparasitación",icon:"🛡️",diasDesdeNacimiento:225},
   {key:"ACTIVACION",label:"Fecha de Activación",icon:"⚡",diasDesdeNacimiento:240},
@@ -83,9 +83,11 @@ const ACCION_CONFIG={
   RETORNO_VACIA:{icon:"⭕",label:"Retorno Vacía"},
   CAMBIAR_SUBFASE:{icon:"🔄",label:"Cambiar Subfase"},
   VACUNA:{icon:"💉",label:"Vacuna"},
+  EMITIR_GUIA:{icon:"📄",label:"Emitir Guía"},
+  QUITAR_GUIA:{icon:"❌",label:"Quitar Guía"},
 };
 
-const URL_SCRIPT="https://script.google.com/macros/s/AKfycbzE8R5Aomo8ppTKDwYmjuFkuaYk-91yPhTg0SYYF8auN05KCrcQGY5U4okc0Om3ljJPrQ/exec";
+const URL_SCRIPT="https://script.google.com/macros/s/AKfycbyl04yXXLNutCw0IdVRZZvcg2QEDhL9-u52vFY-93V-71lRU94PsnF2oI9z8Ypu4rY_nQ/exec";
 
 /* ─── OFFLINE & OPTIMISTIC SYNC SYSTEM ─── */
 const CACHE_KEY = "granja_pro_cache";
@@ -245,7 +247,7 @@ function procesarInventario(regs){
   const estados={};
   regs.forEach(r=>{
     const id=r[1]?.toString();const acc=r[2];const fase=r[3];const fecha=r[0];if(!id)return;
-    if(!estados[id])estados[id]={id,piglets:0,subpuesto:r[12]?.toString()||"",fase:fase||"",chapeta:r[10]?.toString()||"",madre:r[7]?.toString()||"",sexo:r[14]?.toString()||"",fechaNacimiento:r[15]?.toString()||"",activo:true,fechaFase:fecha};
+    if(!estados[id])estados[id]={id,piglets:0,subpuesto:r[12]?.toString()||"",fase:fase||"",chapeta:r[10]?.toString()||"",madre:r[7]?.toString()||"",sexo:r[14]?.toString()||"",fechaNacimiento:r[15]?.toString()||"",tieneGuia:false,activo:true,fechaFase:fecha};
     
     if(r[14] && r[14].toString().trim() !== "") estados[id].sexo = r[14].toString().trim();
     if(r[15] && r[15].toString().trim() !== "") estados[id].fechaNacimiento = r[15].toString().trim();
@@ -261,6 +263,8 @@ function procesarInventario(regs){
       if(acc==="PARTO"){const m=(r[5]||"").match(/Vivos: (\d+)/);if(m)estados[id].piglets=parseInt(m[1]);estados[id].fechaFase=fecha}
       if(acc==="BAJA_LACTANCIA"){const m=(r[5]||"").match(/Cantidad: (\d+)/);if(m)estados[id].piglets=Math.max(0,estados[id].piglets-parseInt(m[1]))}
       if(acc==="DESTETE"){estados[id].piglets=0;estados[id].fechaFase=fecha}
+      if(acc==="EMITIR_GUIA"){estados[id].tieneGuia=true}
+      if(acc==="QUITAR_GUIA"){estados[id].tieneGuia=false}
     }
   });
 
@@ -599,6 +603,7 @@ function AnimalList({title,animals,onSelect,onBack}){
             React.createElement("div",null,
               React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8}},
                 React.createElement("span",{style:{fontWeight:700}},"ID: "+a.id),
+                a.tieneGuia&&!inactive&&React.createElement("span",{style:{fontSize:12},title:"Guía Emitida"},"📄"),
                 !inactive&&React.createElement("span",{style:{width:10,height:10,borderRadius:"50%",background:colorMap[a.color],display:"inline-block"}}),
                 sfInfo&&!inactive&&React.createElement("span",{style:{fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:4,background:"rgba(45,106,79,.1)",color:"var(--primary)"}},sfInfo.icon+" "+sfInfo.label),
                 inactive&&React.createElement("span",{style:{fontSize:10,fontWeight:700,padding:"2px 6px",borderRadius:4,background:"var(--muted)",color:"var(--muted-fg)"}},a.ultimaAccion==="VENTA"?"VENDIDO":"MUERTO")
@@ -731,6 +736,11 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
       isInactive&&React.createElement("div",{style:{marginTop:12,padding:12,borderRadius:8,background:"rgba(220,38,38,.1)",border:"1px solid rgba(220,38,38,.2)",textAlign:"center"}},
         React.createElement("p",{style:{fontSize:14,fontWeight:700,color:"var(--destructive)"}},animal.ultimaAccion==="VENTA"?"💰 VENDIDO":"🔴 MUERTO"," — No se pueden registrar acciones")
       ),
+
+      animal.tieneGuia && React.createElement("div",{style:{marginTop:12,padding:"10px 14px",borderRadius:8,background:"rgba(45,106,79,.1)",border:"1px solid var(--primary)"}},
+        React.createElement("p",{style:{fontSize:13,fontWeight:700,color:"var(--primary)"}},"📄 GUÍA EMITIDA — No apto para matadero")
+      ),
+
       React.createElement("div",{style:{marginTop:16,fontSize:14,lineHeight:2}},
         React.createElement("p",null,"📍 ",React.createElement("b",null,"Puesto:")," ",animal.subpuesto||"N/A"),
         React.createElement("p",null,"🏷️ ",React.createElement("b",null,"Chapeta:")," ",animal.chapeta||"N/A"),
@@ -775,7 +785,11 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
         showDestete&&React.createElement("button",{onClick:()=>onAction(animal.id,"DESTETE"),style:{...btn,gridColumn:"span 2",background:"var(--success)",color:"var(--success-fg)"}},"🥣 Registrar Destete"),
         React.createElement("button",{onClick:()=>onAction(animal.id,"ENFERMEDAD"),style:{...btn,background:"rgba(220,38,38,.1)",color:"var(--destructive)",border:"1px solid rgba(220,38,38,.3)"}},"🏥 Enfermedad"),
         React.createElement("button",{onClick:()=>onAction(animal.id,"MUERTE"),style:{...btn,background:"rgba(220,38,38,.1)",color:"var(--destructive)",border:"1px solid rgba(220,38,38,.3)"}},"🔴 Muerte"),
-        React.createElement("button",{onClick:()=>onAction(animal.id,"VENTA"),style:{...btn,gridColumn:"span 2",background:"rgba(212,160,10,.2)",color:"var(--warning-fg)",border:"1px solid rgba(212,160,10,.4)"}},"💰 Venta")
+        React.createElement("button",{onClick:()=>onAction(animal.id,"VENTA"),style:{...btn,background:"rgba(212,160,10,.2)",color:"var(--warning-fg)",border:"1px solid rgba(212,160,10,.4)"}},"💰 Venta"),
+        !animal.tieneGuia ? 
+          React.createElement("button",{onClick:()=>onAction(animal.id,"EMITIR_GUIA"),style:{...btn,gridColumn:"span 2",background:"var(--card)",color:"var(--card-fg)",border:"1px solid var(--border)"}},"📄 Emitir Guía")
+        :
+          React.createElement("button",{onClick:()=>onAction(animal.id,"QUITAR_GUIA"),style:{...btn,gridColumn:"span 2",background:"var(--card)",color:"var(--card-fg)",border:"1px solid var(--border)"}},"❌ Quitar Guía")
       )
     ),
 
@@ -1301,6 +1315,7 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
   const labelS={display:"block",fontSize:14,fontWeight:600,marginTop:16,marginBottom:4};
 
   const handleAccionChange=val=>{setAccion(val);
+    if(val==="EMITIR_GUIA"||val==="QUITAR_GUIA") setFase(prefillAnimal?.fase||allFases[0]);
     if(val==="SERVICIO"||val==="PARTO"||val==="CONFIRMAR_GESTACION"||val==="RETORNO_VACIA"||val==="CAMBIAR_SUBFASE"||val==="BAJA_LACTANCIA")setFase("REPRODUCTIVA");
     if(val==="DESTETE"){setFase("DESCANSO");setDestLechones("PRECEBO");const a=inventario.find(a=>a.id===tatuaje);if(a){setDestetados(String(a.piglets));setLechones(Array.from({length:a.piglets},(_,i)=>({tat:tatuaje+"-"+(i+1),chap:"",peso:"",sexo:"H",ok:true})))}}
   };
@@ -1342,6 +1357,9 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
       if(accion==="CAMBIAR_SUBFASE")finalNotas="CAMBIAR SUBFASE | Subfase: "+nuevaSubfase+" | "+notas;
       if(accion==="BAJA_LACTANCIA")finalNotas="BAJA LACTANCIA | Cantidad: "+cantBaja+" | Causa: "+(causaBaja||"Desconocida")+" "+notas;
       if(accion==="VENTA")finalNotas="VENTA | Comprador: "+(comprador||"N/A")+" | Peso: "+peso+"kg "+notas;
+      if(accion==="EMITIR_GUIA")finalNotas="GUÍA EMITIDA | "+notas;
+      if(accion==="QUITAR_GUIA")finalNotas="GUÍA REVOCADA | "+notas;
+      
       if(accion==="DESTETE"){const ef=lechones.filter(l=>l.ok);const bj=lechones.length-ef.length;const pt=ef.reduce((s,l)=>s+(parseFloat(l.peso)||0),0);finalNotas="DESTETE | Camada: "+destetados+" | Efectivos: "+ef.length+" | Bajas: "+bj+" | Peso Total: "+pt+"kg "+notas;
         const ld=ef.filter(l=>l.tat).map(l=>({tatuaje:l.tat,chapeta:l.chap,peso:l.peso,sexo:l.sexo,notas:"Hijo de "+tatuaje+(l.peso?" | Peso: "+l.peso+"kg":"")}));
         if(ld.length>0)await enviarBatch({comun:{accion:"INGRESO",fase:"PRECEBO",subpuesto:destLechones,madre:tatuaje,fecha:toAppsScriptDate(fechaStr)},animales:ld})}
@@ -1393,7 +1411,7 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
       )
     ),
 
-    accion!=="BAJA_LACTANCIA"&&React.createElement(React.Fragment,null,
+    (accion!=="BAJA_LACTANCIA" && accion!=="EMITIR_GUIA" && accion!=="QUITAR_GUIA")&&React.createElement(React.Fragment,null,
       React.createElement("label",{style:labelS},"Ubicación / Fase"),
       React.createElement("select",{value:fase,onChange:e=>{
           setFase(e.target.value);
@@ -1483,6 +1501,11 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
       React.createElement("label",{style:labelS},"Comprador"),
       React.createElement("input",{value:comprador,onChange:e=>setComprador(e.target.value),placeholder:"Nombre",style:inputS})
     ),
+
+    accion==="VENTA"&&prefillAnimal?.tieneGuia&&React.createElement("div",{style:{marginTop:16,padding:12,background:"rgba(220,38,38,.1)",borderRadius:8,border:"1px solid rgba(220,38,38,.3)"}},
+        React.createElement("p",{style:{fontSize:13,fontWeight:700,color:"var(--destructive)"}},"⚠️ Este cerdo tiene GUÍA EMITIDA. No se debe vender a matadero.")
+    ),
+
     React.createElement("label",{style:labelS},"Notas"),
     React.createElement("input",{value:notas,onChange:e=>setNotas(e.target.value),placeholder:"Observaciones",style:inputS}),
     React.createElement("button",{onClick:handleSubmit,disabled:saving,style:{width:"100%",marginTop:24,padding:"14px 0",borderRadius:8,background:"var(--primary)",color:"var(--primary-fg)",fontWeight:700,fontSize:16,opacity:saving?.5:1}},(saving?"Guardando...":"Guardar 💾"))
@@ -1508,6 +1531,7 @@ function App(){
   const[prefillAnimal,setPrefillAnimal]=useState(null);
   const[filterPuesto,setFilterPuesto]=useState("");
   const[filterMadre,setFilterMadre]=useState("");
+  const[filterGuia,setFilterGuia]=useState("");
 
   const[isOnline,setIsOnline]=useState(navigator.onLine);
   const[queueCount,setQueueCount]=useState(getQueue().length);
@@ -1662,7 +1686,15 @@ function App(){
   };
 
   const{subpuestos,madres}=useMemo(()=>{const s=new Set(),m=new Set();inventario.forEach(a=>{if(a.subpuesto)s.add(a.subpuesto);if(a.madre)m.add(a.madre)});return{subpuestos:[...s].sort(),madres:[...m].sort()}},[inventario]);
-  const filteredInv=useMemo(()=>inventario.filter(a=>{if(filterPuesto&&a.subpuesto!==filterPuesto)return false;if(filterMadre&&a.madre!==filterMadre)return false;return true}),[inventario,filterPuesto,filterMadre]);
+  
+  const filteredInv=useMemo(()=>inventario.filter(a=>{
+    if(filterPuesto&&a.subpuesto!==filterPuesto)return false;
+    if(filterMadre&&a.madre!==filterMadre)return false;
+    if(filterGuia==="CON"&&!a.tieneGuia)return false;
+    if(filterGuia==="SIN"&&a.tieneGuia)return false;
+    return true;
+  }),[inventario,filterPuesto,filterMadre,filterGuia]);
+  
   const dashboardData=buildDashboardData(filteredInv);
 
   const handlePhaseClick=phase=>{setCurrentPhase(phase);setListTitle(phase.replace(/_/g," "));setDashView("subpuestos")};
@@ -1721,7 +1753,11 @@ function App(){
               React.createElement("div",null,React.createElement("label",{style:{fontSize:9,fontWeight:700,color:"var(--muted-fg)",textTransform:"uppercase",letterSpacing:1}},"📍 Puesto"),React.createElement("select",{value:filterPuesto,onChange:e=>setFilterPuesto(e.target.value),style:inputS},React.createElement("option",{value:""},"Todos"),subpuestos.map(s=>React.createElement("option",{key:s,value:s},s)))),
               React.createElement("div",null,React.createElement("label",{style:{fontSize:9,fontWeight:700,color:"var(--muted-fg)",textTransform:"uppercase",letterSpacing:1}},"👩‍👦 Madre"),React.createElement("select",{value:filterMadre,onChange:e=>setFilterMadre(e.target.value),style:inputS},React.createElement("option",{value:""},"Todas"),madres.map(m=>React.createElement("option",{key:m,value:m},m))))
             ),
-            (filterPuesto||filterMadre)&&React.createElement("button",{onClick:()=>{setFilterPuesto("");setFilterMadre("")},style:{fontSize:12,color:"var(--primary)",fontWeight:600,marginBottom:12}},"✕ Limpiar filtros"),
+            React.createElement("div",{style:{display:"flex",gap:8,marginBottom:12}},
+              React.createElement("button",{onClick:()=>setFilterGuia(filterGuia==="CON"?"":"CON"),style:{flex:1,padding:"8px 0",borderRadius:8,fontSize:12,fontWeight:700,background:filterGuia==="CON"?"var(--primary)":"var(--muted)",color:filterGuia==="CON"?"var(--primary-fg)":"var(--muted-fg)",border:"1px solid var(--border)"}},"📄 Con Guía"),
+              React.createElement("button",{onClick:()=>setFilterGuia(filterGuia==="SIN"?"":"SIN"),style:{flex:1,padding:"8px 0",borderRadius:8,fontSize:12,fontWeight:700,background:filterGuia==="SIN"?"var(--secondary)":"var(--muted)",color:filterGuia==="SIN"?"var(--secondary-fg)":"var(--muted-fg)",border:"1px solid var(--border)"}},"🐷 Sin Guía")
+            ),
+            (filterPuesto||filterMadre||filterGuia)&&React.createElement("button",{onClick:()=>{setFilterPuesto("");setFilterMadre("");setFilterGuia("");},style:{fontSize:12,color:"var(--primary)",fontWeight:600,marginBottom:12}},"✕ Limpiar filtros"),
             React.createElement(DashboardView,{data:dashboardData,onPhaseClick:handlePhaseClick,onSubpuestoClick:handleSubpuestoClick,onPigletsClick:handlePigletsClick})
           ),
           dashView==="subpuestos"&&React.createElement(SubpuestoCards,{phase:currentPhase,animals:filteredInv.filter(a=>a.fase===currentPhase),onSelect:sub=>handleSubpuestoClick(currentPhase,sub),onSelectAll:()=>{setListTitle(currentPhase.replace(/_/g," "));setListAnimals(filteredInv.filter(a=>a.fase===currentPhase));setDashView("list")},onBack:()=>setDashView("summary"),onSubfaseClick:handleSubfaseClick}),
