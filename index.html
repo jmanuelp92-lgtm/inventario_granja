@@ -85,7 +85,7 @@ const ACCION_CONFIG={
   VACUNA:{icon:"💉",label:"Vacuna"},
 };
 
-const URL_SCRIPT="https://script.google.com/macros/s/AKfycbzYbltoUl7qqY557CjaJZD9WRZhUwq2L_4UPjCSHLiTuKzz07HczRwhFLfaG6JQOq-fQg/exec";
+const URL_SCRIPT="https://script.google.com/macros/s/AKfycbzE8R5Aomo8ppTKDwYmjuFkuaYk-91yPhTg0SYYF8auN05KCrcQGY5U4okc0Om3ljJPrQ/exec";
 
 /* ─── OFFLINE & OPTIMISTIC SYNC SYSTEM ─── */
 const CACHE_KEY = "granja_pro_cache";
@@ -181,34 +181,45 @@ function obtenerColor(dias,fase){
 }
 
 function obtenerMensajeAlerta(animal){
-  if(animal.color==="green"||!animal.activo) return null;
-  const d=animal.dias;
-  const t=animal.color==="red"?"URGENTE":"ATENCIÓN";
-  if(animal.fase==="REPRODUCTIVA"){
-    switch(animal.subfase){
-      case "REEMPLAZO": return `${t}: Lleva ${d} días en reemplazo. Debes evaluar servicio o descartarla.`;
-      case "SERVIDAS": return `${t}: Lleva ${d} días servida. Debes confirmar su gestación o retorno.`;
-      case "GESTACION": return `${t}: Ya cumplió ${d} días gestando. Debes trasladarla a Maternidad (Parto).`;
-      case "VACIA": return `${t}: Lleva ${d} días vacía. Debes darle servicio urgente.`;
-      case "MATERNIDAD":
-      case "LACTANCIA": return `${t}: Ya cumplió ${d} días lactando. Debes programar el destete.`;
-      case "DESTETE": return `${t}: Lleva ${d} días en destete. Debes trasladarla a otra fase.`;
-      case "DESCANSO": return `${t}: Descanso completado (${d} días). Lista para nuevo servicio.`;
-      default: return `${t}: Excedió los días esperados (${d} días).`;
+  if(!animal.activo) return null;
+  if(animal.color === "green") return null;
+
+  const t = animal.color === "red" ? "URGENTE" : "ATENCIÓN";
+  const alertas = [];
+  const d = animal.dias;
+
+  if (animal.colorFase === "red" || animal.colorFase === "yellow") {
+    if(animal.fase==="REPRODUCTIVA"){
+      switch(animal.subfase){
+        case "REEMPLAZO": alertas.push(`En reemplazo ${d}d`); break;
+        case "SERVIDAS": alertas.push(`Servida ${d}d (confirmar)`); break;
+        case "GESTACION": alertas.push(`Gestando ${d}d`); break;
+        case "VACIA": alertas.push(`Vacía ${d}d`); break;
+        case "MATERNIDAD":
+        case "LACTANCIA": alertas.push(`Lactando ${d}d (destetar)`); break;
+        case "DESTETE": alertas.push(`Destete ${d}d`); break;
+        case "DESCANSO": alertas.push(`Descanso ${d}d`); break;
+        default: alertas.push(`Excedió límite de fase (${d}d)`);
+      }
+    }else{
+      if(animal.fase.includes("PRECEBO")) alertas.push(`Cumplió Precebo`);
+      if(animal.fase.includes("LEVANTE")) alertas.push(`Cumplió Levante`);
+      if(animal.fase.includes("ENGORDE")) alertas.push(`Lista para Venta`);
     }
-  }else{
-    if(animal.fase.includes("PRECEBO")) return `${t}: Ya cumplió los días en Precebo (${d} días). Debes trasladarla a Levante.`;
-    if(animal.fase.includes("LEVANTE")) return `${t}: Ya cumplió los días en Levante (${d} días). Debes trasladarla a Engorde.`;
-    if(animal.fase.includes("ENGORDE")) return `${t}: Ya cumplió los días en Engorde (${d} días). Lista para Venta.`;
   }
-  return `${t}: Revisar estado, lleva ${d} días.`;
+
+  if (animal.msgVacuna) alertas.push(animal.msgVacuna);
+
+  if (alertas.length === 0) return null;
+  return `${t}: ` + alertas.join(" | ");
 }
 
 function calcularSubfase(id,regs){
   const records=regs.filter(r=>r[1]?.toString()===id);
-  let lServ=-1,lParto=-1,lDest=-1,lConf=-1,lRet=-1,lCamb=-1,cambSf=null,tPartos=0,tServ=0;
+  let lServ=-1,lParto=-1,lDest=-1,lConf=-1,lRet=-1,lCamb=-1,cambSf=null,tPartos=0,tServ=0,subfaseIngreso=null;
   records.forEach((r,i)=>{
     const acc=r[2];
+    if(acc==="INGRESO"){const m=(r[5]||"").match(/Subfase:\s*(\w+)/);if(m)subfaseIngreso=m[1]}
     if(acc==="SERVICIO"){lServ=i;tServ++}
     if(acc==="PARTO"){lParto=i;tPartos++}
     if(acc==="DESTETE")lDest=i;
@@ -222,10 +233,10 @@ function calcularSubfase(id,regs){
   const fecha=lastRec?lastRec[0]?.toString()||"":"";
   if(lDest>lParto&&lDest>lServ)return{subfase:"DESCANSO",fechaSubfase:records[lDest]?.[0]?.toString()||fecha};
   if(lRet>lServ&&lRet>lParto)return{subfase:"VACIA",fechaSubfase:records[lRet]?.[0]?.toString()||fecha};
-  if(lConf>lServ&&lConf>lParto)return{subfase:"GESTACION",fechaSubfase:records[lServ]?.[0]?.toString()||fecha};
+  if(lConf>lServ&&lConf>lParto)return{subfase:"GESTACION",fechaSubfase:records[lConf]?.[0]?.toString()||fecha};
   if(lServ>lParto&&lServ>lDest)return{subfase:"SERVIDAS",fechaSubfase:records[lServ]?.[0]?.toString()||fecha};
   if(lParto>lServ)return{subfase:"LACTANCIA",fechaSubfase:records[lParto]?.[0]?.toString()||fecha};
-  if(tPartos===0&&tServ===0)return{subfase:"REEMPLAZO",fechaSubfase:fecha};
+  if(tPartos===0&&tServ===0)return{subfase:subfaseIngreso||"REEMPLAZO",fechaSubfase:fecha};
   return{subfase:"VACIA",fechaSubfase:fecha};
 }
 
@@ -234,10 +245,10 @@ function procesarInventario(regs){
   const estados={};
   regs.forEach(r=>{
     const id=r[1]?.toString();const acc=r[2];const fase=r[3];const fecha=r[0];if(!id)return;
-    if(!estados[id])estados[id]={id,piglets:0,subpuesto:r[12]?.toString()||"",fase:fase||"",chapeta:r[10]?.toString()||"",madre:r[7]?.toString()||"",sexo:r[14]?.toString()||"",activo:true,fechaFase:fecha};
+    if(!estados[id])estados[id]={id,piglets:0,subpuesto:r[12]?.toString()||"",fase:fase||"",chapeta:r[10]?.toString()||"",madre:r[7]?.toString()||"",sexo:r[14]?.toString()||"",fechaNacimiento:r[15]?.toString()||"",activo:true,fechaFase:fecha};
     
-    // Si este registro tiene guardado el sexo (columna O / índice 14), lo actualizamos
     if(r[14] && r[14].toString().trim() !== "") estados[id].sexo = r[14].toString().trim();
+    if(r[15] && r[15].toString().trim() !== "") estados[id].fechaNacimiento = r[15].toString().trim();
 
     estados[id].ultimaAccion=acc;
     if(acc==="VENTA"||acc==="MUERTE"){estados[id].activo=false;estados[id].fechaFase=fecha}
@@ -254,6 +265,7 @@ function procesarInventario(regs){
   });
 
   const todos=Object.values(estados).map(e=>{
+    // 1. Evaluar color por Fases/Subfases
     if(e.activo&&e.fase==="REPRODUCTIVA"){
       const{subfase,fechaSubfase}=calcularSubfase(e.id,regs);
       if(e.piglets>0){
@@ -262,8 +274,67 @@ function procesarInventario(regs){
         const lastP=partoRecs[partoRecs.length-1];
         e.fechaFase=lastP?lastP[0]?.toString()||fechaSubfase:fechaSubfase;
       }else{e.subfase=subfase;e.fechaFase=fechaSubfase}
-      e.dias=calcularDias(e.fechaFase);e.color=obtenerColorSubfase(e.dias,e.subfase);
-    }else{e.dias=calcularDias(e.fechaFase);e.color=e.activo?obtenerColor(e.dias,e.fase):"red"}
+      e.dias=calcularDias(e.fechaFase);
+      e.colorFase=obtenerColorSubfase(e.dias,e.subfase);
+    }else{
+      e.dias=calcularDias(e.fechaFase);
+      e.colorFase=e.activo?obtenerColor(e.dias,e.fase):"red";
+    }
+
+    // 2. Evaluar color por Vacunas (Nuevo)
+    e.colorVacuna = "green";
+    e.msgVacuna = null;
+    if(e.activo) {
+       const vacunasAplicadas = getVacunaRecords(e.id, regs);
+       let fechaBase = e.fechaNacimiento ? extractDateKey(e.fechaNacimiento) : null;
+       if(!fechaBase) {
+         const ingreso = regs.find(r=>r[1]?.toString()===e.id && r[2]==="INGRESO");
+         if(ingreso) fechaBase = extractDateKey(ingreso[0]);
+       }
+       
+       if(fechaBase) {
+         const hoy = new Date(); hoy.setHours(0,0,0,0);
+         const activeSchedule = getFilteredVacunas(e);
+         for(let v of activeSchedule) {
+           if(vacunasAplicadas[v.key]) continue; // Ya se aplicó
+           
+           let fechaProg=null;
+           if(v.diasDesdeNacimiento){
+             fechaProg=new Date(fechaBase+"T12:00:00");
+             fechaProg.setDate(fechaProg.getDate()+v.diasDesdeNacimiento);
+           } else if(v.diasDesdeVacunaAnterior) {
+             const prev=vacunasAplicadas[v.diasDesdeVacunaAnterior.vacuna];
+             if(prev){
+               fechaProg=new Date(prev+"T12:00:00");
+               fechaProg.setDate(fechaProg.getDate()+v.diasDesdeVacunaAnterior.dias);
+             }
+           }
+           
+           if(fechaProg){
+             const dRest=Math.ceil((fechaProg.getTime()-hoy.getTime())/86400000);
+             if(dRest < 0){
+               e.colorVacuna = "red";
+               e.msgVacuna = `💉 ${v.label} vencida hace ${Math.abs(dRest)}d`;
+               break; // Caso peor, salimos del loop
+             } else if (dRest <= 5) {
+               if(e.colorVacuna !== "red"){
+                 e.colorVacuna = "yellow";
+                 e.msgVacuna = `💉 ${v.label} faltan ${dRest}d`;
+               }
+             }
+           }
+         }
+       }
+    }
+
+    // 3. Unificar ambos colores (El rojo domina, luego el amarillo, por último el verde)
+    const rank = { red: 3, yellow: 2, green: 1 };
+    if (!e.activo) {
+      e.color = "red";
+    } else {
+      e.color = rank[e.colorFase] > rank[e.colorVacuna] ? e.colorFase : e.colorVacuna;
+    }
+
     return e;
   });
   return{activos:todos.filter(e=>e.activo),todos};
@@ -329,6 +400,16 @@ function calcFechaProgramada(vacunaItem,fechaNacimiento,vacunasAplicadas){
   return"";
 }
 
+function getFilteredVacunas(animal) {
+  const isEngorde = animal.fase.includes("PRECEBO") || animal.fase.includes("LEVANTE") || animal.fase.includes("ENGORDE");
+  return VACUNA_SCHEDULE.filter(v => {
+      if (isEngorde) {
+          return v.key === "CML" || v.key === "DESPARASITACION";
+      }
+      return true;
+  });
+}
+
 /* ─── DATE INPUT ─── */
 function DateInput({value,onChange,placeholder}){
   const formatToDisplay=(date)=>{if(!date||isNaN(date.getTime()))return"";const d=String(date.getDate()).padStart(2,"0"),m=String(date.getMonth()+1).padStart(2,"0"),y=date.getFullYear();return d+"/"+m+"/"+y};
@@ -350,7 +431,7 @@ function DateInput({value,onChange,placeholder}){
 
 function FarmHeader({searchValue,onSearch,onNavigate,activeTab, isOnline, queueCount, syncing, onInstall, showInstall}){
   const[menuOpen,setMenuOpen]=useState(false);
-  const menuItems=[{id:"vacunas",label:"💉 Vacunas"},{id:"reportes",label:"📋 Reportes"},{id:"resumen",label:"📊 Resumen"}];
+  const menuItems=[{id:"vacunas",label:"📅 Actividades"},{id:"reportes",label:"📋 Reportes"},{id:"resumen",label:"📊 Resumen"}];
   return React.createElement("header",{style:{position:"sticky",top:0,zIndex:40,boxShadow:"0 4px 12px rgba(0,0,0,.15)"},className:"gradient-farm"},
     React.createElement("div",{style:{maxWidth:480,margin:"0 auto",padding:"16px 16px 12px"}},
       React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
@@ -596,7 +677,7 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
       setShowDateModal(null);
       setVacunaNotas("");
       setApplyingVacuna(null);
-    }catch(e){alert("Error al registrar vacuna"); setApplyingVacuna(null);}
+    }catch(e){alert("Error al registrar actividad"); setApplyingVacuna(null);}
   };
 
   const handleCompletarEsquema = async (animal, pendingList) => {
@@ -655,6 +736,7 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
         React.createElement("p",null,"🏷️ ",React.createElement("b",null,"Chapeta:")," ",animal.chapeta||"N/A"),
         React.createElement("p",null,"👩‍👦 ",React.createElement("b",null,"Madre:")," ",animal.madre||"N/A"),
         React.createElement("p",null,"🚻 ",React.createElement("b",null,"Sexo:")," ",animal.sexo==="M"?"♂ Macho":animal.sexo==="H"?"♀ Hembra":(animal.sexo||"N/A")),
+        React.createElement("p",null,"🎂 ",React.createElement("b",null,"Fecha Nac.:")," ",animal.fechaNacimiento?dateKeyToLabel(extractDateKey(animal.fechaNacimiento)):"N/A"),
         React.createElement("p",null,"📋 ",React.createElement("b",null,"Fase:")," ",(animal.fase||"").replace(/_/g," ")||"N/A"),
         React.createElement("p",null,"⚖️ ",React.createElement("b",null,"Último Peso:")," ",React.createElement("span",{style:{fontWeight:600,color:"var(--primary)"}},ultimoPeso)),
         isRepro&&animal.subfase&&(()=>{
@@ -672,12 +754,23 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
         React.createElement("span",{style:{fontSize:14,fontWeight:700,color:"var(--success)"}},"🐷 "+animal.piglets+" Lechones Vivos"),
         React.createElement("button",{onClick:()=>onAction(animal.id,"BAJA_LACTANCIA"),style:{...btn,width:"auto",padding:"4px 12px",background:"var(--destructive)",color:"#fff",fontSize:11}},"💀 Baja")
       ),
+
+      /* Alerta amarilla a los 25 días (repetir servicio) */
+      isRepro&&animal.subfase==="SERVIDAS"&&animal.colorFase!=="green"&&React.createElement("div",{style:{marginTop:16,padding:16,background:"rgba(212,160,10,.1)",border:"1px solid var(--warning)",borderRadius:8}},
+        React.createElement("h4",{style:{fontSize:14,fontWeight:700,color:"var(--warning)",marginBottom:8}},"⚠️ Alerta: "+animal.dias+" días post-servicio"),
+        React.createElement("p",{style:{fontSize:12,marginBottom:12,color:"var(--muted-fg)"}},"¿La marrana repitió celo o requiere nuevo servicio?"),
+        React.createElement("div",{style:{display:"flex",gap:8}},
+          React.createElement("button",{onClick:()=>onAction(animal.id,"SERVICIO"),style:{flex:1,padding:"10px",borderRadius:8,background:"var(--warning)",color:"#fff",fontWeight:700,fontSize:13}},"🔄 Sí (Repetir)"),
+          React.createElement("button",{onClick:()=>onAction(animal.id,"CONFIRMAR_GESTACION"),style:{flex:1,padding:"10px",borderRadius:8,background:"var(--success)",color:"#fff",fontWeight:700,fontSize:13}},"✅ No (Confirmar)")
+        )
+      ),
+
       !isInactive&&React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:20}},
         React.createElement("button",{onClick:()=>onAction(animal.id,"OBSERVACION"),style:{...btn,background:"var(--secondary)",color:"var(--secondary-fg)"}},"📝 Nota"),
         React.createElement("button",{onClick:()=>onAction(animal.id,"TRASLADO"),style:{...btn,background:"var(--primary)",color:"var(--primary-fg)"}},"🔄 Mover"),
         isRepro&&(!animal.subfase||animal.subfase==="REEMPLAZO"||animal.subfase==="VACIA"||animal.subfase==="DESCANSO")&&React.createElement("button",{onClick:()=>onAction(animal.id,"SERVICIO"),style:{...btn,gridColumn:"span 2",color:"#fff"},className:"gradient-purple"},"💉 Inseminar"),
-        isRepro&&animal.subfase==="SERVIDAS"&&React.createElement("button",{onClick:()=>onAction(animal.id,"CONFIRMAR_GESTACION"),style:{...btn,gridColumn:"span 2",background:"var(--success)",color:"var(--success-fg)"}},"✅ Confirmar Preñez"),
-        isRepro&&animal.subfase==="SERVIDAS"&&React.createElement("button",{onClick:()=>onAction(animal.id,"RETORNO_VACIA"),style:{...btn,gridColumn:"span 2",background:"rgba(212,160,10,.2)",color:"var(--warning-fg)",border:"1px solid rgba(212,160,10,.4)"}},"⭕ Retorno Vacía"),
+        isRepro&&animal.subfase==="SERVIDAS"&&animal.colorFase==="green"&&React.createElement("button",{onClick:()=>onAction(animal.id,"CONFIRMAR_GESTACION"),style:{...btn,gridColumn:"span 2",background:"var(--success)",color:"var(--success-fg)"}},"✅ Confirmar Preñez"),
+        isRepro&&animal.subfase==="SERVIDAS"&&animal.colorFase==="green"&&React.createElement("button",{onClick:()=>onAction(animal.id,"RETORNO_VACIA"),style:{...btn,gridColumn:"span 2",background:"rgba(212,160,10,.2)",color:"var(--warning-fg)",border:"1px solid rgba(212,160,10,.4)"}},"⭕ Retorno Vacía"),
         showParto&&React.createElement("button",{onClick:()=>onAction(animal.id,"PARTO"),style:{...btn,gridColumn:"span 2",background:"var(--accent)",color:"var(--accent-fg)",padding:"12px 0",fontWeight:700,border:"2px solid var(--accent)"}},"🐷 Registrar Parto"),
         showDestete&&React.createElement("button",{onClick:()=>onAction(animal.id,"DESTETE"),style:{...btn,gridColumn:"span 2",background:"var(--success)",color:"var(--success-fg)"}},"🥣 Registrar Destete"),
         React.createElement("button",{onClick:()=>onAction(animal.id,"ENFERMEDAD"),style:{...btn,background:"rgba(220,38,38,.1)",color:"var(--destructive)",border:"1px solid rgba(220,38,38,.3)"}},"🏥 Enfermedad"),
@@ -704,19 +797,22 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
         sowStats.partoDetails.map((p,i)=>React.createElement("div",{key:i,style:{display:"flex",justifyContent:"space-between",alignItems:"center",background:"var(--muted)",borderRadius:8,padding:"8px 12px",marginBottom:4,fontSize:12,flexWrap:"wrap",gap:4}},React.createElement("span",{style:{color:"var(--muted-fg)"}},"📅 "+p.fecha),React.createElement("div",{style:{display:"flex",gap:8,flexWrap:"wrap"}},React.createElement("span",{style:{color:"var(--success)",fontWeight:600}},"🐷 "+p.vivos+"V"),p.muertos>0&&React.createElement("span",{style:{color:"var(--destructive)",fontWeight:600}},"💀 "+p.muertos+"M"),p.hembras>0&&React.createElement("span",{style:{color:"#ec4899",fontWeight:600}},"♀"+p.hembras),p.machos>0&&React.createElement("span",{style:{color:"#3b82f6",fontWeight:600}},"♂"+p.machos),p.padre&&React.createElement("span",{style:{color:"var(--muted-fg)",fontWeight:600}},"🐗 "+p.padre),p.peso>0&&React.createElement("span",{style:{fontWeight:600}},"⚖️ "+p.peso+"kg")))))
     ),
 
-    /* Vaccine Calendar */
+    /* Vaccine Calendar / Actividades */
     !isInactive&&(()=>{
       const records=historial.filter(h=>h[1]?.toString()===animal.id);
       const vacunasAplicadas=getVacunaRecords(animal.id,historial);
       const ingresoRecord=records.find(r=>r[2]==="INGRESO");
-      const fechaIngreso=ingresoRecord?extractDateKey(ingresoRecord[0]):"";
+      // Si tiene fecha en la columna P, la usamos, si no, tomamos la fecha del registro INGRESO.
+      const fechaNacimiento=animal.fechaNacimiento?extractDateKey(animal.fechaNacimiento):(ingresoRecord?extractDateKey(ingresoRecord[0]):"");
       const hoy=new Date();hoy.setHours(0,0,0,0);
       
-      const vacunasRender = VACUNA_SCHEDULE.map(vac=>{
+      const activeSchedule = getFilteredVacunas(animal);
+
+      const vacunasRender = activeSchedule.map(vac=>{
         const aplicada=vacunasAplicadas[vac.key];
         let fechaProg=null;
-        if(vac.diasDesdeNacimiento&&fechaIngreso){
-          fechaProg=new Date(fechaIngreso+"T12:00:00");fechaProg.setDate(fechaProg.getDate()+vac.diasDesdeNacimiento);
+        if(vac.diasDesdeNacimiento&&fechaNacimiento){
+          fechaProg=new Date(fechaNacimiento+"T12:00:00");fechaProg.setDate(fechaProg.getDate()+vac.diasDesdeNacimiento);
         }else if(vac.diasDesdeVacunaAnterior){
           const prev=vacunasAplicadas[vac.diasDesdeVacunaAnterior.vacuna];
           if(prev){fechaProg=new Date(prev+"T12:00:00");fechaProg.setDate(fechaProg.getDate()+vac.diasDesdeVacunaAnterior.dias)}
@@ -726,7 +822,7 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
 
         const bgColor=aplicada?"rgba(45,138,86,.1)":diasRest!==null&&diasRest<=0?"rgba(220,38,38,.1)":diasRest!==null&&diasRest<=5?"rgba(212,160,10,.1)":"var(--muted)";
         const borderColor=aplicada?"rgba(45,138,86,.3)":diasRest!==null&&diasRest<=0?"rgba(220,38,38,.3)":diasRest!==null&&diasRest<=5?"rgba(212,160,10,.3)":"var(--border)";
-        const statusText=aplicada?"✅ Aplicada "+dateKeyToLabel(aplicada):diasRest!==null&&diasRest<0?"🔥 Vencida hace "+Math.abs(diasRest)+" días":diasRest!==null&&diasRest===0?"🚨 HOY toca aplicar":diasRest!==null&&diasRest<=5?"⚠️ Faltan "+diasRest+" días":fechaProg?"📅 Programada: "+dateKeyToLabel(formatDateStr(fechaProg)):"⏳ Pendiente (requiere vacuna previa)";
+        const statusText=aplicada?"✅ Completada "+dateKeyToLabel(aplicada):diasRest!==null&&diasRest<0?"🔥 Vencida hace "+Math.abs(diasRest)+" días":diasRest!==null&&diasRest===0?"🚨 HOY toca aplicar":diasRest!==null&&diasRest<=5?"⚠️ Faltan "+diasRest+" días":fechaProg?"📅 Programada: "+dateKeyToLabel(formatDateStr(fechaProg)):"⏳ Pendiente de actividad previa";
         const isApplyingThis=applyingVacuna===vac.key;
 
         return {vac, aplicada, bgColor, borderColor, statusText, isApplyingThis};
@@ -735,7 +831,7 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
       const pending = vacunasRender.filter(v => !v.aplicada).map(v => ({vacuna: v.vac.key, label: v.vac.label}));
 
       return React.createElement("div",{style:{background:"var(--card)",borderRadius:12,padding:20,boxShadow:"0 2px 10px rgba(0,0,0,.08)",border:"1px solid var(--border)"}},
-        React.createElement("h4",{style:{fontWeight:700,marginBottom:12}},"💉 Calendario de Vacunas"),
+        React.createElement("h4",{style:{fontWeight:700,marginBottom:12}},"📅 Calendario de Actividades"),
         React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:8}},
           vacunasRender.map(({vac, aplicada, bgColor, borderColor, statusText, isApplyingThis})=>
             React.createElement("div",{key:vac.key,style:{borderRadius:8,padding:12,border:"1px solid "+borderColor,background:bgColor,display:"flex",alignItems:"center",justifyContent:"space-between"}},
@@ -807,10 +903,12 @@ function VacunasView({inventario,historial,onRefresh,onSelectAnimal,search}){
   const animalStatuses=useMemo(()=>{
     return selectas.map(animal=>{
       const ingresoRecord=historial.find(r=>r[1]?.toString()===animal.id&&r[2]==="INGRESO");
-      const fechaNacimiento=ingresoRecord?extractDateKey(ingresoRecord[0]):"";
+      const fechaNacimiento=animal.fechaNacimiento?extractDateKey(animal.fechaNacimiento):(ingresoRecord?extractDateKey(ingresoRecord[0]):"");
       const vacunasAplicadas=getVacunaRecords(animal.id,historial);
 
-      const vacunas=VACUNA_SCHEDULE.map(v=>{
+      const activeSchedule = getFilteredVacunas(animal);
+
+      const vacunas=activeSchedule.map(v=>{
         const aplicada=!!vacunasAplicadas[v.key];
         const fechaAplicacion=vacunasAplicadas[v.key]||"";
         const fechaProgramada=aplicada?"":calcFechaProgramada(v,fechaNacimiento,vacunasAplicadas);
@@ -870,12 +968,13 @@ function VacunasView({inventario,historial,onRefresh,onSelectAnimal,search}){
     setApplying(key);
     try{
       const notaString = vacunaNotas.trim() ? "Tipo: "+vacunaKey+" | "+label+" | "+vacunaNotas : "Tipo: "+vacunaKey+" | "+label;
-      await enviarRegistro({tipo:"REGISTRO",fecha:toAppsScriptDate(formatDateStr(selectedDate)),tatuaje:animalId,accion:"VACUNA",fase:"REPRODUCTIVA",notas:notaString});
+      const animalX = inventario.find(a=>a.id === animalId);
+      await enviarRegistro({tipo:"REGISTRO",fecha:toAppsScriptDate(formatDateStr(selectedDate)),tatuaje:animalId,accion:"VACUNA",fase:animalX?.fase||"REPRODUCTIVA",notas:notaString});
       
       setShowDateModal(null);
       setVacunaNotas("");
       setApplying(null);
-    }catch(e){alert("Error al registrar vacuna"); setApplying(null);}
+    }catch(e){alert("Error al registrar"); setApplying(null);}
   };
 
   const handleCompletarEsquema = async (animal, pendingList) => {
@@ -917,7 +1016,7 @@ function VacunasView({inventario,historial,onRefresh,onSelectAnimal,search}){
       )
     ),
 
-    React.createElement("h2",{style:{fontSize:18,fontWeight:700}},"💉 Control de Vacunas"),
+    React.createElement("h2",{style:{fontSize:18,fontWeight:700}},"📅 Calendario de Actividades"),
 
     /* Summary cards */
     React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8}},
@@ -956,13 +1055,13 @@ function VacunasView({inventario,historial,onRefresh,onSelectAnimal,search}){
             React.createElement("span",{style:{width:12,height:12,borderRadius:"50%",background:colorBg[status.overallColor],flexShrink:0}}),
             React.createElement("div",{style:{flex:1,minWidth:0}},
               React.createElement("p",{style:{fontWeight:700,fontSize:14}},status.animal.id,status.animal.chapeta?" ("+status.animal.chapeta+")":""),
-              status.nextPending?React.createElement("p",{style:{fontSize:11,color:"var(--muted-fg)"}},"Próxima: "+status.nextPending):React.createElement("p",{style:{fontSize:11,color:"var(--success)",fontWeight:600}},"✅ Todas aplicadas")
+              status.nextPending?React.createElement("p",{style:{fontSize:11,color:"var(--muted-fg)"}},"Próxima: "+status.nextPending):React.createElement("p",{style:{fontSize:11,color:"var(--success)",fontWeight:600}},"✅ Todas completadas")
             ),
             React.createElement("div",{style:{display:"flex",gap:4}},status.vacunas.map(v=>React.createElement("span",{key:v.vacuna,style:{width:10,height:10,borderRadius:"50%",background:colorBg[v.color]}}))),
             React.createElement("span",{style:{color:"var(--muted-fg)",fontSize:16}},isExpanded?"▲":"▼")
           ),
           isExpanded&&React.createElement("div",{style:{padding:"0 12px 12px",borderTop:"1px solid var(--border)",paddingTop:8,display:"flex",flexDirection:"column",gap:8}},
-            status.fechaNacimiento?React.createElement("p",{style:{fontSize:12,color:"var(--muted-fg)"}},"📅 Ingreso: "+dateKeyToLabel(status.fechaNacimiento)):React.createElement("p",{style:{fontSize:12,color:"var(--warning)"}},"⚠️ Sin fecha de ingreso"),
+            status.fechaNacimiento?React.createElement("p",{style:{fontSize:12,color:"var(--muted-fg)"}},"🎂 Fecha Nac.: "+dateKeyToLabel(status.fechaNacimiento)):React.createElement("p",{style:{fontSize:12,color:"var(--warning)"}},"⚠️ Sin fecha de Nac/Ingreso"),
             status.vacunas.map(v=>{
               const applyKey=status.animal.id+"-"+v.vacuna;
               const isApplying=applying===applyKey;
@@ -972,9 +1071,9 @@ function VacunasView({inventario,historial,onRefresh,onSelectAnimal,search}){
                 React.createElement("span",{style:{fontSize:16}},v.aplicada?"✅":v.color==="red"?"⚠️":"🕐"),
                 React.createElement("div",{style:{flex:1,minWidth:0}},
                   React.createElement("p",{style:{fontSize:12,fontWeight:600}},v.icon+" "+v.label),
-                  v.aplicada?React.createElement("p",{style:{fontSize:10,color:"var(--success)"}},"✅ Aplicada: "+dateKeyToLabel(v.fechaAplicacion)):
+                  v.aplicada?React.createElement("p",{style:{fontSize:10,color:"var(--success)"}},"✅ Completada: "+dateKeyToLabel(v.fechaAplicacion)):
                   v.fechaProgramada?React.createElement("p",{style:{fontSize:10,color:v.color==="red"?"var(--destructive)":v.color==="yellow"?"var(--warning)":"var(--muted-fg)",fontWeight:v.color==="red"?700:400}},v.diasRestantes<0?"⚠️ Vencida hace "+Math.abs(v.diasRestantes)+" días":v.diasRestantes===0?"⚡ ¡Hoy!":"📅 En "+v.diasRestantes+" días ("+dateKeyToLabel(v.fechaProgramada)+")"):
-                  React.createElement("p",{style:{fontSize:10,color:"var(--muted-fg)"}},"Pendiente de vacuna anterior")
+                  React.createElement("p",{style:{fontSize:10,color:"var(--muted-fg)"}},"Pendiente de actividad anterior")
                 ),
                 !v.aplicada&&React.createElement("button",{onClick:e=>{e.stopPropagation();setVacunaNotas("");setSelectedDate(new Date());setShowDateModal({animalId:status.animal.id,vacunaKey:v.vacuna,label:v.label});},disabled:isApplying,style:{fontSize:10,fontWeight:700,padding:"6px 10px",borderRadius:6,background:"var(--primary)",color:"var(--primary-fg)",opacity:isApplying?.5:1,flexShrink:0}},isApplying?"...":"✅ Aplicar")
               );
@@ -994,37 +1093,84 @@ function VacunasView({inventario,historial,onRefresh,onSelectAnimal,search}){
 
 function ReportsView({historial,search,onSelectAnimal}){
   const[filtro,setFiltro]=useState("TODOS");
-  const[filtroPuesto,setFiltroPuesto]=useState("");const[filtroMadre,setFiltroMadre]=useState("");
-  const[filtroComprador,setFiltroComprador]=useState("");const[filtroFechaDesde,setFiltroFechaDesde]=useState("");const[filtroFechaHasta,setFiltroFechaHasta]=useState("");
-  const{subpuestos,madres,compradores}=useMemo(()=>{const subs=new Set(),mads=new Set(),comps=new Set();historial.forEach(h=>{if(h[12])subs.add(h[12].toString().trim());if(h[7])mads.add(h[7].toString().trim());const n=h[5]||"";const cm=n.match(/Comprador: ([^|]+)/);if(cm){const c=cm[1].trim();if(c&&c!=="N/A")comps.add(c)}});return{subpuestos:[...subs].sort(),madres:[...mads].sort(),compradores:[...comps].sort()}},[historial]);
-  const lista=historial.filter(h=>{const accion=h[2],notas=h[5]||"",id=h[1]?.toString()||"",chapeta=h[10]?.toString()||"",puesto=h[12]?.toString()||"",madre=h[7]?.toString()||"",fechaStr=extractDateKey(h[0]);
-    if(search.trim()){const upper=search.toUpperCase();if(!id.toUpperCase().includes(upper)&&!chapeta.toUpperCase().includes(upper)&&!(notas||"").toUpperCase().includes(upper)&&!(accion||"").toUpperCase().includes(upper)&&!puesto.toUpperCase().includes(upper)&&!madre.toUpperCase().includes(upper))return false}
-    let passAction=true;if(filtro!=="TODOS"){if(filtro==="MUERTE")passAction=accion==="MUERTE"||accion==="BAJA_LACTANCIA"||(accion==="PARTO"&&notas.includes("Muertos:")&&!notas.includes("Muertos: 0"))||(accion==="DESTETE"&&notas.includes("Bajas:")&&!notas.includes("Bajas: 0"));else passAction=accion===filtro}
+  const[filtroPuesto,setFiltroPuesto]=useState("");
+  const[filtroMadre,setFiltroMadre]=useState("");
+  const[filtroComprador,setFiltroComprador]=useState("");
+  const[filtroInseminador,setFiltroInseminador]=useState("");
+  const[filtroFechaDesde,setFiltroFechaDesde]=useState("");
+  const[filtroFechaHasta,setFiltroFechaHasta]=useState("");
+  
+  const{subpuestos,madres,compradores,inseminadores}=useMemo(()=>{
+    const subs=new Set(),mads=new Set(),comps=new Set(),insem=new Set();
+    historial.forEach(h=>{
+      if(h[12])subs.add(h[12].toString().trim());
+      if(h[7])mads.add(h[7].toString().trim());
+      if(h[13])insem.add(h[13].toString().trim());
+      const n=h[5]||"";
+      const cm=n.match(/Comprador: ([^|]+)/);
+      if(cm){const c=cm[1].trim();if(c&&c!=="N/A")comps.add(c)}
+    });
+    return{subpuestos:[...subs].sort(),madres:[...mads].sort(),compradores:[...comps].sort(),inseminadores:[...insem].sort()}
+  },[historial]);
+  
+  const lista=historial.filter(h=>{
+    const accion=h[2],notas=h[5]||"",id=h[1]?.toString()||"",chapeta=h[10]?.toString()||"",puesto=h[12]?.toString()||"",madre=h[7]?.toString()||"",fechaStr=extractDateKey(h[0]);
+    if(search.trim()){
+      const upper=search.toUpperCase();
+      if(!id.toUpperCase().includes(upper)&&!chapeta.toUpperCase().includes(upper)&&!(notas||"").toUpperCase().includes(upper)&&!(accion||"").toUpperCase().includes(upper)&&!puesto.toUpperCase().includes(upper)&&!madre.toUpperCase().includes(upper))return false;
+    }
+    
+    let passAction=true;
+    if(filtro!=="TODOS"){
+      if(filtro==="MUERTE"){
+        passAction = (accion==="MUERTE" || accion==="BAJA_LACTANCIA");
+      }else{
+        passAction = (accion===filtro);
+      }
+    }
+    
     if(filtroPuesto&&(h[12]||"").toString().trim().toUpperCase()!==filtroPuesto.toUpperCase())return false;
     if(filtroMadre&&(h[7]||"").toString().trim().toUpperCase()!==filtroMadre.toUpperCase())return false;
-    if(filtroComprador){const cm=notas.match(/Comprador: ([^|]+)/);const c=cm?cm[1].trim():"";if(c.toUpperCase()!==filtroComprador.toUpperCase())return false}
-    if(fechaStr){if(filtroFechaDesde&&fechaStr<filtroFechaDesde)return false;if(filtroFechaHasta&&fechaStr>filtroFechaHasta)return false}
+    if(filtroInseminador&&(h[13]||"").toString().trim().toUpperCase()!==filtroInseminador.toUpperCase())return false;
+    
+    if(filtroComprador){
+      const cm=notas.match(/Comprador: ([^|]+)/);
+      const c=cm?cm[1].trim():"";
+      if(c.toUpperCase()!==filtroComprador.toUpperCase())return false;
+    }
+    if(fechaStr){
+      if(filtroFechaDesde&&fechaStr<filtroFechaDesde)return false;
+      if(filtroFechaHasta&&fechaStr>filtroFechaHasta)return false;
+    }
     return passAction;
   });
+  
   const reversed=[...lista].reverse();
   const ventaTotals=useMemo(()=>{if(filtro!=="VENTA")return null;return{count:reversed.filter(h=>h[2]==="VENTA").length}},[filtro,reversed]);
-  const hasAF=filtroPuesto||filtroMadre||filtroComprador||filtroFechaDesde||filtroFechaHasta;
-  const clearFilters=()=>{setFiltroPuesto("");setFiltroMadre("");setFiltroComprador("");setFiltroFechaDesde("");setFiltroFechaHasta("")};
+  const hasAF=filtroPuesto||filtroMadre||filtroComprador||filtroInseminador||filtroFechaDesde||filtroFechaHasta;
+  const clearFilters=()=>{setFiltroPuesto("");setFiltroMadre("");setFiltroComprador("");setFiltroInseminador("");setFiltroFechaDesde("");setFiltroFechaHasta("")};
   const inputS={width:"100%",padding:"8px",borderRadius:8,border:"1px solid var(--input)",background:"var(--bg)",color:"var(--fg)",fontSize:12};
 
   return React.createElement("div",{className:"animate-fade-in",style:{background:"var(--card)",borderRadius:12,padding:20,boxShadow:"0 2px 10px rgba(0,0,0,.08)",border:"1px solid var(--border)"}},
     React.createElement("h3",{style:{fontSize:18,fontWeight:700,marginBottom:12}},"📋 Historial de Eventos"),
     React.createElement("select",{value:filtro,onChange:e=>setFiltro(e.target.value),style:{...inputS,marginBottom:8,fontSize:14}},
       [{v:"TODOS",l:"Ver Todos"},{v:"VENTA",l:"💰 Ventas"},{v:"MUERTE",l:"🔴 Muertes"},{v:"PARTO",l:"🐷 Partos"},{v:"DESTETE",l:"🥣 Destetes"},{v:"SERVICIO",l:"💉 Servicios"}].map(o=>React.createElement("option",{key:o.v,value:o.v},o.l))),
+    
     React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}},
       React.createElement("div",null,React.createElement("label",{style:{fontSize:10,fontWeight:600,color:"var(--muted-fg)",textTransform:"uppercase"}},"📅 Desde"),React.createElement("input",{type:"date",value:filtroFechaDesde,onChange:e=>setFiltroFechaDesde(e.target.value),style:inputS})),
       React.createElement("div",null,React.createElement("label",{style:{fontSize:10,fontWeight:600,color:"var(--muted-fg)",textTransform:"uppercase"}},"📅 Hasta"),React.createElement("input",{type:"date",value:filtroFechaHasta,onChange:e=>setFiltroFechaHasta(e.target.value),style:inputS}))
     ),
+    
     React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}},
       React.createElement("div",null,React.createElement("label",{style:{fontSize:10,fontWeight:600,color:"var(--muted-fg)",textTransform:"uppercase"}},"📍 Puesto"),React.createElement("select",{value:filtroPuesto,onChange:e=>setFiltroPuesto(e.target.value),style:inputS},React.createElement("option",{value:""},"Todos"),subpuestos.map(s=>React.createElement("option",{key:s,value:s},s)))),
-      React.createElement("div",null,React.createElement("label",{style:{fontSize:10,fontWeight:600,color:"var(--muted-fg)",textTransform:"uppercase"}},"👩‍👦 Madre"),React.createElement("select",{value:filterMadre,onChange:e=>setFilterMadre(e.target.value),style:inputS},React.createElement("option",{value:""},"Todas"),madres.map(m=>React.createElement("option",{key:m,value:m},m))))
+      React.createElement("div",null,React.createElement("label",{style:{fontSize:10,fontWeight:600,color:"var(--muted-fg)",textTransform:"uppercase"}},"👩‍👦 Madre"),React.createElement("select",{value:filtroMadre,onChange:e=>setFiltroMadre(e.target.value),style:inputS},React.createElement("option",{value:""},"Todas"),madres.map(m=>React.createElement("option",{key:m,value:m},m))))
     ),
-    compradores.length>0&&React.createElement("div",{style:{marginBottom:8}},React.createElement("label",{style:{fontSize:10,fontWeight:600,color:"var(--muted-fg)",textTransform:"uppercase"}},"🤝 Comprador"),React.createElement("select",{value:filtroComprador,onChange:e=>setFiltroComprador(e.target.value),style:inputS},React.createElement("option",{value:""},"Todos"),compradores.map(c=>React.createElement("option",{key:c,value:c},c)))),
+    
+    (compradores.length>0||inseminadores.length>0)&&React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}},
+      compradores.length>0&&React.createElement("div",null,React.createElement("label",{style:{fontSize:10,fontWeight:600,color:"var(--muted-fg)",textTransform:"uppercase"}},"🤝 Comprador"),React.createElement("select",{value:filtroComprador,onChange:e=>setFiltroComprador(e.target.value),style:inputS},React.createElement("option",{value:""},"Todos"),compradores.map(c=>React.createElement("option",{key:c,value:c},c)))),
+      inseminadores.length>0&&React.createElement("div",null,React.createElement("label",{style:{fontSize:10,fontWeight:600,color:"var(--muted-fg)",textTransform:"uppercase"}},"💉 Inseminador"),React.createElement("select",{value:filtroInseminador,onChange:e=>setFiltroInseminador(e.target.value),style:inputS},React.createElement("option",{value:""},"Todos"),inseminadores.map(i=>React.createElement("option",{key:i,value:i},i))))
+    ),
+    
     hasAF&&React.createElement("button",{onClick:clearFilters,style:{fontSize:12,color:"var(--primary)",fontWeight:600,marginBottom:12}},"✕ Limpiar filtros"),
     ventaTotals&&React.createElement("div",{style:{marginBottom:12,padding:12,borderRadius:8,background:"rgba(45,138,86,.1)",border:"1px solid rgba(45,138,86,.2)"}},React.createElement("p",{style:{fontSize:14,fontWeight:700,color:"var(--success)"}},"💰 Total ventas: "+ventaTotals.count)),
     React.createElement("p",{style:{fontSize:12,color:"var(--muted-fg)",marginBottom:12}},reversed.length+" registros"),
@@ -1033,6 +1179,7 @@ function ReportsView({historial,search,onSelectAnimal}){
       reversed.map((h,i)=>{
         const accion=h[2]||"";const config=ACCION_CONFIG[accion]||ACCION_CONFIG.OBSERVACION;const notas=h[5]||"";const fecha=dateKeyToLabel(extractDateKey(h[0]));
         const compradorV=accion==="VENTA"&&notas.includes("Comprador:")?(notas.match(/Comprador: ([^|]+)/)||[])[1]?.trim()||"":"";
+        const inseminadorName=h[13]?.toString().trim()||"";
         return React.createElement("div",{key:i,style:{display:"flex",gap:12,cursor:"pointer",position:"relative"},onClick:()=>onSelectAnimal&&onSelectAnimal(h[1]?.toString())},
           i<reversed.length-1&&React.createElement("div",{style:{position:"absolute",left:19,top:40,bottom:-16,width:2,background:"var(--border)"}}),
           React.createElement("div",{style:{width:40,height:40,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0,boxShadow:"0 1px 3px rgba(0,0,0,.1)",zIndex:1,color:"#fff",background:accion==="VENTA"?"var(--success)":accion==="MUERTE"||accion==="BAJA_LACTANCIA"?"var(--destructive)":accion==="PARTO"?"var(--accent)":"var(--primary)"}},config.icon),
@@ -1045,6 +1192,7 @@ function ReportsView({historial,search,onSelectAnimal}){
             h[12]&&React.createElement("p",{style:{fontSize:10,color:"var(--muted-fg)"}},"📍 "+h[12]),
             h[7]&&React.createElement("p",{style:{fontSize:10,color:"var(--muted-fg)"}},"👩‍👦 "+h[7]),
             compradorV&&compradorV!=="N/A"&&React.createElement("p",{style:{fontSize:12,fontWeight:600,color:"var(--primary)",marginTop:2}},"🤝 "+compradorV),
+            inseminadorName&&React.createElement("p",{style:{fontSize:12,fontWeight:600,color:"#7c3aed",marginTop:2}},"👨‍⚕️ "+inseminadorName),
             React.createElement("p",{style:{fontSize:12,color:"var(--muted-fg)",marginTop:4}},notas)
           )
         );
@@ -1128,7 +1276,7 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
   const[tatuaje,setTatuaje]=useState(prefillId||"");
   const[chapeta,setChapeta]=useState(prefillAnimal?.chapeta||"");
   const[peso,setPeso]=useState("");
-  const[sexo,setSexo]=useState(prefillAnimal?.sexo||"H"); // <-- NUEVO ESTADO PARA SEXO
+  const[sexo,setSexo]=useState(prefillAnimal?.sexo||"H"); 
   const[fase,setFase]=useState(prefillAnimal?.fase||allFases[0]);
   const[subpuesto,setSubpuesto]=useState(prefillAnimal?.subpuesto||"");
   const[notas,setNotas]=useState("");
@@ -1147,23 +1295,28 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
   const[semanaNac,setSemanaNac]=useState("");
   const[saving,setSaving]=useState(false);
   const[fechaEvento,setFechaEvento]=useState(prefillAccion==="INGRESO"?undefined:new Date());
+  const[fechaNac,setFechaNac]=useState(undefined); // Para Ingresos (Columna P)
   const[nuevaSubfase,setNuevaSubfase]=useState(prefillAnimal?.subfase||"REEMPLAZO");
   const inputS={width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid var(--input)",background:"var(--bg)",color:"var(--fg)",fontSize:14,outline:"none"};
   const labelS={display:"block",fontSize:14,fontWeight:600,marginTop:16,marginBottom:4};
 
   const handleAccionChange=val=>{setAccion(val);
-    if(val==="SERVICIO")setFase("SALA_SERVICIO");if(val==="PARTO"||val==="CONFIRMAR_GESTACION"||val==="RETORNO_VACIA"||val==="CAMBIAR_SUBFASE"||val==="BAJA_LACTANCIA")setFase("REPRODUCTIVA");
+    if(val==="SERVICIO"||val==="PARTO"||val==="CONFIRMAR_GESTACION"||val==="RETORNO_VACIA"||val==="CAMBIAR_SUBFASE"||val==="BAJA_LACTANCIA")setFase("REPRODUCTIVA");
     if(val==="DESTETE"){setFase("DESCANSO");setDestLechones("PRECEBO");const a=inventario.find(a=>a.id===tatuaje);if(a){setDestetados(String(a.piglets));setLechones(Array.from({length:a.piglets},(_,i)=>({tat:tatuaje+"-"+(i+1),chap:"",peso:"",sexo:"H",ok:true})))}}
   };
 
   const handleSubmit=async()=>{
     if(!tatuaje.trim()){alert("El campo Tatuaje (ID) es obligatorio");return}
-    if(!fechaEvento){alert("Debes seleccionar la fecha");return}
+    if(!fechaEvento){alert("Debes seleccionar la fecha del evento");return}
     const animal=inventario.find(a=>a.id===tatuaje);
     if(accion==="TRASLADO"&&animal&&animal.piglets>0){alert("No puedes mover: tiene lechones. Usa DESTETE.");return}
     setSaving(true);
     try{
       let finalNotas=notas;const fechaStr=formatDateStr(fechaEvento);
+
+      if(accion==="INGRESO"&&fase==="REPRODUCTIVA"){
+          finalNotas = "Subfase: " + nuevaSubfase + (notas ? " | " + notas : "");
+      }
 
       if(accion==="VACUNA"){
         const vacunaKeys=VACUNA_SCHEDULE.map(v=>v.key);
@@ -1195,7 +1348,9 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
       
       if(accion==="SERVICIO" && dosis) finalNotas = "Dosis: " + dosis + (notas ? " | " + notas : "");
 
-      const res = await enviarRegistro({tatuaje,chapeta,peso,sexo,accion,fase,subpuesto,notas:finalNotas,inseminador,fecha:toAppsScriptDate(fechaStr)});
+      const finalFechaNac = fechaNac ? toAppsScriptDate(formatDateStr(fechaNac)) : "";
+      const payload = {tatuaje,chapeta,peso,sexo,accion,fase,subpuesto,notas:finalNotas,inseminador,fecha:toAppsScriptDate(fechaStr), fechaNacimiento: finalFechaNac};
+      await enviarRegistro(payload);
       
       setSaving(false);onSuccess();
     }catch(err){alert("Error al guardar: "+(err.message||"Intenta de nuevo."));setSaving(false)}
@@ -1217,6 +1372,12 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
     ),
     React.createElement("label",{style:labelS},"📅 Fecha del evento *"),
     React.createElement(DateInput,{value:fechaEvento,onChange:d=>setFechaEvento(d)}),
+    
+    accion==="INGRESO"&&React.createElement(React.Fragment,null,
+      React.createElement("label",{style:labelS},"📅 Fecha de Nacimiento (Opcional)"),
+      React.createElement(DateInput,{value:fechaNac,onChange:d=>setFechaNac(d),placeholder:"dd/mm/aaaa (Columna P)"})
+    ),
+
     React.createElement("label",{style:labelS},"Tatuaje (ID)"),
     React.createElement("input",{value:tatuaje,onChange:e=>setTatuaje(e.target.value),placeholder:"ID del animal",style:inputS}),
     React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}},
@@ -1224,7 +1385,6 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
       React.createElement("div",null,React.createElement("label",{style:labelS},"Peso (kg)"),React.createElement("input",{type:"number",value:peso,onChange:e=>setPeso(e.target.value),placeholder:"0.0",style:inputS}))
     ),
 
-    /* NUEVO: Campo de sexo solo visible en Ingresos */
     accion==="INGRESO"&&React.createElement(React.Fragment,null,
       React.createElement("label",{style:labelS},"Sexo"),
       React.createElement("select",{value:sexo,onChange:e=>setSexo(e.target.value),style:inputS},
@@ -1235,7 +1395,16 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
 
     accion!=="BAJA_LACTANCIA"&&React.createElement(React.Fragment,null,
       React.createElement("label",{style:labelS},"Ubicación / Fase"),
-      React.createElement("select",{value:fase,onChange:e=>setFase(e.target.value),style:inputS},allFases.map(f=>React.createElement("option",{key:f,value:f},f))),
+      React.createElement("select",{value:fase,onChange:e=>{
+          setFase(e.target.value);
+          if(e.target.value!=="REPRODUCTIVA") setNuevaSubfase("REEMPLAZO");
+        },style:inputS},allFases.map(f=>React.createElement("option",{key:f,value:f},f))),
+      
+      accion==="INGRESO"&&fase==="REPRODUCTIVA"&&React.createElement(React.Fragment,null,
+        React.createElement("label",{style:labelS},"Subfase Inicial"),
+        React.createElement("select",{value:nuevaSubfase,onChange:e=>setNuevaSubfase(e.target.value),style:inputS},SUBFASES_REPRODUCTIVA.map(sf=>React.createElement("option",{key:sf.key,value:sf.key},sf.icon+" "+sf.label)))
+      ),
+
       React.createElement("label",{style:labelS},"Sub-Puesto"),
       React.createElement("input",{value:subpuesto,onChange:e=>setSubpuesto(e.target.value),placeholder:"Jaula/Corral",style:inputS})
     ),
@@ -1409,10 +1578,11 @@ function App(){
           "",                                  // 8
           "",                                  // 9
           d.chapeta || "",                     // 10
-          d.peso || "",                        // 11 (Peso L)
+          d.peso || "",                        // 11 (Peso)
           d.subpuesto || "",                   // 12
-          "",                                  // 13
-          d.sexo || ""                         // 14 (Sexo O)
+          d.inseminador || "",                 // 13 (Inseminador NUEVO)
+          d.sexo || "",                        // 14 (Sexo)
+          d.fechaNacimiento || ""              // 15 (Fecha Nacimiento)
         ]];
         const result = procesarInventario(next);
         setInventario(result.activos);
@@ -1441,7 +1611,8 @@ function App(){
              a.peso || "",
              comun.subpuesto || "",
              "",
-             a.sexo || ""
+             a.sexo || "",
+             a.fechaNacimiento || ""
            ]);
         });
         const result = procesarInventario(next);
