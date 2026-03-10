@@ -53,16 +53,24 @@ const {useState,useEffect,useCallback,useMemo}=React;
 
 /* ─── CONSTANTS ─── */
 const FASES_DEFAULT=["SALA_SERVICIO","GESTACION","REPRODUCTIVA","PRECEBO","LEVANTE","ENGORDE","DESCANSO"];
+
 const SUBFASES_REPRODUCTIVA=[
-  {key:"REEMPLAZO",label:"Reemplazo",icon:"🔄"},
-  {key:"SERVIDAS",label:"Servidas",icon:"💉"},
-  {key:"GESTACION",label:"Gestación",icon:"🤰"},
-  {key:"VACIA",label:"Vacía",icon:"⭕"},
-  {key:"MATERNIDAD",label:"Maternidad",icon:"🏥"},
-  {key:"LACTANCIA",label:"Lactancia",icon:"🍼"},
-  {key:"DESTETE",label:"Destete",icon:"🥣"},
-  {key:"DESCANSO",label:"Descanso",icon:"😴"},
+  /* --- GESTACIÓN --- */
+  {key:"GEST_GESTANTE",label:"Gestación - Gestante",icon:"🤰"},
+  {key:"GEST_SERVIDAS",label:"Gestación - Servidas",icon:"💉"},
+  {key:"GEST_VACIA",label:"Gestación - Vacía",icon:"⭕"},
+  {key:"GEST_DESCANSO",label:"Gestación - Descanso",icon:"😴"},
+  {key:"GEST_DESCARTE",label:"Gestación - Descarte",icon:"🗑️"},
+  /* --- MATERNIDAD --- */
+  {key:"MAT_PROXIMA",label:"Maternidad - Próxima",icon:"⏳"},
+  {key:"MAT_LACTANTES",label:"Maternidad - Lactantes",icon:"🍼"},
+  {key:"MAT_DESTETADAS",label:"Maternidad - Destetadas",icon:"🥣"},
+  /* --- REEMPLAZO --- */
+  {key:"REEMP_VACIA",label:"Reemplazo - Vacía",icon:"⭕"},
+  {key:"REEMP_SERVIDAS",label:"Reemplazo - Servidas",icon:"💉"},
+  {key:"REEMP_GESTANTE",label:"Reemplazo - Gestante",icon:"🤰"}
 ];
+
 const VACUNA_SCHEDULE=[
   {key:"PRIMERA_TRIPLE",label:"1ra Dosis Vacuna Triple",icon:"💉",diasDesdeNacimiento:145},
   {key:"CML",label:"CML",icon:"🧪",diasDesdeVacunaAnterior:{vacuna:"PRIMERA_TRIPLE",dias:15}},
@@ -170,7 +178,11 @@ async function syncQueue() {
 function calcularDias(f){if(!f)return 0;return Math.floor((Date.now()-new Date(f).getTime())/864e5)}
 
 function obtenerColorSubfase(dias,subfase){
-  const rules={REEMPLAZO:[90,60],SERVIDAS:[30,25],GESTACION:[114,110],VACIA:[10,5],MATERNIDAD:[28,21],LACTANCIA:[28,21],DESTETE:[5,3],DESCANSO:[7,5]};
+  const rules={
+    REEMP_VACIA:[10,5], REEMP_SERVIDAS:[30,25], REEMP_GESTANTE:[114,110],
+    GEST_VACIA:[10,5], GEST_SERVIDAS:[30,25], GEST_GESTANTE:[114,110], GEST_DESCANSO:[7,5], GEST_DESCARTE:[999,999],
+    MAT_PROXIMA:[5,3], MAT_LACTANTES:[28,21], MAT_DESTETADAS:[5,3]
+  };
   const r=rules[subfase];
   if(r){if(dias>r[0])return"red";if(dias>r[1])return"yellow";}
   return"green";
@@ -192,17 +204,8 @@ function obtenerMensajeAlerta(animal){
 
   if (animal.colorFase === "red" || animal.colorFase === "yellow") {
     if(animal.fase==="REPRODUCTIVA"){
-      switch(animal.subfase){
-        case "REEMPLAZO": alertas.push(`En reemplazo ${d}d`); break;
-        case "SERVIDAS": alertas.push(`Servida ${d}d (confirmar)`); break;
-        case "GESTACION": alertas.push(`Gestando ${d}d`); break;
-        case "VACIA": alertas.push(`Vacía ${d}d`); break;
-        case "MATERNIDAD":
-        case "LACTANCIA": alertas.push(`Lactando ${d}d (destetar)`); break;
-        case "DESTETE": alertas.push(`Destete ${d}d`); break;
-        case "DESCANSO": alertas.push(`Descanso ${d}d`); break;
-        default: alertas.push(`Excedió límite de fase (${d}d)`);
-      }
+      const sfInfo = SUBFASES_REPRODUCTIVA.find(s=>s.key===animal.subfase);
+      alertas.push(`${sfInfo ? sfInfo.label : animal.subfase} (${d}d)`);
     }else{
       if(animal.fase.includes("PRECEBO")) alertas.push(`Cumplió Precebo`);
       if(animal.fase.includes("LEVANTE")) alertas.push(`Cumplió Levante`);
@@ -230,16 +233,22 @@ function calcularSubfase(id,regs){
     if(acc==="CAMBIAR_SUBFASE"){lCamb=i;const m=(r[5]||"").match(/Subfase:\s*(\w+)/);if(m)cambSf=m[1]}
   });
   const maxIdx=Math.max(lServ,lParto,lDest,lConf,lRet,lCamb);
+  
   if(lCamb===maxIdx&&cambSf)return{subfase:cambSf,fechaSubfase:records[lCamb]?.[0]?.toString()||""};
+  
   const lastRec=maxIdx>=0?records[maxIdx]:records[records.length-1];
   const fecha=lastRec?lastRec[0]?.toString()||"":"";
-  if(lDest>lParto&&lDest>lServ)return{subfase:"DESCANSO",fechaSubfase:records[lDest]?.[0]?.toString()||fecha};
-  if(lRet>lServ&&lRet>lParto)return{subfase:"VACIA",fechaSubfase:records[lRet]?.[0]?.toString()||fecha};
-  if(lConf>lServ&&lConf>lParto)return{subfase:"GESTACION",fechaSubfase:records[lConf]?.[0]?.toString()||fecha};
-  if(lServ>lParto&&lServ>lDest)return{subfase:"SERVIDAS",fechaSubfase:records[lServ]?.[0]?.toString()||fecha};
-  if(lParto>lServ)return{subfase:"LACTANCIA",fechaSubfase:records[lParto]?.[0]?.toString()||fecha};
-  if(tPartos===0&&tServ===0)return{subfase:subfaseIngreso||"REEMPLAZO",fechaSubfase:fecha};
-  return{subfase:"VACIA",fechaSubfase:fecha};
+
+  const isReemplazo = (tPartos === 0);
+
+  if(lDest>lParto&&lDest>lServ)return{subfase:"MAT_DESTETADAS",fechaSubfase:records[lDest]?.[0]?.toString()||fecha};
+  if(lRet>lServ&&lRet>lParto)return{subfase:isReemplazo?"REEMP_VACIA":"GEST_VACIA",fechaSubfase:records[lRet]?.[0]?.toString()||fecha};
+  if(lConf>lServ&&lConf>lParto)return{subfase:isReemplazo?"REEMP_GESTANTE":"GEST_GESTANTE",fechaSubfase:records[lConf]?.[0]?.toString()||fecha};
+  if(lServ>lParto&&lServ>lDest)return{subfase:isReemplazo?"REEMP_SERVIDAS":"GEST_SERVIDAS",fechaSubfase:records[lServ]?.[0]?.toString()||fecha};
+  if(lParto>lServ)return{subfase:"MAT_LACTANTES",fechaSubfase:records[lParto]?.[0]?.toString()||fecha};
+  
+  if(tPartos===0&&tServ===0)return{subfase:subfaseIngreso||"REEMP_VACIA",fechaSubfase:fecha};
+  return{subfase:"GEST_VACIA",fechaSubfase:fecha};
 }
 
 function procesarInventario(regs){
@@ -273,7 +282,7 @@ function procesarInventario(regs){
     if(e.activo&&e.fase==="REPRODUCTIVA"){
       const{subfase,fechaSubfase}=calcularSubfase(e.id,regs);
       if(e.piglets>0){
-        e.subfase="LACTANCIA";
+        e.subfase="MAT_LACTANTES";
         const partoRecs=regs.filter(r=>r[1]?.toString()===e.id&&r[2]==="PARTO");
         const lastP=partoRecs[partoRecs.length-1];
         e.fechaFase=lastP?lastP[0]?.toString()||fechaSubfase:fechaSubfase;
@@ -439,7 +448,7 @@ function FarmHeader({searchValue,onSearch,onNavigate,activeTab, isOnline, queueC
     {id:"vacunas",label:"📅 Actividades"},
     {id:"reportes",label:"📋 Reportes"},
     {id:"resumen",label:"📊 Resumen"},
-    {id:"logout",label:"🚪 Cerrar Sesión"} // NUEVO BOTÓN
+    {id:"logout",label:"🚪 Cerrar Sesión"} 
   ];
   return React.createElement("header",{style:{position:"sticky",top:0,zIndex:40,boxShadow:"0 4px 12px rgba(0,0,0,.15)"},className:"gradient-farm"},
     React.createElement("div",{style:{maxWidth:480,margin:"0 auto",padding:"16px 16px 12px"}},
@@ -520,12 +529,11 @@ function SubpuestoCards({phase,animals,onSelect,onSelectAll,onBack,onSubfaseClic
       if(a.color==="yellow")map[k].warnings++;
     });
     return Object.entries(map).sort((a,b)=>a[0].localeCompare(b[0], undefined, {numeric: true}));
-  },
-  [animals]);
+  },[animals]);
 
   const subfaseGroups=useMemo(()=>{
     if(phase!=="REPRODUCTIVA")return[];
-    const map={};animals.forEach(a=>{const k=a.subfase||"REEMPLAZO";if(!map[k])map[k]={count:0,alerts:0,warnings:0};map[k].count++;if(a.color==="red")map[k].alerts++;if(a.color==="yellow")map[k].warnings++});
+    const map={};animals.forEach(a=>{const k=a.subfase||"REEMP_VACIA";if(!map[k])map[k]={count:0,alerts:0,warnings:0};map[k].count++;if(a.color==="red")map[k].alerts++;if(a.color==="yellow")map[k].warnings++});
     return SUBFASES_REPRODUCTIVA.map(sf=>({...sf,count:(map[sf.key]||{count:0}).count,alerts:(map[sf.key]||{alerts:0}).alerts,warnings:(map[sf.key]||{warnings:0}).warnings})).filter(sf=>sf.count>0);
   },[animals,phase]);
 
@@ -583,15 +591,14 @@ function AnimalList({title,animals,onSelect,onBack}){
   const [showMoveModal, setShowMoveModal] = useState(false);
   const [targetFase, setTargetFase] = useState(""); 
   const [targetSubpuesto, setTargetSubpuesto] = useState("");
-  const [targetDate, setTargetDate] = useState(new Date()); // NUEVO: Estado para la fecha
+  const [targetDate, setTargetDate] = useState(new Date()); 
   const [isMoving, setIsMoving] = useState(false);
 
-  // Función para abrir el modal pre-cargando la fase actual y fecha de hoy
   const handleOpenModal = () => {
     const activeAnimals = animals.filter(a => a.activo);
     if(activeAnimals.length === 0) return;
     setTargetFase(activeAnimals[0].fase || "LEVANTE"); 
-    setTargetDate(new Date()); // Resetea a la fecha actual al abrir
+    setTargetDate(new Date()); 
     setShowMoveModal(true);
   };
 
@@ -601,13 +608,11 @@ function AnimalList({title,animals,onSelect,onBack}){
     if (!targetFase) { alert("Selecciona la fase de destino"); return; }
     if (!targetSubpuesto.trim()) { alert("Ingresa el nuevo puesto"); return; }
     
-    // Mostramos la confirmación incluyendo la fecha
     const fechaAviso = formatDateStr(targetDate);
     if (!window.confirm(`¿Seguro que deseas mover ${activeAnimals.length} animales a la fase ${targetFase} - Puesto ${targetSubpuesto.toUpperCase()} con fecha ${fechaAviso}?`)) return;
     
     setIsMoving(true);
     try {
-      // Usamos la fecha seleccionada en lugar de la fecha actual
       const fechaStr = toAppsScriptDate(formatDateStr(targetDate)); 
       
       const payload = {
@@ -623,35 +628,30 @@ function AnimalList({title,animals,onSelect,onBack}){
       await enviarBatch(payload);
       setShowMoveModal(false);
       setTargetSubpuesto("");
-      if(onBack) onBack(); // Regresa a la vista anterior tras moverlos
+      if(onBack) onBack(); 
     } catch (e) {
       alert("Error al intentar mover los animales.");
     }
     setIsMoving(false);
   };
-  // ----------------------------------------------------
 
   return React.createElement("div",{className:"animate-fade-in"},
     
-    /* MODAL DE TRASLADO MASIVO */
     showMoveModal && React.createElement("div",{style:{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.5)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:20}},
       React.createElement("div",{style:{background:"var(--card)",padding:20,borderRadius:12,width:"100%",maxWidth:320,boxShadow:"0 4px 20px rgba(0,0,0,.15)"}},
         React.createElement("h3",{style:{fontSize:16,marginBottom:8,fontWeight:700}},"🔄 Traslado Masivo"),
         React.createElement("p",{style:{fontSize:12,marginBottom:16,color:"var(--muted-fg)"}},"Se moverán "+counts.act+" animales a una nueva ubicación."),
         
-        // INPUT DE FECHA
         React.createElement("label",{style:{display:"block",fontSize:12,fontWeight:700,marginBottom:6,color:"var(--muted-fg)"}},"📅 Fecha del traslado"),
         React.createElement("div", {style:{marginBottom:12}},
             React.createElement(DateInput,{value:targetDate,onChange:d=>setTargetDate(d)})
         ),
 
-        // SELECTOR DE FASE (SITIO)
         React.createElement("label",{style:{display:"block",fontSize:12,fontWeight:700,marginBottom:6,color:"var(--muted-fg)"}},"Nueva Fase (Sitio)"),
         React.createElement("select",{value:targetFase,onChange:e=>setTargetFase(e.target.value),style:{width:"100%",padding:"10px",borderRadius:8,border:"1px solid var(--input)",background:"var(--bg)",color:"var(--fg)",marginBottom:12,fontSize:14,outline:"none",fontFamily:"inherit"}},
           FASES_DEFAULT.map(f => React.createElement("option",{key:f,value:f},f))
         ),
 
-        // INPUT DE PUESTO (CORRAL)
         React.createElement("label",{style:{display:"block",fontSize:12,fontWeight:700,marginBottom:6,color:"var(--muted-fg)"}},"Nuevo Puesto / Corral"),
         React.createElement("input",{value:targetSubpuesto,onChange:e=>setTargetSubpuesto(e.target.value),placeholder:"Ej. P20",style:{width:"100%",padding:"10px",borderRadius:8,border:"1px solid var(--input)",background:"var(--bg)",color:"var(--fg)",marginBottom:16,fontSize:14,outline:"none",fontFamily:"inherit"}}),
         
@@ -673,7 +673,6 @@ function AnimalList({title,animals,onSelect,onBack}){
       counts.vend>0&&React.createElement("span",{style:{fontSize:11,fontWeight:700,color:"#d97706",background:"rgba(217,119,6,.1)",padding:"4px 8px",borderRadius:6,border:"1px solid rgba(217,119,6,.2)"}},"💰 Vendidas: "+counts.vend),
       counts.muer>0&&React.createElement("span",{style:{fontSize:11,fontWeight:700,color:"var(--destructive)",background:"rgba(220,38,38,.1)",padding:"4px 8px",borderRadius:6,border:"1px solid rgba(220,38,38,.2)"}},"🔴 Muertas: "+counts.muer),
       
-      /* BOTÓN DE TRASLADO MASIVO */
       counts.act>0&&React.createElement("button",{onClick:handleOpenModal,style:{fontSize:11,fontWeight:700,color:"#fff",background:"var(--primary)",padding:"6px 12px",borderRadius:6,border:"none",cursor:"pointer",marginLeft:"auto",boxShadow:"0 2px 4px rgba(0,0,0,0.1)"}},"🔄 Mover Todos")
     ),
 
@@ -738,8 +737,10 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
   const isSow=sowStats.partos>0||sowStats.servicios>0||["SALA_SERVICIO","GESTACION","REPRODUCTIVA","DESCANSO"].includes(animal.fase);
   const isInactive=!animal.activo;
   const isRepro=animal.fase==="REPRODUCTIVA";
-  const showParto=!isInactive&&isRepro&&animal.subfase==="GESTACION"&&animal.piglets===0;
+  const subf=animal.subfase||"";
+  const showParto=!isInactive&&isRepro&&subf.includes("GESTANTE")&&animal.piglets===0;
   const showDestete=!isInactive&&animal.piglets>0;
+  
   const scoreColor=sowStats.score>=70?"var(--success)":sowStats.score>=40?"var(--warning)":"var(--destructive)";
   const scoreLabel=sowStats.score>=70?"Excelente":sowStats.score>=40?"Regular":"Bajo rendimiento";
   const btn={cursor:"pointer",borderRadius:8,fontWeight:600,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"10px 0",width:"100%",border:"none"};
@@ -853,7 +854,7 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
       ),
 
       /* Alerta amarilla a los 25 días (repetir servicio) */
-      isRepro&&animal.subfase==="SERVIDAS"&&animal.colorFase!=="green"&&React.createElement("div",{style:{marginTop:16,padding:16,background:"rgba(212,160,10,.1)",border:"1px solid var(--warning)",borderRadius:8}},
+      isRepro&&subf.includes("SERVIDAS")&&animal.colorFase!=="green"&&React.createElement("div",{style:{marginTop:16,padding:16,background:"rgba(212,160,10,.1)",border:"1px solid var(--warning)",borderRadius:8}},
         React.createElement("h4",{style:{fontSize:14,fontWeight:700,color:"var(--warning)",marginBottom:8}},"⚠️ Alerta: "+animal.dias+" días post-servicio"),
         React.createElement("p",{style:{fontSize:12,marginBottom:12,color:"var(--muted-fg)"}},"¿La marrana repitió celo o requiere nuevo servicio?"),
         React.createElement("div",{style:{display:"flex",gap:8}},
@@ -865,9 +866,9 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
       !isInactive&&React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:20}},
         React.createElement("button",{onClick:()=>onAction(animal.id,"OBSERVACION"),style:{...btn,background:"var(--secondary)",color:"var(--secondary-fg)"}},"📝 Nota"),
         React.createElement("button",{onClick:()=>onAction(animal.id,"TRASLADO"),style:{...btn,background:"var(--primary)",color:"var(--primary-fg)"}},"🔄 Mover"),
-        isRepro&&(!animal.subfase||animal.subfase==="REEMPLAZO"||animal.subfase==="VACIA"||animal.subfase==="DESCANSO")&&React.createElement("button",{onClick:()=>onAction(animal.id,"SERVICIO"),style:{...btn,gridColumn:"span 2",color:"#fff"},className:"gradient-purple"},"💉 Inseminar"),
-        isRepro&&animal.subfase==="SERVIDAS"&&animal.colorFase==="green"&&React.createElement("button",{onClick:()=>onAction(animal.id,"CONFIRMAR_GESTACION"),style:{...btn,gridColumn:"span 2",background:"var(--success)",color:"var(--success-fg)"}},"✅ Confirmar Preñez"),
-        isRepro&&animal.subfase==="SERVIDAS"&&animal.colorFase==="green"&&React.createElement("button",{onClick:()=>onAction(animal.id,"RETORNO_VACIA"),style:{...btn,gridColumn:"span 2",background:"rgba(212,160,10,.2)",color:"var(--warning-fg)",border:"1px solid rgba(212,160,10,.4)"}},"⭕ Retorno Vacía"),
+        isRepro&&(!subf||subf.includes("VACIA")||subf.includes("DESCANSO")||subf.includes("DESTETADAS"))&&React.createElement("button",{onClick:()=>onAction(animal.id,"SERVICIO"),style:{...btn,gridColumn:"span 2",color:"#fff"},className:"gradient-purple"},"💉 Inseminar"),
+        isRepro&&subf.includes("SERVIDAS")&&animal.colorFase==="green"&&React.createElement("button",{onClick:()=>onAction(animal.id,"CONFIRMAR_GESTACION"),style:{...btn,gridColumn:"span 2",background:"var(--success)",color:"var(--success-fg)"}},"✅ Confirmar Preñez"),
+        isRepro&&subf.includes("SERVIDAS")&&animal.colorFase==="green"&&React.createElement("button",{onClick:()=>onAction(animal.id,"RETORNO_VACIA"),style:{...btn,gridColumn:"span 2",background:"rgba(212,160,10,.2)",color:"var(--warning-fg)",border:"1px solid rgba(212,160,10,.4)"}},"⭕ Retorno Vacía"),
         showParto&&React.createElement("button",{onClick:()=>onAction(animal.id,"PARTO"),style:{...btn,gridColumn:"span 2",background:"var(--accent)",color:"var(--accent-fg)",padding:"12px 0",fontWeight:700,border:"2px solid var(--accent)"}},"🐷 Registrar Parto"),
         showDestete&&React.createElement("button",{onClick:()=>onAction(animal.id,"DESTETE"),style:{...btn,gridColumn:"span 2",background:"var(--success)",color:"var(--success-fg)"}},"🥣 Registrar Destete"),
         React.createElement("button",{onClick:()=>onAction(animal.id,"ENFERMEDAD"),style:{...btn,background:"rgba(220,38,38,.1)",color:"var(--destructive)",border:"1px solid rgba(220,38,38,.3)"}},"🏥 Enfermedad"),
@@ -903,7 +904,7 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
       const records=historial.filter(h=>h[1]?.toString()===animal.id);
       const vacunasAplicadas=getVacunaRecords(animal.id,historial);
       const ingresoRecord=records.find(r=>r[2]==="INGRESO");
-      // Si tiene fecha en la columna P, la usamos, si no, tomamos la fecha del registro INGRESO.
+      
       const fechaNacimiento=animal.fechaNacimiento?extractDateKey(animal.fechaNacimiento):(ingresoRecord?extractDateKey(ingresoRecord[0]):"");
       const hoy=new Date();hoy.setHours(0,0,0,0);
       
@@ -1396,8 +1397,8 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
   const[semanaNac,setSemanaNac]=useState("");
   const[saving,setSaving]=useState(false);
   const[fechaEvento,setFechaEvento]=useState(prefillAccion==="INGRESO"?undefined:new Date());
-  const[fechaNac,setFechaNac]=useState(undefined); // Para Ingresos (Columna P)
-  const[nuevaSubfase,setNuevaSubfase]=useState(prefillAnimal?.subfase||"REEMPLAZO");
+  const[fechaNac,setFechaNac]=useState(undefined); 
+  const[nuevaSubfase,setNuevaSubfase]=useState(prefillAnimal?.subfase||"REEMP_VACIA");
   const inputS={width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid var(--input)",background:"var(--bg)",color:"var(--fg)",fontSize:14,outline:"none"};
   const labelS={display:"block",fontSize:14,fontWeight:600,marginTop:16,marginBottom:4};
 
@@ -1502,7 +1503,7 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
       React.createElement("label",{style:labelS},"Ubicación / Fase"),
       React.createElement("select",{value:fase,onChange:e=>{
           setFase(e.target.value);
-          if(e.target.value!=="REPRODUCTIVA") setNuevaSubfase("REEMPLAZO");
+          if(e.target.value!=="REPRODUCTIVA") setNuevaSubfase("REEMP_VACIA");
         },style:inputS},allFases.map(f=>React.createElement("option",{key:f,value:f},f))),
       
       accion==="INGRESO"&&fase==="REPRODUCTIVA"&&React.createElement(React.Fragment,null,
@@ -1598,6 +1599,7 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
     React.createElement("button",{onClick:handleSubmit,disabled:saving,style:{width:"100%",marginTop:24,padding:"14px 0",borderRadius:8,background:"var(--primary)",color:"var(--primary-fg)",fontWeight:700,fontSize:16,opacity:saving?.5:1}},(saving?"Guardando...":"Guardar 💾"))
   );
 }
+
 /* ─── LOGIN COMPONENT ─── */
 function LoginView({ onLogin }) {
   const [user, setUser] = useState("");
@@ -1648,7 +1650,6 @@ function LoginView({ onLogin }) {
 
 /* ─── APP ─── */
 function App(){
-  // --- NUEVA LÓGICA DE USUARIO ---
   const [currentUser, setCurrentUser] = useState(localStorage.getItem("granja_pro_user"));
 
   const handleLogout = () => {
@@ -1657,8 +1658,6 @@ function App(){
     setCurrentUser(null);
   };
 
-  
-  // ---------------------------------
   const[tab,setTab]=useState("dashboard");
   const[dashView,setDashView]=useState("summary");
   const[inventario,setInventario]=useState([]);
@@ -1749,7 +1748,7 @@ function App(){
           d.chapeta || "",                     // 10
           d.peso || "",                        // 11 (Peso)
           d.subpuesto || "",                   // 12
-          d.inseminador || "",                 // 13 (Inseminador NUEVO)
+          d.inseminador || "",                 // 13 (Inseminador)
           d.sexo || "",                        // 14 (Sexo)
           d.fechaNacimiento || ""              // 15 (Fecha Nacimiento)
         ]];
@@ -1830,7 +1829,7 @@ function App(){
     }
   };
 
-  const{subpuestos,madres}=useMemo(()=>{const s=new Set(),m=new Set();inventario.forEach(a=>{if(a.subpuesto)s.add(a.subpuesto);if(a.madre)m.add(a.madre)});return{subpuestos:[...s].sort(),madres:[...m].sort()}},[inventario]);
+  const{subpuestos,madres}=useMemo(()=>{const s=new Set(),m=new Set();inventario.forEach(a=>{if(a.subpuesto)s.add(a.subpuesto);if(a.madre)m.add(a.madre)});return{subpuestos:[...s].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true})),madres:[...m].sort()}},[inventario]);
   
   const filteredInv=useMemo(()=>inventario.filter(a=>{
     if(filterPuesto&&a.subpuesto!==filterPuesto)return false;
@@ -1844,7 +1843,15 @@ function App(){
 
   const handlePhaseClick=phase=>{setCurrentPhase(phase);setListTitle(phase.replace(/_/g," "));setDashView("subpuestos")};
   const handleSubpuestoClick=(phase,subpuesto)=>{const sub=subpuesto==="Sin puesto"?"":subpuesto;setListTitle(phase.replace(/_/g," ")+" · 📍 "+subpuesto);setListAnimals(filteredInv.filter(a=>a.fase===phase&&(a.subpuesto||"")===(sub||"")));setDashView("list")};
-  const handleSubfaseClick=subfase=>{const labels={REEMPLAZO:"🔄 Reemplazo",SERVIDAS:"💉 Servidas",GESTACION:"🤰 Gestación",VACIA:"⭕ Vacía",MATERNIDAD:"🏥 Maternidad",LACTANCIA:"🍼 Lactancia",DESTETE:"🥣 Destete",DESCANSO:"😴 Descanso"};setListTitle("REPRODUCTIVA · "+(labels[subfase]||subfase));setListAnimals(filteredInv.filter(a=>a.fase==="REPRODUCTIVA"&&a.subfase===subfase));setDashView("list")};
+  
+  const handleSubfaseClick=subfase=>{
+    const sfInfo = SUBFASES_REPRODUCTIVA.find(s => s.key === subfase);
+    const labelStr = sfInfo ? sfInfo.icon + " " + sfInfo.label : subfase;
+    setListTitle("REPRODUCTIVA · " + labelStr);
+    setListAnimals(filteredInv.filter(a=>a.fase==="REPRODUCTIVA"&&a.subfase===subfase));
+    setDashView("list");
+  };
+
   const handlePigletsClick=()=>{setListTitle("Lechones");setListAnimals(filteredInv.filter(a=>a.piglets>0));setDashView("list")};
   const handleSelectAnimal=id=>{const a=todosAnimales.find(x=>x.id===id);if(a){setSelectedAnimal(a);setDashView("detail")}};
 
@@ -1884,9 +1891,12 @@ function App(){
 
   const handleTabChange=newTab=>{setTab(newTab);if(newTab==="dashboard")setDashView("summary");if(newTab==="registro"){setPrefillId("");setPrefillAccion("INGRESO");setPrefillAnimal(null)}};
   const inputS={width:"100%",padding:"6px 8px",borderRadius:8,border:"1px solid var(--input)",background:"var(--card)",color:"var(--fg)",fontSize:12};
+
+  // --- LOGIN CONDICIONAL ---
   if (!currentUser) {
     return React.createElement(LoginView, { onLogin: setCurrentUser });
   }
+
   return React.createElement("div",{style:{minHeight:"100vh",background:"var(--bg)",paddingBottom:80}},
     React.createElement(FarmHeader,{searchValue:search,onSearch:handleSearch,onNavigate:handleTabChange,activeTab:tab, isOnline, queueCount, syncing, showInstall:!!deferredPrompt, onInstall:handleInstallClick, onLogout:handleLogout}),
     React.createElement("main",{style:{maxWidth:480,margin:"0 auto",padding:"16px 16px"}},
