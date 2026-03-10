@@ -95,7 +95,7 @@ const ACCION_CONFIG={
   QUITAR_GUIA:{icon:"❌",label:"Quitar Guía"},
 };
 
-const URL_SCRIPT="https://script.google.com/macros/s/AKfycbzfz44gwcPUfSEI7D8uVO5ZE2H47cPKeyka_4qBnWgdiuz6sOo3yKm56Z5seCaciVUkJw/exec";
+const URL_SCRIPT="https://script.google.com/macros/s/AKfycbzpjl8GmaMW-8pDdDxxvCMxlRSzjTHZAWgcoEVdbHxlDrP-Qo54RFk24jUKiTtlYfOrXA/exec";
 
 /* ─── OFFLINE & OPTIMISTIC SYNC SYSTEM ─── */
 const CACHE_KEY = "granja_pro_cache";
@@ -120,6 +120,9 @@ async function fetchFarmData(){
 
 async function enviarRegistro(d){
   const q = getQueue(); 
+  // --- NUEVO: Inyectar usuario actual ---
+  d.usuario = localStorage.getItem("granja_pro_user") || "Desconocido";
+  // --------------------------------------
   q.push({id:Date.now() + Math.random(), tipo:'registro', data:d}); 
   setQueue(q);
   window.dispatchEvent(new CustomEvent('optimistic_save', {detail: d}));
@@ -129,6 +132,10 @@ async function enviarRegistro(d){
 
 async function enviarBatch(d){
   const q = getQueue(); 
+  // --- NUEVO: Inyectar usuario actual al bloque común ---
+  if(!d.comun) d.comun = {};
+  d.comun.usuario = localStorage.getItem("granja_pro_user") || "Desconocido";
+  // -----------------------------------------------------
   q.push({id:Date.now() + Math.random(), tipo:'batch', data:d}); 
   setQueue(q);
   window.dispatchEvent(new CustomEvent('optimistic_batch', {detail: d}));
@@ -1735,22 +1742,23 @@ function App(){
       const d = e.detail;
       setHistorial(prev=>{
         const next = [...prev, [
-          d.fecha || new Date().toISOString(), // 0
-          d.tatuaje || "",                     // 1
-          d.accion || "",                      // 2
-          d.fase || "",                        // 3
-          "",                                  // 4
-          d.notas || "",                       // 5
-          "",                                  // 6
-          d.madre || "",                       // 7
-          "",                                  // 8
-          "",                                  // 9
-          d.chapeta || "",                     // 10
-          d.peso || "",                        // 11 (Peso)
-          d.subpuesto || "",                   // 12
-          d.inseminador || "",                 // 13 (Inseminador)
-          d.sexo || "",                        // 14 (Sexo)
-          d.fechaNacimiento || ""              // 15 (Fecha Nacimiento)
+          d.fecha || new Date().toISOString(), // 0 (A)
+          d.tatuaje || "",                     // 1 (B)
+          d.accion || "",                      // 2 (C)
+          d.fase || "",                        // 3 (D)
+          "",                                  // 4 (E)
+          d.notas || "",                       // 5 (F)
+          "",                                  // 6 (G)
+          d.madre || "",                       // 7 (H)
+          "",                                  // 8 (I)
+          "",                                  // 9 (J)
+          d.chapeta || "",                     // 10 (K)
+          d.peso || "",                        // 11 (L)
+          d.subpuesto || "",                   // 12 (M)
+          d.inseminador || "",                 // 13 (N)
+          d.sexo || "",                        // 14 (O)
+          d.fechaNacimiento || "",             // 15 (P)
+          d.usuario || ""                      // 16 (Q) <--- NUEVO USUARIO
         ]];
         const result = procesarInventario(next);
         setInventario(result.activos);
@@ -1780,7 +1788,8 @@ function App(){
              comun.subpuesto || "",
              "",
              a.sexo || "",
-             a.fechaNacimiento || ""
+             a.fechaNacimiento || "",
+             comun.usuario || ""            // <--- NUEVO USUARIO
            ]);
         });
         const result = procesarInventario(next);
