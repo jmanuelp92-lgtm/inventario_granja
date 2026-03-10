@@ -579,27 +579,34 @@ function AnimalList({title,animals,onSelect,onBack}){
 
   // --- ESTADO Y LÓGICA PARA TRASLADO MASIVO ---
   const [showMoveModal, setShowMoveModal] = useState(false);
-  const [targetFase, setTargetFase] = useState(""); // NUEVO: Estado para la Fase/Sitio
+  const [targetFase, setTargetFase] = useState(""); 
   const [targetSubpuesto, setTargetSubpuesto] = useState("");
+  const [targetDate, setTargetDate] = useState(new Date()); // NUEVO: Estado para la fecha
   const [isMoving, setIsMoving] = useState(false);
 
-  // Función para abrir el modal pre-cargando la fase actual
+  // Función para abrir el modal pre-cargando la fase actual y fecha de hoy
   const handleOpenModal = () => {
     const activeAnimals = animals.filter(a => a.activo);
     if(activeAnimals.length === 0) return;
-    setTargetFase(activeAnimals[0].fase || "LEVANTE"); // Pre-selecciona la fase actual
+    setTargetFase(activeAnimals[0].fase || "LEVANTE"); 
+    setTargetDate(new Date()); // Resetea a la fecha actual al abrir
     setShowMoveModal(true);
   };
 
   const handleMassMove = async () => {
     const activeAnimals = animals.filter(a => a.activo);
+    if (!targetDate) { alert("Ingresa una fecha válida"); return; }
     if (!targetFase) { alert("Selecciona la fase de destino"); return; }
     if (!targetSubpuesto.trim()) { alert("Ingresa el nuevo puesto"); return; }
-    if (!window.confirm(`¿Seguro que deseas mover ${activeAnimals.length} animales a la fase ${targetFase} - Puesto ${targetSubpuesto.toUpperCase()}?`)) return;
+    
+    // Mostramos la confirmación incluyendo la fecha
+    const fechaAviso = formatDateStr(targetDate);
+    if (!window.confirm(`¿Seguro que deseas mover ${activeAnimals.length} animales a la fase ${targetFase} - Puesto ${targetSubpuesto.toUpperCase()} con fecha ${fechaAviso}?`)) return;
     
     setIsMoving(true);
     try {
-      const fechaStr = toAppsScriptDate(formatDateStr(new Date()));
+      // Usamos la fecha seleccionada en lugar de la fecha actual
+      const fechaStr = toAppsScriptDate(formatDateStr(targetDate)); 
       
       const payload = {
         comun: { accion: "TRASLADO", fase: targetFase, subpuesto: targetSubpuesto.toUpperCase(), fecha: fechaStr, madre: "" },
@@ -630,6 +637,12 @@ function AnimalList({title,animals,onSelect,onBack}){
         React.createElement("h3",{style:{fontSize:16,marginBottom:8,fontWeight:700}},"🔄 Traslado Masivo"),
         React.createElement("p",{style:{fontSize:12,marginBottom:16,color:"var(--muted-fg)"}},"Se moverán "+counts.act+" animales a una nueva ubicación."),
         
+        // INPUT DE FECHA
+        React.createElement("label",{style:{display:"block",fontSize:12,fontWeight:700,marginBottom:6,color:"var(--muted-fg)"}},"📅 Fecha del traslado"),
+        React.createElement("div", {style:{marginBottom:12}},
+            React.createElement(DateInput,{value:targetDate,onChange:d=>setTargetDate(d)})
+        ),
+
         // SELECTOR DE FASE (SITIO)
         React.createElement("label",{style:{display:"block",fontSize:12,fontWeight:700,marginBottom:6,color:"var(--muted-fg)"}},"Nueva Fase (Sitio)"),
         React.createElement("select",{value:targetFase,onChange:e=>setTargetFase(e.target.value),style:{width:"100%",padding:"10px",borderRadius:8,border:"1px solid var(--input)",background:"var(--bg)",color:"var(--fg)",marginBottom:12,fontSize:14,outline:"none",fontFamily:"inherit"}},
@@ -642,7 +655,7 @@ function AnimalList({title,animals,onSelect,onBack}){
         
         React.createElement("div",{style:{display:"flex",gap:8}},
           React.createElement("button",{onClick:()=>setShowMoveModal(false),style:{flex:1,padding:"10px 0",borderRadius:8,background:"var(--muted)",fontWeight:600}},"Cancelar"),
-          React.createElement("button",{onClick:handleMassMove,disabled:!targetSubpuesto||isMoving,style:{flex:1,padding:"10px 0",borderRadius:8,background:"var(--primary)",color:"#fff",fontWeight:600}},isMoving?"Moviendo...":"Confirmar")
+          React.createElement("button",{onClick:handleMassMove,disabled:!targetSubpuesto||!targetDate||isMoving,style:{flex:1,padding:"10px 0",borderRadius:8,background:"var(--primary)",color:"#fff",fontWeight:600}},isMoving?"Moviendo...":"Confirmar")
         )
       )
     ),
