@@ -87,7 +87,7 @@ const ACCION_CONFIG={
   QUITAR_GUIA:{icon:"❌",label:"Quitar Guía"},
 };
 
-const URL_SCRIPT="https://script.google.com/macros/s/AKfycbyl04yXXLNutCw0IdVRZZvcg2QEDhL9-u52vFY-93V-71lRU94PsnF2oI9z8Ypu4rY_nQ/exec";
+const URL_SCRIPT="https://script.google.com/macros/s/AKfycbzfz44gwcPUfSEI7D8uVO5ZE2H47cPKeyka_4qBnWgdiuz6sOo3yKm56Z5seCaciVUkJw/exec";
 
 /* ─── OFFLINE & OPTIMISTIC SYNC SYSTEM ─── */
 const CACHE_KEY = "granja_pro_cache";
@@ -433,9 +433,14 @@ function DateInput({value,onChange,placeholder}){
 
 /* ─── COMPONENTS ─── */
 
-function FarmHeader({searchValue,onSearch,onNavigate,activeTab, isOnline, queueCount, syncing, onInstall, showInstall}){
+function FarmHeader({searchValue,onSearch,onNavigate,activeTab, isOnline, queueCount, syncing, onInstall, showInstall, onLogout}){
   const[menuOpen,setMenuOpen]=useState(false);
-  const menuItems=[{id:"vacunas",label:"📅 Actividades"},{id:"reportes",label:"📋 Reportes"},{id:"resumen",label:"📊 Resumen"}];
+  const menuItems=[
+    {id:"vacunas",label:"📅 Actividades"},
+    {id:"reportes",label:"📋 Reportes"},
+    {id:"resumen",label:"📊 Resumen"},
+    {id:"logout",label:"🚪 Cerrar Sesión"} // NUEVO BOTÓN
+  ];
   return React.createElement("header",{style:{position:"sticky",top:0,zIndex:40,boxShadow:"0 4px 12px rgba(0,0,0,.15)"},className:"gradient-farm"},
     React.createElement("div",{style:{maxWidth:480,margin:"0 auto",padding:"16px 16px 12px"}},
       React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
@@ -449,7 +454,7 @@ function FarmHeader({searchValue,onSearch,onNavigate,activeTab, isOnline, queueC
         )
       ),
       menuOpen&&React.createElement("div",{className:"animate-fade-in",style:{marginTop:8,background:"var(--card)",borderRadius:12,boxShadow:"0 4px 20px rgba(0,0,0,.15)",border:"1px solid var(--border)",overflow:"hidden"}},
-        menuItems.map(item=>React.createElement("button",{key:item.id,onClick:()=>{onNavigate(item.id);setMenuOpen(false)},style:{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 16px",fontSize:14,fontWeight:600,color:activeTab===item.id?"var(--primary)":"var(--card-fg)",background:activeTab===item.id?"rgba(45,106,79,.1)":"transparent",borderBottom:"1px solid var(--border)"}},item.label))
+        menuItems.map(item=>React.createElement("button",{key:item.id,onClick:()=>{if(item.id==="logout"){onLogout()}else{onNavigate(item.id)}setMenuOpen(false)},style:{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 16px",fontSize:14,fontWeight:600,color:activeTab===item.id?"var(--primary)":(item.id==="logout"?"var(--destructive)":"var(--card-fg)"),background:activeTab===item.id?"rgba(45,106,79,.1)":"transparent",borderBottom:"1px solid var(--border)"}},item.label))
       ),
       React.createElement("div",{style:{marginTop:12,position:"relative"}},
         React.createElement("span",{style:{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",color:"var(--muted-fg)"}},"🔍"),
@@ -485,7 +490,7 @@ function DashboardView({data,onPhaseClick,onSubpuestoClick,onPigletsClick}){
       ),
       Object.entries(data.phases).sort((a,b)=>a[0].localeCompare(b[0])).map(([fase,info])=>{
         const isS=fase.includes("REPRODUCTIVA")||fase.includes("SALA_SERVICIO"),isExp=expanded===fase;
-        const subs=Object.entries(info.subpuestos).sort((a,b)=>a[0].localeCompare(b[0]));
+        const subs=Object.entries(info.subpuestos).sort((a,b)=>a[0].localeCompare(b[0], undefined, {numeric: true}));
         const hasMS=subs.length>1||(subs.length===1&&subs[0][0]!=="Sin puesto");
         const usePurple=fase==="REPRODUCTIVA"||fase.includes("SALA_SERVICIO");
         return React.createElement("div",{key:fase,style:{position:"relative",borderRadius:12,boxShadow:"0 2px 8px rgba(0,0,0,.08)",gridColumn:isExp?"span 2":"span 1",background:usePurple?undefined:"var(--card)",border:usePurple?"none":"1px solid var(--border)"},className:usePurple?"gradient-purple":undefined},
@@ -514,12 +519,9 @@ function SubpuestoCards({phase,animals,onSelect,onSelectAll,onBack,onSubfaseClic
       if(a.color==="red")map[k].alerts++;
       if(a.color==="yellow")map[k].warnings++;
     });
-    return Object.entries(map).sort((a,b)=>{
-      if(b[1].alerts!==a[1].alerts)return b[1].alerts-a[1].alerts;
-      if(b[1].warnings!==a[1].warnings)return b[1].warnings-a[1].warnings;
-      return a[0].localeCompare(b[0],undefined,{numeric:true});
-    });
-  },[animals]);
+    return Object.entries(map).sort((a,b)=>a[0].localeCompare(b[0], undefined, {numeric: true}));
+  },
+  [animals]);
 
   const subfaseGroups=useMemo(()=>{
     if(phase!=="REPRODUCTIVA")return[];
@@ -1209,7 +1211,7 @@ function ReportsView({historial,search,onSelectAnimal}){
       const cm=n.match(/Comprador: ([^|]+)/);
       if(cm){const c=cm[1].trim();if(c&&c!=="N/A")comps.add(c)}
     });
-    return{subpuestos:[...subs].sort(),madres:[...mads].sort(),compradores:[...comps].sort(),inseminadores:[...insem].sort()}
+    return{subpuestos:[...subs].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true})),madres:[...mads].sort(),compradores:[...comps].sort(),inseminadores:[...insem].sort()}
   },[historial]);
   
   const lista=historial.filter(h=>{
@@ -1596,9 +1598,67 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
     React.createElement("button",{onClick:handleSubmit,disabled:saving,style:{width:"100%",marginTop:24,padding:"14px 0",borderRadius:8,background:"var(--primary)",color:"var(--primary-fg)",fontWeight:700,fontSize:16,opacity:saving?.5:1}},(saving?"Guardando...":"Guardar 💾"))
   );
 }
+/* ─── LOGIN COMPONENT ─── */
+function LoginView({ onLogin }) {
+  const [user, setUser] = useState("");
+  const [pass, setPass] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    if(!user || !pass) { setError("Completa los datos"); return; }
+    setLoading(true); setError("");
+    try {
+      if(!navigator.onLine) throw new Error("Necesitas internet para iniciar sesión la primera vez.");
+      const res = await fetch(URL_SCRIPT, {
+        method: "POST", 
+        body: JSON.stringify({tipo: "LOGIN", usuario: user.trim(), clave: pass.trim()}),
+        headers: { "Content-Type": "text/plain;charset=utf-8" }
+      });
+      const data = await res.json();
+      if(data.ok) {
+        localStorage.setItem("granja_pro_user", data.usuario);
+        onLogin(data.usuario);
+      } else {
+        setError(data.error || "Datos incorrectos");
+      }
+    } catch(err) {
+      setError(err.message || "Error al conectar con el servidor.");
+    }
+    setLoading(false);
+  };
+
+  return React.createElement("div", {style: {minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 20}, className: "gradient-farm"},
+    React.createElement("form", {onSubmit: handleLogin, className: "animate-fade-in", style: {background: "var(--card)", padding: 32, borderRadius: 16, width: "100%", maxWidth: 360, boxShadow: "0 10px 25px rgba(0,0,0,0.5)"}},
+      React.createElement("div", {style: {textAlign: "center", marginBottom: 24}},
+        React.createElement("span", {style: {fontSize: 48}}, "🐷"),
+        React.createElement("h1", {style: {fontSize: 24, fontWeight: 800, color: "var(--card-fg)", marginTop: 8}}, "Granja Pro"),
+        React.createElement("p", {style: {fontSize: 12, color: "var(--muted-fg)", marginTop: 4}}, "Acceso de Usuarios")
+      ),
+      error && React.createElement("div", {style: {padding: 12, background: "rgba(220,38,38,.1)", color: "var(--destructive)", borderRadius: 8, marginBottom: 16, fontSize: 13, textAlign: "center", fontWeight: 700}}, error),
+      React.createElement("label", {style: {display:"block", fontSize:12, fontWeight:700, marginBottom:6, color:"var(--muted-fg)"}}, "Usuario"),
+      React.createElement("input", {value: user, onChange: e=>setUser(e.target.value), placeholder: "Tu usuario", style: {width: "100%", padding: "12px", borderRadius: 8, border: "1px solid var(--input)", background: "var(--bg)", color: "var(--fg)", marginBottom: 16, fontSize: 14, outline: "none"}}),
+      React.createElement("label", {style: {display:"block", fontSize:12, fontWeight:700, marginBottom:6, color:"var(--muted-fg)"}}, "Contraseña"),
+      React.createElement("input", {type: "password", value: pass, onChange: e=>setPass(e.target.value), placeholder: "••••••••", style: {width: "100%", padding: "12px", borderRadius: 8, border: "1px solid var(--input)", background: "var(--bg)", color: "var(--fg)", marginBottom: 24, fontSize: 14, outline: "none"}}),
+      React.createElement("button", {type: "submit", disabled: loading, style: {width: "100%", padding: "14px 0", borderRadius: 8, background: "var(--primary)", color: "#fff", fontWeight: 700, fontSize: 16, border: "none", cursor: "pointer", opacity: loading?0.7:1}}, loading ? "Verificando..." : "Ingresar")
+    )
+  );
+}
 
 /* ─── APP ─── */
 function App(){
+  // --- NUEVA LÓGICA DE USUARIO ---
+  const [currentUser, setCurrentUser] = useState(localStorage.getItem("granja_pro_user"));
+
+  const handleLogout = () => {
+    if(!window.confirm("¿Seguro que deseas cerrar sesión? Necesitarás internet para volver a entrar.")) return;
+    localStorage.removeItem("granja_pro_user");
+    setCurrentUser(null);
+  };
+
+  
+  // ---------------------------------
   const[tab,setTab]=useState("dashboard");
   const[dashView,setDashView]=useState("summary");
   const[inventario,setInventario]=useState([]);
@@ -1824,9 +1884,11 @@ function App(){
 
   const handleTabChange=newTab=>{setTab(newTab);if(newTab==="dashboard")setDashView("summary");if(newTab==="registro"){setPrefillId("");setPrefillAccion("INGRESO");setPrefillAnimal(null)}};
   const inputS={width:"100%",padding:"6px 8px",borderRadius:8,border:"1px solid var(--input)",background:"var(--card)",color:"var(--fg)",fontSize:12};
-
+  if (!currentUser) {
+    return React.createElement(LoginView, { onLogin: setCurrentUser });
+  }
   return React.createElement("div",{style:{minHeight:"100vh",background:"var(--bg)",paddingBottom:80}},
-    React.createElement(FarmHeader,{searchValue:search,onSearch:handleSearch,onNavigate:handleTabChange,activeTab:tab, isOnline, queueCount, syncing, showInstall:!!deferredPrompt, onInstall:handleInstallClick}),
+    React.createElement(FarmHeader,{searchValue:search,onSearch:handleSearch,onNavigate:handleTabChange,activeTab:tab, isOnline, queueCount, syncing, showInstall:!!deferredPrompt, onInstall:handleInstallClick, onLogout:handleLogout}),
     React.createElement("main",{style:{maxWidth:480,margin:"0 auto",padding:"16px 16px"}},
       tab==="dashboard"&&(loading?
         React.createElement("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",paddingTop:80}},
