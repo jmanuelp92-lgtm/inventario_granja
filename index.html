@@ -577,17 +577,89 @@ function AnimalList({title,animals,onSelect,onBack}){
     });
   }, [animals]);
 
+  // --- ESTADO Y LÓGICA PARA TRASLADO MASIVO ---
+  const [showMoveModal, setShowMoveModal] = useState(false);
+  const [targetFase, setTargetFase] = useState(""); // NUEVO: Estado para la Fase/Sitio
+  const [targetSubpuesto, setTargetSubpuesto] = useState("");
+  const [isMoving, setIsMoving] = useState(false);
+
+  // Función para abrir el modal pre-cargando la fase actual
+  const handleOpenModal = () => {
+    const activeAnimals = animals.filter(a => a.activo);
+    if(activeAnimals.length === 0) return;
+    setTargetFase(activeAnimals[0].fase || "LEVANTE"); // Pre-selecciona la fase actual
+    setShowMoveModal(true);
+  };
+
+  const handleMassMove = async () => {
+    const activeAnimals = animals.filter(a => a.activo);
+    if (!targetFase) { alert("Selecciona la fase de destino"); return; }
+    if (!targetSubpuesto.trim()) { alert("Ingresa el nuevo puesto"); return; }
+    if (!window.confirm(`¿Seguro que deseas mover ${activeAnimals.length} animales a la fase ${targetFase} - Puesto ${targetSubpuesto.toUpperCase()}?`)) return;
+    
+    setIsMoving(true);
+    try {
+      const fechaStr = toAppsScriptDate(formatDateStr(new Date()));
+      
+      const payload = {
+        comun: { accion: "TRASLADO", fase: targetFase, subpuesto: targetSubpuesto.toUpperCase(), fecha: fechaStr, madre: "" },
+        animales: activeAnimals.map(a => ({
+          tatuaje: a.id,
+          chapeta: a.chapeta || "",
+          peso: "",
+          notas: "Traslado masivo"
+        }))
+      };
+      
+      await enviarBatch(payload);
+      setShowMoveModal(false);
+      setTargetSubpuesto("");
+      if(onBack) onBack(); // Regresa a la vista anterior tras moverlos
+    } catch (e) {
+      alert("Error al intentar mover los animales.");
+    }
+    setIsMoving(false);
+  };
+  // ----------------------------------------------------
+
   return React.createElement("div",{className:"animate-fade-in"},
+    
+    /* MODAL DE TRASLADO MASIVO */
+    showMoveModal && React.createElement("div",{style:{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.5)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:20}},
+      React.createElement("div",{style:{background:"var(--card)",padding:20,borderRadius:12,width:"100%",maxWidth:320,boxShadow:"0 4px 20px rgba(0,0,0,.15)"}},
+        React.createElement("h3",{style:{fontSize:16,marginBottom:8,fontWeight:700}},"🔄 Traslado Masivo"),
+        React.createElement("p",{style:{fontSize:12,marginBottom:16,color:"var(--muted-fg)"}},"Se moverán "+counts.act+" animales a una nueva ubicación."),
+        
+        // SELECTOR DE FASE (SITIO)
+        React.createElement("label",{style:{display:"block",fontSize:12,fontWeight:700,marginBottom:6,color:"var(--muted-fg)"}},"Nueva Fase (Sitio)"),
+        React.createElement("select",{value:targetFase,onChange:e=>setTargetFase(e.target.value),style:{width:"100%",padding:"10px",borderRadius:8,border:"1px solid var(--input)",background:"var(--bg)",color:"var(--fg)",marginBottom:12,fontSize:14,outline:"none",fontFamily:"inherit"}},
+          FASES_DEFAULT.map(f => React.createElement("option",{key:f,value:f},f))
+        ),
+
+        // INPUT DE PUESTO (CORRAL)
+        React.createElement("label",{style:{display:"block",fontSize:12,fontWeight:700,marginBottom:6,color:"var(--muted-fg)"}},"Nuevo Puesto / Corral"),
+        React.createElement("input",{value:targetSubpuesto,onChange:e=>setTargetSubpuesto(e.target.value),placeholder:"Ej. P20",style:{width:"100%",padding:"10px",borderRadius:8,border:"1px solid var(--input)",background:"var(--bg)",color:"var(--fg)",marginBottom:16,fontSize:14,outline:"none",fontFamily:"inherit"}}),
+        
+        React.createElement("div",{style:{display:"flex",gap:8}},
+          React.createElement("button",{onClick:()=>setShowMoveModal(false),style:{flex:1,padding:"10px 0",borderRadius:8,background:"var(--muted)",fontWeight:600}},"Cancelar"),
+          React.createElement("button",{onClick:handleMassMove,disabled:!targetSubpuesto||isMoving,style:{flex:1,padding:"10px 0",borderRadius:8,background:"var(--primary)",color:"#fff",fontWeight:600}},isMoving?"Moviendo...":"Confirmar")
+        )
+      )
+    ),
+
     React.createElement("button",{onClick:onBack,style:{display:"flex",alignItems:"center",gap:4,fontSize:14,fontWeight:600,color:"var(--primary)",marginBottom:12}},"← Volver"),
     React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}},
       React.createElement("h3",{style:{fontSize:18,fontWeight:700}},title),
       React.createElement("span",{style:{fontSize:12,fontWeight:700,color:"var(--muted-fg)",background:"var(--muted)",padding:"4px 8px",borderRadius:12}},counts.total+" resultados")
     ),
     
-    counts.total>0&&React.createElement("div",{style:{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}},
+    counts.total>0&&React.createElement("div",{style:{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap",alignItems:"center"}},
       React.createElement("span",{style:{fontSize:11,fontWeight:700,color:"var(--success)",background:"rgba(45,138,86,.1)",padding:"4px 8px",borderRadius:6,border:"1px solid rgba(45,138,86,.2)"}},"🟢 Activas: "+counts.act),
       counts.vend>0&&React.createElement("span",{style:{fontSize:11,fontWeight:700,color:"#d97706",background:"rgba(217,119,6,.1)",padding:"4px 8px",borderRadius:6,border:"1px solid rgba(217,119,6,.2)"}},"💰 Vendidas: "+counts.vend),
-      counts.muer>0&&React.createElement("span",{style:{fontSize:11,fontWeight:700,color:"var(--destructive)",background:"rgba(220,38,38,.1)",padding:"4px 8px",borderRadius:6,border:"1px solid rgba(220,38,38,.2)"}},"🔴 Muertas: "+counts.muer)
+      counts.muer>0&&React.createElement("span",{style:{fontSize:11,fontWeight:700,color:"var(--destructive)",background:"rgba(220,38,38,.1)",padding:"4px 8px",borderRadius:6,border:"1px solid rgba(220,38,38,.2)"}},"🔴 Muertas: "+counts.muer),
+      
+      /* BOTÓN DE TRASLADO MASIVO */
+      counts.act>0&&React.createElement("button",{onClick:handleOpenModal,style:{fontSize:11,fontWeight:700,color:"#fff",background:"var(--primary)",padding:"6px 12px",borderRadius:6,border:"none",cursor:"pointer",marginLeft:"auto",boxShadow:"0 2px 4px rgba(0,0,0,0.1)"}},"🔄 Mover Todos")
     ),
 
     sortedAnimals.length===0?React.createElement("p",{style:{textAlign:"center",color:"var(--muted-fg)",padding:"32px 0"}},"Sin animales en esta búsqueda/fase."):
