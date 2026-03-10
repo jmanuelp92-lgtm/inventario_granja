@@ -688,7 +688,7 @@ function AnimalList({title,animals,onSelect,onBack}){
           React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center"}},
             React.createElement("div",null,
               React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8}},
-                React.createElement("span",{style:{fontWeight:700}},"ID: "+a.id),
+                React.createElement("span",{style:{fontWeight:700}},"ID: "+a.id + (a.chapeta ? " · 🏷️ " + a.chapeta : "")),
                 a.tieneGuia&&!inactive&&React.createElement("span",{style:{fontSize:12},title:"Guía Emitida"},"📄"),
                 !inactive&&React.createElement("span",{style:{width:10,height:10,borderRadius:"50%",background:colorMap[a.color],display:"inline-block"}}),
                 sfInfo&&!inactive&&React.createElement("span",{style:{fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:4,background:"rgba(45,106,79,.1)",color:"var(--primary)"}},sfInfo.icon+" "+sfInfo.label),
