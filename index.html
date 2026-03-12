@@ -1770,7 +1770,7 @@ function App(){
     const handleQueueChange=()=>setQueueCount(getQueue().length);
     const handleSyncStart=()=>setSyncing(true);
     const handleSyncEnd=()=>setSyncing(false);
-    const handleSyncAllDone=()=>loadData(true);
+    const handleSyncAllDone=()=>{ /* Ya no forzamos recarga de Google Sheets para no borrar la caché de trabajo rápido */ };
 
     const handleOptimisticSave=(e)=>{
       const d = e.detail;
@@ -1836,6 +1836,16 @@ function App(){
              comun.usuario || ""            // <--- NUEVO USUARIO
            ]);
         });
+        /* 👇 INICIO NUEVO: GUARDAR EN CACHÉ LOCAL INMEDIATAMENTE 👇 */
+        try {
+          const cacheStr = localStorage.getItem(CACHE_KEY);
+          if (cacheStr) {
+             const cache = JSON.parse(cacheStr);
+             cache.registros = next;
+             localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+          }
+        } catch(err) {}
+        /* 👆 FIN NUEVO 👆 */
         const result = procesarInventario(next);
         setInventario(result.activos);
         setTodosAnimales(result.todos);
