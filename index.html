@@ -1473,7 +1473,15 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
       }
 
       if(accion==="PARTO"){const ptc=partoLechones.reduce((s,l)=>s+(parseFloat(l.peso)||0),0);const h=partoLechones.filter(l=>l.sexo==="H").length;const m=partoLechones.filter(l=>l.sexo==="M").length;const det=partoLechones.map((l,i)=>"L"+(i+1)+":"+(l.peso||0)+"kg("+l.sexo+")").join(", ");finalNotas="PARTO | Vivos: "+vivos+" | Muertos: "+muertos+" | Hembras: "+h+" | Machos: "+m+" | Semana: "+semanaNac+" | Madre: "+tatuaje+" | Padre: "+(padre||"N/A")+" | Peso Total: "+ptc.toFixed(1)+"kg | Detalle: "+det+" "+notas}
-      if(accion==="CONFIRMAR_GESTACION")finalNotas="GESTACIÓN CONFIRMADA | "+notas;
+      if(accion==="CONFIRMAR_GESTACION"){
+        const lastServ = (historial||[]).filter(r=>r[1]?.toString()===tatuaje && r[2]==="SERVICIO").pop();
+        let extra = "";
+        if(lastServ){
+          const m = (lastServ[5]||"").match(/Dosis:\s*([^|]+)/);
+          if(m) extra = " | Padre/Dosis: " + m[1].trim();
+        }
+        finalNotas = "GESTACIÓN CONFIRMADA" + extra + (notas ? " | " + notas : "");
+      }
       if(accion==="RETORNO_VACIA")finalNotas="RETORNO VACÍA | "+notas;
       if(accion==="CAMBIAR_SUBFASE")finalNotas="CAMBIAR SUBFASE | Subfase: "+nuevaSubfase+" | "+notas;
       if(accion==="BAJA_LACTANCIA")finalNotas="BAJA LACTANCIA | Cantidad: "+cantBaja+" | Causa: "+(causaBaja||"Desconocida")+" "+notas;
@@ -1786,6 +1794,16 @@ function App(){
           d.fechaNacimiento || "",             // 15 (P)
           d.usuario || ""                      // 16 (Q) <--- NUEVO USUARIO
         ]];
+        /* 👇 INICIO NUEVO: GUARDAR EN CACHÉ LOCAL INMEDIATAMENTE 👇 */
+        try {
+          const cacheStr = localStorage.getItem(CACHE_KEY);
+          if (cacheStr) {
+             const cache = JSON.parse(cacheStr);
+             cache.registros = next;
+             localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+          }
+        } catch(err) {}
+        /* 👆 FIN NUEVO 👆 */
         const result = procesarInventario(next);
         setInventario(result.activos);
         setTodosAnimales(result.todos);
