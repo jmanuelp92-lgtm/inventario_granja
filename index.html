@@ -1936,11 +1936,42 @@ function App(){
       tab==="resumen"&&React.createElement(ResumenView,{historial:historial,search:search,onSelectAnimal:id=>{const a=todosAnimales.find(x=>x.id===id);if(a){setSelectedAnimal(a);setTab("dashboard");setDashView("detail")}}}),
       tab==="vacunas"&&React.createElement(VacunasView,{inventario:inventario,historial:historial,search:search,onRefresh:()=>loadData(true),onSelectAnimal:id=>{const a=todosAnimales.find(x=>x.id===id);if(a){setSelectedAnimal(a);setTab("dashboard");setDashView("detail")}}})
     ),
-    React.createElement(BottomNav,{active:tab,onChange:handleTabChange})
+    React.createElement(BottomNav,{active:tab,onChange:handleTabChange}),
+    
+    /* 👇 INICIO DEL BOTÓN FLOTANTE 👇 */
+    deferredPrompt && React.createElement("button", {
+      onClick: handleInstallClick,
+      className: "animate-fade-in",
+      style: {
+        position: "fixed",
+        bottom: "80px", /* Justo arriba de la barra de navegación */
+        right: "20px",
+        zIndex: 9999,
+        background: "#2563eb",
+        color: "#fff",
+        padding: "14px 20px",
+        borderRadius: "30px",
+        fontWeight: 800,
+        fontSize: "15px",
+        boxShadow: "0 4px 15px rgba(0,0,0,0.3)",
+        border: "2px solid #fff",
+        cursor: "pointer"
+      }
+    }, "📲 Instalar App")
+    /* 👆 FIN DEL BOTÓN FLOTANTE 👆 */
   );
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js');
+    });
+  }
+</script>
+
 </body>
 </html>
