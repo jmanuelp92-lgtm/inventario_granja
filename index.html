@@ -1420,7 +1420,40 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
   const[dosis,setDosis]=useState("");
   const[padre,setPadre]=useState("");
   const[vivos,setVivos]=useState("");
-  const[muertos,setMuertos]=useState("");
+  const[murieronNacer,setMurieronNacer]=useState("");
+  const[nacidosMuertos,setNacidosMuertos]=useState("");
+  const[momias,setMomias]=useState("");
+
+  // 1. AUTO-COMPLETAR PADRE
+  useEffect(() => {
+    if(accion === "PARTO" && tatuaje){
+      const records = (historial||[]).filter(r => r[1]?.toString() === tatuaje);
+      const lastServ = records.slice().reverse().find(r => r[2] === "SERVICIO" || r[2] === "CONFIRMAR_GESTACION");
+      if(lastServ){
+        const match = (lastServ[5]||"").match(/(?:Dosis|Padre\/Dosis):\s*([^|]+)/);
+        if(match) setPadre(match[1].trim());
+      }
+    }
+  }, [accion, tatuaje, historial]);
+
+  // 2. CALCULAR LISTA DE PESOS (Vivos + Murieron al nacer + Nacidos Muertos)
+  const updateTotalLechones = (vVal, mnVal, nmVal) => {
+      const v = parseInt(vVal) || 0;
+      const mn = parseInt(mnVal) || 0;
+      const nm = parseInt(nmVal) || 0;
+      const total = v + mn + nm;
+      
+      setPartoLechones(prev => {
+          return Array.from({length: total}, (_, i) => {
+              let cat = "VIVO";
+              if (i >= v && i < v + mn) cat = "M. NACER";
+              else if (i >= v + mn) cat = "N. MUERTO";
+              
+              if (prev[i]) return {...prev[i], estado: cat};
+              return {peso: "", sexo: "H", estado: cat};
+          });
+      });
+  };
   const[cantBaja,setCantBaja]=useState("1");
   const[causaBaja,setCausaBaja]=useState("");
   const[destetados,setDestetados]=useState("");
@@ -1472,7 +1505,14 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
         }
       }
 
-      if(accion==="PARTO"){const ptc=partoLechones.reduce((s,l)=>s+(parseFloat(l.peso)||0),0);const h=partoLechones.filter(l=>l.sexo==="H").length;const m=partoLechones.filter(l=>l.sexo==="M").length;const det=partoLechones.map((l,i)=>"L"+(i+1)+":"+(l.peso||0)+"kg("+l.sexo+")").join(", ");finalNotas="PARTO | Vivos: "+vivos+" | Muertos: "+muertos+" | Hembras: "+h+" | Machos: "+m+" | Semana: "+semanaNac+" | Madre: "+tatuaje+" | Padre: "+(padre||"N/A")+" | Peso Total: "+ptc.toFixed(1)+"kg | Detalle: "+det+" "+notas}
+      if(accion==="PARTO"){
+        const ptc=partoLechones.reduce((s,l)=>s+(parseFloat(l.peso)||0),0);
+        const h=partoLechones.filter(l=>l.sexo==="H").length;
+        const m=partoLechones.filter(l=>l.sexo==="M").length;
+        const det=partoLechones.map((l,i)=>"L"+(i+1)+":"+(l.peso||0)+"kg("+l.sexo+"-"+(l.estado||"V")+")").join(", ");
+        const totalMuertos = (parseInt(murieronNacer)||0) + (parseInt(nacidosMuertos)||0) + (parseInt(momias)||0);
+        finalNotas="PARTO | Vivos: "+vivos+" | Muertos: "+totalMuertos+" | Detalle Muertes: "+(murieronNacer||0)+" MN, "+(nacidosMuertos||0)+" NM, "+(momias||0)+" Momias | Hembras: "+h+" | Machos: "+m+" | Semana: "+semanaNac+" | Madre: "+tatuaje+" | Padre: "+(padre||"N/A")+" | Peso Total: "+ptc.toFixed(1)+"kg | Detalle: "+det+" "+notas;
+      }
       if(accion==="CONFIRMAR_GESTACION"){
         const lastServ = (historial||[]).filter(r=>r[1]?.toString()===tatuaje && r[2]==="SERVICIO").pop();
         let extra = "";
@@ -1576,19 +1616,26 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
     accion==="PARTO"&&React.createElement("div",{style:{marginTop:16,padding:16,borderRadius:8,background:"var(--muted)",border:"1px solid var(--border)"}},
       React.createElement("h4",{style:{fontSize:14,fontWeight:700,marginBottom:8}},"🐷 Registro de Camada"),
       React.createElement("label",{style:labelS},"🐗 Padre (Verraco / Dosis)"),
-      React.createElement("input",{value:padre,onChange:e=>setPadre(e.target.value),placeholder:"ID del padre",style:inputS}),
-      React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}},
-        React.createElement("div",null,React.createElement("label",{style:labelS},"Vivos"),React.createElement("input",{type:"number",value:vivos,onChange:e=>{setVivos(e.target.value);const n=parseInt(e.target.value)||0;setPartoLechones(Array.from({length:n},()=>({peso:"",sexo:"H"})))},style:inputS})),
-        React.createElement("div",null,React.createElement("label",{style:labelS},"Muertos"),React.createElement("input",{type:"number",value:muertos,onChange:e=>setMuertos(e.target.value),style:inputS}))
+      React.createElement("input",{value:padre,onChange:e=>setPadre(e.target.value),placeholder:"ID del padre (Autocompletado)",style:inputS}),
+      
+      React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12,marginTop:12}},
+        React.createElement("div",null,React.createElement("label",{style:{...labelS, marginTop:0}},"Vivos"),React.createElement("input",{type:"number",value:vivos,onChange:e=>{setVivos(e.target.value);updateTotalLechones(e.target.value,murieronNacer,nacidosMuertos)},style:inputS})),
+        React.createElement("div",null,React.createElement("label",{style:{...labelS, marginTop:0}},"Murieron al nacer"),React.createElement("input",{type:"number",value:murieronNacer,onChange:e=>{setMurieronNacer(e.target.value);updateTotalLechones(vivos,e.target.value,nacidosMuertos)},style:inputS}))
       ),
+      React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}},
+        React.createElement("div",null,React.createElement("label",{style:{...labelS, marginTop:0}},"Nacidos Muertos"),React.createElement("input",{type:"number",value:nacidosMuertos,onChange:e=>{setNacidosMuertos(e.target.value);updateTotalLechones(vivos,murieronNacer,e.target.value)},style:inputS})),
+        React.createElement("div",null,React.createElement("label",{style:{...labelS, marginTop:0}},"Momias"),React.createElement("input",{type:"number",value:momias,onChange:e=>setMomias(e.target.value),style:inputS}))
+      ),
+
       React.createElement("label",{style:labelS},"Semana de Nacimiento"),
       React.createElement("input",{value:semanaNac,onChange:e=>setSemanaNac(e.target.value),placeholder:"Ej. S10",style:inputS}),
+      
       partoLechones.length>0&&React.createElement("div",{style:{marginTop:12}},
         React.createElement("p",{style:{fontSize:10,fontWeight:700,color:"var(--muted-fg)",textTransform:"uppercase",letterSpacing:1,marginBottom:8}},"Peso individual"),
-        partoLechones.map((l,i)=>React.createElement("div",{key:i,style:{display:"flex",alignItems:"center",gap:8,marginBottom:4,background:"var(--bg)",borderRadius:6,padding:6,border:"1px solid var(--border)"}},
-          React.createElement("span",{style:{fontSize:12,color:"var(--muted-fg)",width:20,textAlign:"center",fontWeight:600}},i+1),
-          React.createElement("span",{style:{fontSize:11,color:"var(--muted-fg)",flexShrink:0}},tatuaje?(semanaNac||"?")+"-"+tatuaje+"-"+(i+1):"Lechón "+(i+1)),
-          React.createElement("input",{type:"number",value:l.peso,onChange:e=>{const c=[...partoLechones];c[i]={...c[i],peso:e.target.value};setPartoLechones(c)},placeholder:"kg",style:{width:60,padding:"4px 8px",borderRadius:4,border:"1px solid var(--input)",fontSize:12,background:"var(--bg)"}}),
+        partoLechones.map((l,i)=>React.createElement("div",{key:i,style:{display:"flex",alignItems:"center",gap:8,marginBottom:4,background:"var(--bg)",borderRadius:6,padding:6,border:"1px solid var(--border)", borderLeft: "4px solid " + (l.estado==="VIVO"?"var(--success)":"var(--destructive)")}},
+          React.createElement("span",{style:{fontSize:12,color:"var(--muted-fg)",width:16,textAlign:"center",fontWeight:600}},i+1),
+          React.createElement("span",{style:{fontSize:9,fontWeight:800,color:l.estado==="VIVO"?"var(--success)":"var(--destructive)",width:50,lineHeight:1}},l.estado),
+          React.createElement("input",{type:"number",value:l.peso,onChange:e=>{const c=[...partoLechones];c[i]={...c[i],peso:e.target.value};setPartoLechones(c)},placeholder:"kg",style:{flex:1,padding:"4px 8px",borderRadius:4,border:"1px solid var(--input)",fontSize:12,background:"var(--bg)",minWidth:40}}),
           React.createElement("button",{onClick:()=>{const c=[...partoLechones];c[i]={...c[i],sexo:"H"};setPartoLechones(c)},style:{padding:"4px 8px",borderRadius:4,fontSize:12,fontWeight:700,background:l.sexo==="H"?"#ec4899":"var(--muted)",color:l.sexo==="H"?"#fff":"var(--muted-fg)"}},"♀ H"),
           React.createElement("button",{onClick:()=>{const c=[...partoLechones];c[i]={...c[i],sexo:"M"};setPartoLechones(c)},style:{padding:"4px 8px",borderRadius:4,fontSize:12,fontWeight:700,background:l.sexo==="M"?"#3b82f6":"var(--muted)",color:l.sexo==="M"?"#fff":"var(--muted-fg)"}},"♂ M")
         )),
