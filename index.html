@@ -525,6 +525,7 @@ function DashboardView({data,onPhaseClick,onSubpuestoClick,onPigletsClick}){
 
 function SubpuestoCards({phase,animals,onSelect,onSelectAll,onBack,onSubfaseClick}){
   const[viewMode,setViewMode]=useState(phase==="REPRODUCTIVA"?"subfases":"subpuestos");
+  const[macroFase,setMacroFase]=useState(null); // NUEVO: Controla si estamos dentro de una tarjeta principal
   
   const groups=useMemo(()=>{
     const map={};
@@ -545,6 +546,7 @@ function SubpuestoCards({phase,animals,onSelect,onSelectAll,onBack,onSubfaseClic
   },[animals,phase]);
 
   const isRepro=phase==="REPRODUCTIVA";
+  
   const renderCard=(key,label,count,alerts,warnings,onClick)=>React.createElement("div",{key,onClick,style:{position:"relative",background:"var(--card)",borderRadius:12,padding:16,border:"1px solid var(--border)",boxShadow:"0 2px 6px rgba(0,0,0,.05)",cursor:"pointer"}},
     alerts>0&&React.createElement("span",{className:"animate-pulse-alert",style:{position:"absolute",top:8,right:8,width:12,height:12,borderRadius:"50%",background:"var(--destructive)",border:"2px solid var(--card)"}}),
     alerts===0&&warnings>0&&React.createElement("span",{style:{position:"absolute",top:8,right:8,width:12,height:12,borderRadius:"50%",background:"var(--warning)",border:"2px solid var(--card)"}}),
@@ -553,25 +555,49 @@ function SubpuestoCards({phase,animals,onSelect,onSelectAll,onBack,onSubfaseClic
     React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8}},React.createElement("span",{style:{fontSize:10,color:"var(--muted-fg)"}},"animales"),React.createElement("span",{style:{color:"var(--muted-fg)"}},"›"))
   );
 
+  // Calcular totales para las 3 Tarjetas Maestras
+  const macroStats = {GEST:{c:0,a:0,w:0}, MAT:{c:0,a:0,w:0}, REEMP:{c:0,a:0,w:0}};
+  subfaseGroups.forEach(sf=>{
+    if(sf.key.startsWith("GEST_")){macroStats.GEST.c+=sf.count;macroStats.GEST.a+=sf.alerts;macroStats.GEST.w+=sf.warnings;}
+    if(sf.key.startsWith("MAT_")){macroStats.MAT.c+=sf.count;macroStats.MAT.a+=sf.alerts;macroStats.MAT.w+=sf.warnings;}
+    if(sf.key.startsWith("REEMP_")){macroStats.REEMP.c+=sf.count;macroStats.REEMP.a+=sf.alerts;macroStats.REEMP.w+=sf.warnings;}
+  });
+
   return React.createElement("div",{className:"animate-fade-in"},
-    React.createElement("button",{onClick:onBack,style:{display:"flex",alignItems:"center",gap:4,fontSize:14,fontWeight:600,color:"var(--primary)",marginBottom:12}},"← Volver"),
+    React.createElement("button",{onClick:()=>{
+      if(isRepro && viewMode==="subfases" && macroFase) setMacroFase(null); // Botón atrás sale de la tarjeta
+      else onBack(); // Botón atrás sale al dashboard
+    },style:{display:"flex",alignItems:"center",gap:4,fontSize:14,fontWeight:600,color:"var(--primary)",marginBottom:12}},"← Volver"),
+    
     React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}},
-      React.createElement("h3",{style:{fontSize:18,fontWeight:700}},phase.replace(/_/g," ")),
-      React.createElement("span",{style:{fontSize:13,fontWeight:600,color:"var(--muted-fg)",background:"var(--muted)",padding:"4px 10px",borderRadius:20}},animals.length+" total")
+      React.createElement("h3",{style:{fontSize:18,fontWeight:700}},
+        phase.replace(/_/g," ") + (macroFase ? (macroFase==="GEST"?" · Gestación":macroFase==="MAT"?" · Maternidad":" · Reemplazo") : "")
+      ),
+      React.createElement("span",{style:{fontSize:13,fontWeight:600,color:"var(--muted-fg)",background:"var(--muted)",padding:"4px 10px",borderRadius:20}},
+        (macroFase ? macroStats[macroFase].c : animals.length)+" total"
+      )
     ),
-    isRepro&&React.createElement("div",{style:{display:"flex",gap:8,marginBottom:12}},
-      React.createElement("button",{onClick:()=>setViewMode("subfases"),style:{flex:1,padding:"8px 0",borderRadius:8,fontSize:12,fontWeight:700,background:viewMode==="subfases"?"var(--primary)":"var(--muted)",color:viewMode==="subfases"?"var(--primary-fg)":"var(--muted-fg)"}},"🔄 Por Subfase"),
+    
+    isRepro&&!macroFase&&React.createElement("div",{style:{display:"flex",gap:8,marginBottom:12}},
+      React.createElement("button",{onClick:()=>setViewMode("subfases"),style:{flex:1,padding:"8px 0",borderRadius:8,fontSize:12,fontWeight:700,background:viewMode==="subfases"?"var(--primary)":"var(--muted)",color:viewMode==="subfases"?"var(--primary-fg)":"var(--muted-fg)"}},"🔄 Por Categoría"),
       React.createElement("button",{onClick:()=>setViewMode("subpuestos"),style:{flex:1,padding:"8px 0",borderRadius:8,fontSize:12,fontWeight:700,background:viewMode==="subpuestos"?"var(--primary)":"var(--muted)",color:viewMode==="subpuestos"?"var(--primary-fg)":"var(--muted-fg)"}},"📍 Por Puesto")
     ),
-    React.createElement("button",{onClick:onSelectAll,style:{width:"100%",marginBottom:12,padding:12,borderRadius:12,background:"rgba(45,106,79,.1)",color:"var(--primary)",fontWeight:600,fontSize:14}},"Ver todos ("+animals.length+")"),
-    isRepro&&viewMode==="subfases"?React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}},
-      subfaseGroups.map(sf=>renderCard(sf.key,sf.icon+" "+sf.label,sf.count,sf.alerts,sf.warnings,()=>onSubfaseClick&&onSubfaseClick(sf.key)))
+    
+    !macroFase&&React.createElement("button",{onClick:onSelectAll,style:{width:"100%",marginBottom:12,padding:12,borderRadius:12,background:"rgba(45,106,79,.1)",color:"var(--primary)",fontWeight:600,fontSize:14}},"Ver todos ("+animals.length+")"),
+    
+    isRepro&&viewMode==="subfases"?React.createElement(React.Fragment,null,
+      !macroFase ? React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:12}},
+        macroStats.GEST.c>0&&renderCard("GEST","🤰 Gestación",macroStats.GEST.c,macroStats.GEST.a,macroStats.GEST.w,()=>setMacroFase("GEST")),
+        macroStats.MAT.c>0&&renderCard("MAT","🍼 Maternidad",macroStats.MAT.c,macroStats.MAT.a,macroStats.MAT.w,()=>setMacroFase("MAT")),
+        macroStats.REEMP.c>0&&renderCard("REEMP","🌱 Reemplazo",macroStats.REEMP.c,macroStats.REEMP.a,macroStats.REEMP.w,()=>setMacroFase("REEMP"))
+      ) : React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}},
+        subfaseGroups.filter(sf=>sf.key.startsWith(macroFase+"_")).map(sf=>renderCard(sf.key,sf.icon+" "+sf.label.split(" - ")[1],sf.count,sf.alerts,sf.warnings,()=>onSubfaseClick&&onSubfaseClick(sf.key)))
+      )
     ):React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}},
       groups.map(([sub,info])=>renderCard(sub,"📍 "+sub,info.count,info.alerts,info.warnings,()=>onSelect(sub)))
     )
   );
 }
-
 function AnimalList({title,animals,onSelect,onBack}){
   const counts=useMemo(()=>{
     let act=0,vend=0,muer=0;
