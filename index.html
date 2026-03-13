@@ -1471,7 +1471,7 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
   const handleAccionChange=val=>{setAccion(val);
     if(val==="EMITIR_GUIA"||val==="QUITAR_GUIA") setFase(prefillAnimal?.fase||allFases[0]);
     if(val==="SERVICIO"||val==="PARTO"||val==="CONFIRMAR_GESTACION"||val==="RETORNO_VACIA"||val==="CAMBIAR_SUBFASE"||val==="BAJA_LACTANCIA")setFase("REPRODUCTIVA");
-    if(val==="DESTETE"){setFase("DESCANSO");setDestLechones("PRECEBO");const a=inventario.find(a=>a.id===tatuaje);if(a){setDestetados(String(a.piglets));setLechones(Array.from({length:a.piglets},(_,i)=>({tat:tatuaje+"-"+(i+1),chap:"",peso:"",sexo:"H",ok:true})))}}
+    if(val==="DESTETE"){setFase("DESCANSO");setDestLechones("PRECEBO");const a=inventario.find(a=>a.id===tatuaje);if(a){setDestetados(String(a.piglets));setLechones(Array.from({length:a.piglets},(_,i)=>({tat:tatuaje+"-"+(i+1),chap:"",corral:"",peso:"",sexo:"H",ok:true})))}}
   };
 
   const handleSubmit=async()=>{
@@ -1530,7 +1530,7 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
       if(accion==="QUITAR_GUIA")finalNotas="GUÍA REVOCADA | "+notas;
       
       if(accion==="DESTETE"){const ef=lechones.filter(l=>l.ok);const bj=lechones.length-ef.length;const pt=ef.reduce((s,l)=>s+(parseFloat(l.peso)||0),0);finalNotas="DESTETE | Camada: "+destetados+" | Efectivos: "+ef.length+" | Bajas: "+bj+" | Peso Total: "+pt+"kg "+notas;
-        const ld=ef.filter(l=>l.tat).map(l=>({tatuaje:l.tat,chapeta:l.chap,peso:l.peso,sexo:l.sexo,notas:"Hijo de "+tatuaje+(l.peso?" | Peso: "+l.peso+"kg":"")}));
+        const ld=ef.filter(l=>l.tat).map(l=>({tatuaje:l.tat,chapeta:l.chap,subpuesto:l.corral||destLechones,peso:l.peso,sexo:l.sexo,notas:"Hijo de "+tatuaje+(l.peso?" | Peso: "+l.peso+"kg":"")}));
         if(ld.length>0)await enviarBatch({comun:{accion:"INGRESO",fase:"PRECEBO",subpuesto:destLechones,madre:tatuaje,fecha:toAppsScriptDate(fechaStr)},animales:ld})}
       
       if(accion==="SERVICIO" && dosis) finalNotas = "Dosis: " + dosis + (notas ? " | " + notas : "");
@@ -1671,14 +1671,15 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
     accion==="DESTETE"&&React.createElement("div",{style:{marginTop:16,padding:16,borderRadius:8,background:"rgba(45,138,86,.1)",border:"1px solid rgba(45,138,86,.2)"}},
       React.createElement("h4",{style:{fontSize:14,fontWeight:700,color:"var(--success)",marginBottom:8}},"🥣 Movimiento de Lechones"),
       React.createElement("label",{style:labelS},"Cant. Destetados"),
-      React.createElement("input",{type:"number",value:destetados,onChange:e=>{setDestetados(e.target.value);const n=parseInt(e.target.value)||0;setLechones(Array.from({length:n},()=>({tat:"",chap:"",peso:"",sexo:"H",ok:true})))},style:inputS}),
+      React.createElement("input",{type:"number",value:destetados,onChange:e=>{setDestetados(e.target.value);const n=parseInt(e.target.value)||0;setLechones(Array.from({length:n},()=>({tat:"",chap:"",corral:"",peso:"",sexo:"H",ok:true})))},style:inputS}),
       React.createElement("label",{style:labelS},"Destino Lechones"),
       React.createElement("select",{value:destLechones,onChange:e=>setDestLechones(e.target.value),style:inputS},allFases.map(f=>React.createElement("option",{key:f,value:f},f))),
       lechones.length>0&&React.createElement("div",{style:{marginTop:12}},
-        lechones.map((l,i)=>React.createElement("div",{key:i,style:{display:"grid",gridTemplateColumns:"24px 1fr 1fr 60px 40px 28px",gap:4,alignItems:"center",background:"var(--bg)",borderRadius:4,padding:4,marginBottom:4,border:"1px solid var(--border)"}},
+        lechones.map((l,i)=>React.createElement("div",{key:i,style:{display:"grid",gridTemplateColumns:"24px 1fr 1fr 1fr 60px 40px 28px",gap:4,alignItems:"center",background:"var(--bg)",borderRadius:4,padding:4,marginBottom:4,border:"1px solid var(--border)"}},
           React.createElement("span",{style:{fontSize:12,textAlign:"center",color:"var(--muted-fg)"}},i+1),
           React.createElement("input",{value:l.tat,onChange:e=>{const c=[...lechones];c[i]={...c[i],tat:e.target.value};setLechones(c)},placeholder:"ID",style:{fontSize:12,padding:"4px 6px",borderRadius:4,border:"1px solid var(--input)",background:"var(--bg)",minWidth:0}}),
           React.createElement("input",{value:l.chap,onChange:e=>{const c=[...lechones];c[i]={...c[i],chap:e.target.value};setLechones(c)},placeholder:"Chap",style:{fontSize:12,padding:"4px 6px",borderRadius:4,border:"1px solid var(--input)",background:"var(--bg)",minWidth:0}}),
+          React.createElement("input",{value:l.corral,onChange:e=>{const c=[...lechones];c[i]={...c[i],corral:e.target.value};setLechones(c)},placeholder:"Corral",style:{fontSize:12,padding:"4px 6px",borderRadius:4,border:"1px solid var(--input)",background:"var(--bg)",minWidth:0}}),
           React.createElement("input",{type:"number",value:l.peso,onChange:e=>{const c=[...lechones];c[i]={...c[i],peso:e.target.value};setLechones(c)},placeholder:"kg",style:{fontSize:12,padding:"4px 6px",borderRadius:4,border:"1px solid var(--input)",background:"var(--bg)",minWidth:0}}),
           React.createElement("button",{onClick:()=>{const c=[...lechones];c[i]={...c[i],sexo:c[i].sexo==="H"?"M":"H"};setLechones(c)},style:{fontSize:11,fontWeight:700,padding:"4px",borderRadius:4,background:l.sexo==="H"?"#ec4899":"#3b82f6",color:"#fff"}},l.sexo),
           React.createElement("input",{type:"checkbox",checked:l.ok,onChange:e=>{const c=[...lechones];c[i]={...c[i],ok:e.target.checked};setLechones(c)},style:{width:16,height:16,cursor:"pointer",margin:"0 auto"}})
@@ -1889,7 +1890,7 @@ function App(){
              "",
              a.chapeta || "",
              a.peso || "",
-             comun.subpuesto || "",
+             a.subpuesto || comun.subpuesto || "",
              "",
              a.sexo || "",
              a.fechaNacimiento || "",
