@@ -771,7 +771,7 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
   const isInactive=!animal.activo;
   const isRepro=animal.fase==="REPRODUCTIVA";
   const subf=animal.subfase||"";
-  const showParto=!isInactive&&isRepro&&subf.includes("GESTANTE")&&animal.piglets===0;
+  const showParto=!isInactive&&isRepro&&(subf.includes("GESTANTE")||subf.includes("PROXIMA"))&&animal.piglets===0;
   const showDestete=!isInactive&&animal.piglets>0;
   
   const scoreColor=sowStats.score>=70?"var(--success)":sowStats.score>=40?"var(--warning)":"var(--destructive)";
@@ -2069,10 +2069,22 @@ ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js');
+      navigator.serviceWorker.register('./sw.js').then(reg => {
+        // Escucha si hay una nueva versión disponible en el servidor
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          newWorker.addEventListener('statechange', () => {
+            // Si la nueva versión se instaló y ya había una app controlando antes...
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              console.log("Nueva versión detectada. Recargando app...");
+              // Recarga la página automáticamente para aplicar los cambios
+              window.location.reload();
+            }
+          });
+        });
+      });
     });
   }
 </script>
-
 </body>
 </html>
