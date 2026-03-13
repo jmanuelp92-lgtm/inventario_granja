@@ -1565,8 +1565,21 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
       React.createElement(DateInput,{value:fechaNac,onChange:d=>setFechaNac(d),placeholder:"dd/mm/aaaa (Columna P)"})
     ),
 
-    React.createElement("label",{style:labelS},"Tatuaje (ID)"),
-    React.createElement("input",{value:tatuaje,onChange:e=>setTatuaje(e.target.value),placeholder:"ID del animal",style:inputS}),
+    React.createElement("label",{style:labelS},"Tatuaje (ID) *"),
+    React.createElement("input",{
+      value:tatuaje,
+      onChange:e=>setTatuaje(e.target.value),
+      placeholder:"ID del animal",
+      disabled: !!prefillId, /* Bloquea el campo si el animal ya existe */
+      style: {
+        ...inputS, 
+        background: prefillId ? "var(--muted)" : "var(--bg)", 
+        color: prefillId ? "var(--muted-fg)" : "var(--fg)",
+        cursor: prefillId ? "not-allowed" : "text",
+        fontWeight: prefillId ? 800 : 400,
+        opacity: prefillId ? 0.8 : 1
+      }
+    }),
     React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}},
       React.createElement("div",null,React.createElement("label",{style:labelS},"Chapeta"),React.createElement("input",{value:chapeta,onChange:e=>setChapeta(e.target.value),placeholder:"N°",style:inputS})),
       React.createElement("div",null,React.createElement("label",{style:labelS},"Peso (kg)"),React.createElement("input",{type:"number",value:peso,onChange:e=>setPeso(e.target.value),placeholder:"0.0",style:inputS}))
