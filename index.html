@@ -95,7 +95,7 @@ const ACCION_CONFIG={
   QUITAR_GUIA:{icon:"❌",label:"Quitar Guía"},
 };
 
-const URL_SCRIPT="https://script.google.com/macros/s/AKfycbzpjl8GmaMW-8pDdDxxvCMxlRSzjTHZAWgcoEVdbHxlDrP-Qo54RFk24jUKiTtlYfOrXA/exec";
+const URL_SCRIPT="https://script.google.com/macros/s/AKfycbxE02CoqpyAY2g-DBHBQj4HLj62yBJUL36azqnQ_PJ3VRxjPdD2_BF1YGqr3Lwie6Ra/exec";
 
 /* ─── OFFLINE & OPTIMISTIC SYNC SYSTEM ─── */
 const CACHE_KEY = "granja_pro_cache";
@@ -248,7 +248,11 @@ function calcularSubfase(id,regs){
 
   const isReemplazo = (tPartos === 0);
 
-  if(lDest>lParto&&lDest>lServ)return{subfase:"MAT_DESTETADAS",fechaSubfase:records[lDest]?.[0]?.toString()||fecha};
+  if(lDest>lParto&&lDest>lServ){
+    const fSub = records[lDest]?.[0]?.toString()||fecha;
+    if(calcularDias(fSub) >= 7) return {subfase: isReemplazo ? "REEMP_VACIA" : "GEST_VACIA", fechaSubfase: fSub};
+    return {subfase: "MAT_DESTETADAS", fechaSubfase: fSub};
+  }
   if(lRet>lServ&&lRet>lParto)return{subfase:isReemplazo?"REEMP_VACIA":"GEST_VACIA",fechaSubfase:records[lRet]?.[0]?.toString()||fecha};
   if(lConf>lServ&&lConf>lParto)return{subfase:isReemplazo?"REEMP_GESTANTE":"GEST_GESTANTE",fechaSubfase:records[lConf]?.[0]?.toString()||fecha};
   if(lServ>lParto&&lServ>lDest)return{subfase:isReemplazo?"REEMP_SERVIDAS":"GEST_SERVIDAS",fechaSubfase:records[lServ]?.[0]?.toString()||fecha};
@@ -285,6 +289,12 @@ function procesarInventario(regs){
   });
 
   const todos=Object.values(estados).map(e=>{
+    // --- NUEVO: Pasar automáticamente de DESCANSO a REPRODUCTIVA a los 7 días ---
+    if(e.activo && e.fase === "DESCANSO" && calcularDias(e.fechaFase) >= 7) {
+        e.fase = "REPRODUCTIVA";
+    }
+    // ----------------------------------------------------------------------------
+
     // 1. Evaluar color por Fases/Subfases
     if(e.activo&&e.fase==="REPRODUCTIVA"){
       const{subfase,fechaSubfase}=calcularSubfase(e.id,regs);
@@ -1423,6 +1433,31 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
   const[murieronNacer,setMurieronNacer]=useState("");
   const[nacidosMuertos,setNacidosMuertos]=useState("");
   const[momias,setMomias]=useState("");
+  const[partoPrevioInfo,setPartoPrevioInfo]=useState(null);
+
+  // 1.5 AUTO-COMPLETAR INFO DEL ÚLTIMO PARTO EN EL DESTETE
+  useEffect(() => {
+    if (accion === "DESTETE" && tatuaje) {
+      const records = (historial||[]).filter(r => r[1]?.toString() === tatuaje && r[2] === "PARTO");
+      if (records.length > 0) {
+        const lastParto = records[records.length - 1];
+        const notas = lastParto[5] || "";
+        const mH = notas.match(/Hembras:\s*(\d+)/);
+        const mM = notas.match(/Machos:\s*(\d+)/);
+        const mVivos = notas.match(/Vivos:\s*(\d+)/);
+        
+        setPartoPrevioInfo({
+          hembras: mH ? parseInt(mH[1]) : 0,
+          machos: mM ? parseInt(mM[1]) : 0,
+          vivos: mVivos ? parseInt(mVivos[1]) : 0
+        });
+      } else {
+        setPartoPrevioInfo(null);
+      }
+    } else {
+      setPartoPrevioInfo(null);
+    }
+  }, [accion, tatuaje, historial]);
 
   // 1. AUTO-COMPLETAR PADRE
   useEffect(() => {
@@ -1529,9 +1564,35 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
       if(accion==="EMITIR_GUIA")finalNotas="GUÍA EMITIDA | "+notas;
       if(accion==="QUITAR_GUIA")finalNotas="GUÍA REVOCADA | "+notas;
       
-      if(accion==="DESTETE"){const ef=lechones.filter(l=>l.ok);const bj=lechones.length-ef.length;const pt=ef.reduce((s,l)=>s+(parseFloat(l.peso)||0),0);finalNotas="DESTETE | Camada: "+destetados+" | Efectivos: "+ef.length+" | Bajas: "+bj+" | Peso Total: "+pt+"kg "+notas;
-        const ld=ef.filter(l=>l.tat).map(l=>({tatuaje:l.tat,chapeta:l.chap,subpuesto:l.corral||destLechones,peso:l.peso,sexo:l.sexo,notas:"Hijo de "+tatuaje+(l.peso?" | Peso: "+l.peso+"kg":"")}));
-        if(ld.length>0)await enviarBatch({comun:{accion:"INGRESO",fase:"PRECEBO",subpuesto:destLechones,madre:tatuaje,fecha:toAppsScriptDate(fechaStr)},animales:ld})}
+      if(accion==="DESTETE"){
+        const ef=lechones.filter(l=>l.ok);
+        const bj=lechones.length-ef.length;
+        const pt=ef.reduce((s,l)=>s+(parseFloat(l.peso)||0),0);
+        finalNotas="DESTETE | Camada: "+destetados+" | Efectivos: "+ef.length+" | Bajas: "+bj+" | Peso Total: "+pt+"kg "+notas;
+        
+        // AQUÍ MAPEAMOS EL CORRAL AL "SUBPUESTO" (Columna M)
+        const ld=ef.filter(l=>l.tat).map(l=>({
+          tatuaje: l.tat,
+          chapeta: l.chap,
+          subpuesto: l.corral || "", // <--- El valor del corral viaja como subpuesto
+          peso: l.peso,
+          sexo: l.sexo,
+          notas: "Hijo de "+tatuaje+(l.peso?" | Peso: "+l.peso+"kg":"")
+        }));
+        
+        if(ld.length>0){
+          await enviarBatch({
+            comun: {
+              accion: "INGRESO",
+              fase: destLechones, // Guarda la fase seleccionada (ej. PRECEBO)
+              subpuesto: "",      // Lo dejamos vacío para que el servidor use el individual
+              madre: tatuaje,
+              fecha: toAppsScriptDate(fechaStr)
+            },
+            animales: ld
+          });
+        }
+      }
       
       if(accion==="SERVICIO" && dosis) finalNotas = "Dosis: " + dosis + (notas ? " | " + notas : "");
 
@@ -1670,6 +1731,18 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
     ),
     accion==="DESTETE"&&React.createElement("div",{style:{marginTop:16,padding:16,borderRadius:8,background:"rgba(45,138,86,.1)",border:"1px solid rgba(45,138,86,.2)"}},
       React.createElement("h4",{style:{fontSize:14,fontWeight:700,color:"var(--success)",marginBottom:8}},"🥣 Movimiento de Lechones"),
+      
+      /* 👇 NUEVO BLOQUE DE INFORMACIÓN DEL PARTO 👇 */
+      partoPrevioInfo&&React.createElement("div",{style:{marginBottom:12,padding:10,background:"var(--card)",borderRadius:6,border:"1px solid var(--success)",fontSize:12}},
+        React.createElement("p",{style:{fontWeight:700,color:"var(--muted-fg)",marginBottom:6}},"ℹ️ Nacidos vivos en el último parto:"),
+        React.createElement("div",{style:{display:"flex",gap:16,fontWeight:600}},
+          React.createElement("span",null,"🐷 Total: ",partoPrevioInfo.vivos),
+          React.createElement("span",{style:{color:"#ec4899"}},"♀ Hembras: ",partoPrevioInfo.hembras),
+          React.createElement("span",{style:{color:"#3b82f6"}},"♂ Machos: ",partoPrevioInfo.machos)
+        )
+      ),
+      /* 👆 FIN DEL NUEVO BLOQUE 👆 */
+
       React.createElement("label",{style:labelS},"Cant. Destetados"),
       React.createElement("input",{type:"number",value:destetados,onChange:e=>{setDestetados(e.target.value);const n=parseInt(e.target.value)||0;setLechones(Array.from({length:n},()=>({tat:"",chap:"",corral:"",peso:"",sexo:"H",ok:true})))},style:inputS}),
       React.createElement("label",{style:labelS},"Destino Lechones"),
