@@ -93,6 +93,7 @@ const ACCION_CONFIG={
   VACUNA:{icon:"💉",label:"Vacuna"},
   EMITIR_GUIA:{icon:"📄",label:"Emitir Guía"},
   QUITAR_GUIA:{icon:"❌",label:"Quitar Guía"},
+  ATETE:{icon:"🍼",label:"Atete (Traslado Lechones)"},
 };
 
 const URL_SCRIPT="https://script.google.com/macros/s/AKfycbxE02CoqpyAY2g-DBHBQj4HLj62yBJUL36azqnQ_PJ3VRxjPdD2_BF1YGqr3Lwie6Ra/exec";
@@ -283,6 +284,10 @@ function procesarInventario(regs){
       if(acc==="PARTO"){const m=(r[5]||"").match(/Vivos: (\d+)/);if(m)estados[id].piglets=parseInt(m[1]);estados[id].fechaFase=fecha}
       if(acc==="BAJA_LACTANCIA"){const m=(r[5]||"").match(/Cantidad: (\d+)/);if(m)estados[id].piglets=Math.max(0,estados[id].piglets-parseInt(m[1]))}
       if(acc==="DESTETE"){estados[id].piglets=0;estados[id].fechaFase=fecha}
+      if(acc==="ATETE"){
+        const mSal=r[5]?.match(/Salida de (\d+)/); if(mSal) estados[id].piglets=Math.max(0,(estados[id].piglets||0)-parseInt(mSal[1]));
+        const mEnt=r[5]?.match(/Entrada de (\d+)/); if(mEnt) estados[id].piglets=(estados[id].piglets||0)+parseInt(mEnt[1]);
+      }
       if(acc==="EMITIR_GUIA"){estados[id].tieneGuia=true}
       if(acc==="QUITAR_GUIA"){estados[id].tieneGuia=false}
     }
@@ -511,7 +516,7 @@ function DashboardView({data,onPhaseClick,onSubpuestoClick,onPigletsClick}){
     ),
     React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}},
       React.createElement("div",{onClick:onPigletsClick,className:"gradient-amber",style:{borderRadius:12,padding:16,textAlign:"center",boxShadow:"0 2px 8px rgba(0,0,0,.1)",cursor:"pointer"}},
-        React.createElement("p",{style:{fontSize:10,textTransform:"uppercase",letterSpacing:2,color:"rgba(255,255,255,.8)",fontWeight:600}},"Lechones Vivos"),
+        React.createElement("p",{style:{fontSize:10,textTransform:"uppercase",letterSpacing:2,color:"rgba(255,255,255,.8)",fontWeight:600}},"Lechones Predestete"),
         React.createElement("p",{style:{fontSize:28,fontWeight:700,color:"#fff",marginTop:4}},data.piglets)
       ),
       Object.entries(data.phases).sort((a,b)=>a[0].localeCompare(b[0])).map(([fase,info])=>{
@@ -892,7 +897,7 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
         isRepro&&React.createElement("p",null,"🐖 ",React.createElement("b",null,"Madurez:")," ",React.createElement("span",{style:{fontWeight:700,color:"var(--primary)"}},madurez)," ",React.createElement("span",{style:{color:"var(--muted-fg)",fontSize:12}},"("+sowStats.partos+" partos)"))
       ),
       !isInactive&&animal.piglets>0&&React.createElement("div",{style:{marginTop:12,display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(45,138,86,.1)",border:"1px solid rgba(45,138,86,.2)",borderRadius:8,padding:12}},
-        React.createElement("span",{style:{fontSize:14,fontWeight:700,color:"var(--success)"}},"🐷 "+animal.piglets+" Lechones Vivos"),
+        React.createElement("span",{style:{fontSize:14,fontWeight:700,color:"var(--success)"}},"🐷 "+animal.piglets+" Lechones Predestete"),
         React.createElement("button",{onClick:()=>onAction(animal.id,"BAJA_LACTANCIA"),style:{...btn,width:"auto",padding:"4px 12px",background:"var(--destructive)",color:"#fff",fontSize:11}},"💀 Baja")
       ),
 
@@ -913,7 +918,7 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
         isRepro&&subf.includes("SERVIDAS")&&animal.colorFase==="green"&&React.createElement("button",{onClick:()=>onAction(animal.id,"CONFIRMAR_GESTACION"),style:{...btn,gridColumn:"span 2",background:"var(--success)",color:"var(--success-fg)"}},"✅ Confirmar Preñez"),
         isRepro&&subf.includes("SERVIDAS")&&animal.colorFase==="green"&&React.createElement("button",{onClick:()=>onAction(animal.id,"RETORNO_VACIA"),style:{...btn,gridColumn:"span 2",background:"rgba(212,160,10,.2)",color:"var(--warning-fg)",border:"1px solid rgba(212,160,10,.4)"}},"⭕ Retorno Vacía"),
         showParto&&React.createElement("button",{onClick:()=>onAction(animal.id,"PARTO"),style:{...btn,gridColumn:"span 2",background:"var(--accent)",color:"var(--accent-fg)",padding:"12px 0",fontWeight:700,border:"2px solid var(--accent)"}},"🐷 Registrar Parto"),
-        showDestete&&React.createElement("button",{onClick:()=>onAction(animal.id,"DESTETE"),style:{...btn,gridColumn:"span 2",background:"var(--success)",color:"var(--success-fg)"}},"🥣 Registrar Destete"),
+        showDestete&&React.createElement("button",{onClick:()=>onAction(animal.id,"ATETE"),style:{...btn,gridColumn:"span 2",background:"#3b82f6",color:"#fff"}},"🍼 Registrar Atete"),
         React.createElement("button",{onClick:()=>onAction(animal.id,"ENFERMEDAD"),style:{...btn,background:"rgba(220,38,38,.1)",color:"var(--destructive)",border:"1px solid rgba(220,38,38,.3)"}},"🏥 Enfermedad"),
         React.createElement("button",{onClick:()=>onAction(animal.id,"MUERTE"),style:{...btn,background:"rgba(220,38,38,.1)",color:"var(--destructive)",border:"1px solid rgba(220,38,38,.3)"}},"🔴 Muerte"),
         React.createElement("button",{onClick:()=>onAction(animal.id,"VENTA"),style:{...btn,background:"rgba(212,160,10,.2)",color:"var(--warning-fg)",border:"1px solid rgba(212,160,10,.4)"}},"💰 Venta"),
@@ -1405,7 +1410,7 @@ function ResumenView({historial,onSelectAnimal,search}){
         return React.createElement("div",{key:cat.key,onClick:()=>data.count>0&&setExpanded(cat.key),style:{background:"var(--card)",borderRadius:12,padding:12,border:"1px solid var(--border)",boxShadow:"0 2px 6px rgba(0,0,0,.05)",cursor:data.count>0?"pointer":"default"}},
           React.createElement("p",{style:{fontSize:11,color:"var(--muted-fg)",fontWeight:500,marginBottom:4}},cat.label),
           React.createElement("p",{style:{fontSize:28,fontWeight:800,color:cat.color}},data.count),
-          cat.key==="PARTO"&&data.detalle&&React.createElement("p",{style:{fontSize:10,color:"var(--muted-fg)",marginTop:2}},"🐽 "+data.detalle+" lechones vivos"),
+          cat.key==="PARTO"&&data.detalle&&React.createElement("p",{style:{fontSize:10,color:"var(--muted-fg)",marginTop:2}},"🐽 "+data.detalle+" lechones Predestete"),
           cat.key==="VENTA"&&data.detalle&&parseFloat(data.detalle)>0&&React.createElement("p",{style:{fontSize:10,color:"var(--muted-fg)",marginTop:2}},"⚖️ "+data.detalle+" kg total"),
           cat.key==="BAJA_LACTANCIA"&&data.detalle&&React.createElement("p",{style:{fontSize:10,color:"var(--muted-fg)",marginTop:2}},"🐽 "+data.detalle+" lechones perdidos"),
           data.count>0&&React.createElement("p",{style:{fontSize:9,color:"var(--primary)",marginTop:4,fontWeight:600}},"Toca para ver detalle →")
@@ -1434,6 +1439,8 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
   const[nacidosMuertos,setNacidosMuertos]=useState("");
   const[momias,setMomias]=useState("");
   const[partoPrevioInfo,setPartoPrevioInfo]=useState(null);
+  const[cantAtete,setCantAtete]=useState("");
+  const[madreReceptora,setMadreReceptora]=useState("");
 
   // 1.5 AUTO-COMPLETAR INFO DEL ÚLTIMO PARTO EN EL DESTETE
   useEffect(() => {
@@ -1560,6 +1567,21 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
       if(accion==="RETORNO_VACIA")finalNotas="RETORNO VACÍA | "+notas;
       if(accion==="CAMBIAR_SUBFASE")finalNotas="CAMBIAR SUBFASE | Subfase: "+nuevaSubfase+" | "+notas;
       if(accion==="BAJA_LACTANCIA")finalNotas="BAJA LACTANCIA | Cantidad: "+cantBaja+" | Causa: "+(causaBaja||"Desconocida")+" "+notas;
+      if(accion==="ATETE"){
+        if(!madreReceptora || !cantAtete || parseInt(cantAtete) <= 0) { alert("Completa la madre receptora y una cantidad válida."); setSaving(false); return; }
+        const animalDonante = inventario.find(a=>a.id===tatuaje);
+        if(!animalDonante || animalDonante.piglets < parseInt(cantAtete)) { alert("La cerda donante no tiene suficientes lechones predestete."); setSaving(false); return; }
+        
+        await enviarBatch({
+          comun: { accion: "ATETE", fase: "REPRODUCTIVA", fecha: toAppsScriptDate(fechaStr) },
+          animales: [
+            { tatuaje: tatuaje, chapeta: chapeta, peso: "", sexo: "", notas: "ATETE | Salida de " + cantAtete + " lechones hacia Madre Receptora: " + madreReceptora + (notas ? " | " + notas : "") },
+            { tatuaje: madreReceptora, chapeta: "", peso: "", sexo: "", notas: "ATETE | Entrada de " + cantAtete + " lechones desde Madre Donante: " + tatuaje + (notas ? " | " + notas : "") }
+          ]
+        });
+        setSaving(false); onSuccess();
+        return; 
+      }
       if(accion==="VENTA")finalNotas="VENTA | Comprador: "+(comprador||"N/A")+" | Peso: "+peso+"kg "+notas;
       if(accion==="EMITIR_GUIA")finalNotas="GUÍA EMITIDA | "+notas;
       if(accion==="QUITAR_GUIA")finalNotas="GUÍA REVOCADA | "+notas;
@@ -1728,6 +1750,19 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
       React.createElement("input",{type:"number",value:cantBaja,onChange:e=>setCantBaja(e.target.value),style:inputS}),
       React.createElement("label",{style:labelS},"Causa"),
       React.createElement("input",{value:causaBaja,onChange:e=>setCausaBaja(e.target.value),placeholder:"Ej. Aplastamiento",style:inputS})
+    ),
+    accion==="ATETE"&&React.createElement("div",{style:{marginTop:16,padding:16,borderRadius:8,background:"rgba(59,130,246,.1)",border:"1px solid rgba(59,130,246,.2)"}},
+      React.createElement("h4",{style:{fontSize:14,fontWeight:700,color:"#3b82f6",marginBottom:8}},"🍼 Traslado de Lechones (Atete)"),
+      React.createElement("p", {style:{fontSize:12, marginBottom:12, color:"var(--muted-fg)"}}, "Los lechones se restarán de esta cerda (Donante) y se sumarán a la Receptora."),
+      React.createElement("label",{style:labelS},"ID Madre Receptora (Nodriza) *"),
+      React.createElement("select",{value:madreReceptora,onChange:e=>setMadreReceptora(e.target.value),style:inputS},
+        React.createElement("option",{value:""},"Selecciona una cerda nodriza..."),
+        inventario.filter(a => a.piglets > 0 && a.id !== tatuaje).map(n => 
+          React.createElement("option", {key:n.id, value:n.id}, "ID: " + n.id + " (📍 Puesto: " + (n.subpuesto||"N/A") + " | 🐷 " + n.piglets + " lechones)")
+        )
+      ),
+      React.createElement("label",{style:labelS},"Cantidad de lechones a mover *"),
+      React.createElement("input",{type:"number",value:cantAtete,onChange:e=>setCantAtete(e.target.value),style:inputS})
     ),
     accion==="DESTETE"&&React.createElement("div",{style:{marginTop:16,padding:16,borderRadius:8,background:"rgba(45,138,86,.1)",border:"1px solid rgba(45,138,86,.2)"}},
       React.createElement("h4",{style:{fontSize:14,fontWeight:700,color:"var(--success)",marginBottom:8}},"🥣 Movimiento de Lechones"),
