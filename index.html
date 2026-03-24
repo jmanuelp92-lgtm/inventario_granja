@@ -96,7 +96,7 @@ const ACCION_CONFIG={
   ATETE:{icon:"🍼",label:"Atete (Traslado Lechones)"},
 };
 
-const URL_SCRIPT="https://script.google.com/macros/s/AKfycbxE02CoqpyAY2g-DBHBQj4HLj62yBJUL36azqnQ_PJ3VRxjPdD2_BF1YGqr3Lwie6Ra/exec";
+const URL_SCRIPT="https://script.google.com/macros/s/AKfycbxHJ85IB1H8QOJVKWDYpeuw1iV0cIJul3IvF-dXL1A9I7K2Ncq3ZeAR_M1MwQedy6NRiQ/exec";
 
 /* ─── OFFLINE & OPTIMISTIC SYNC SYSTEM ─── */
 const CACHE_KEY = "granja_pro_cache";
@@ -763,7 +763,9 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
   const[editDate,setEditDate]=useState(undefined);
   const[savingDate,setSavingDate]=useState(false);
   const[applyingVacuna,setApplyingVacuna]=useState(null);
-
+  const[isEditingNac,setIsEditingNac]=useState(false);
+  const[editNacDate,setEditNacDate]=useState(undefined);
+  const[savingNac,setSavingNac]=useState(false);
   const[showDateModal,setShowDateModal]=useState(null); 
   const[selectedDate,setSelectedDate]=useState(new Date());
   const[vacunaNotas,setVacunaNotas]=useState("");
@@ -883,7 +885,20 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
         React.createElement("p",null,"🏷️ ",React.createElement("b",null,"Chapeta:")," ",animal.chapeta||"N/A"),
         React.createElement("p",null,"👩‍👦 ",React.createElement("b",null,"Madre:")," ",animal.madre||"N/A"),
         React.createElement("p",null,"🚻 ",React.createElement("b",null,"Sexo:")," ",animal.sexo==="M"?"♂ Macho":animal.sexo==="H"?"♀ Hembra":(animal.sexo||"N/A")),
-        React.createElement("p",null,"🎂 ",React.createElement("b",null,"Fecha Nac.:")," ",animal.fechaNacimiento?dateKeyToLabel(extractDateKey(animal.fechaNacimiento)):"N/A"),
+        React.createElement("div",{style:{marginBottom: 8}},
+  React.createElement("div",{style:{display:"flex", alignItems:"center", gap:8}},
+    React.createElement("p",{style:{margin:0}},"🎂 ",React.createElement("b",null,"Fecha Nac.:")," ",animal.fechaNacimiento?dateKeyToLabel(extractDateKey(animal.fechaNacimiento)):"N/A"),
+    !isEditingNac && React.createElement("button",{onClick:()=>{const dk=extractDateKey(animal.fechaNacimiento);setEditNacDate(dk?new Date(dk+"T12:00:00"):undefined);setIsEditingNac(true);},style:{color:"var(--primary)",fontSize:12},title:"Editar fecha de nacimiento"},"✏️")
+  ),
+  isEditingNac && React.createElement("div",{style:{marginTop:8,padding:12,borderRadius:8,background:"var(--muted)",border:"1px solid var(--border)"}},
+    React.createElement("p",{style:{fontSize:12,fontWeight:600,marginBottom:8}},"📅 Cambiar fecha de nacimiento:"),
+    React.createElement(DateInput,{value:editNacDate,onChange:d=>setEditNacDate(d)}),
+    React.createElement("div",{style:{display:"flex",gap:8,marginTop:8}},
+      React.createElement("button",{onClick:()=>setIsEditingNac(false),style:{padding:"6px 12px",borderRadius:6,background:"var(--bg)",color:"var(--card-fg)",fontSize:12,fontWeight:600,border:"1px solid var(--border)"}},"Cancelar"),
+      React.createElement("button",{disabled:!editNacDate||savingNac,onClick:async()=>{if(!editNacDate)return;setSavingNac(true);try{const newDateKey=formatDateStr(editNacDate);await enviarRegistro({tipo:"EDITAR_FECHA_NACIMIENTO",tatuaje:animal.id,fechaNueva:toAppsScriptDate(newDateKey)});setIsEditingNac(false);if(onRefresh)onRefresh();}catch(err){alert("Error al actualizar la fecha")}finally{setSavingNac(false)}},style:{padding:"6px 12px",borderRadius:6,background:"var(--primary)",color:"var(--primary-fg)",fontSize:12,fontWeight:600,opacity:(!editNacDate||savingNac)?.5:1}},savingNac?"Guardando...":"💾 Guardar")
+    )
+  )
+),
         React.createElement("p",null,"📋 ",React.createElement("b",null,"Fase:")," ",(animal.fase||"").replace(/_/g," ")||"N/A"),
         React.createElement("p",null,"⚖️ ",React.createElement("b",null,"Último Peso:")," ",React.createElement("span",{style:{fontWeight:600,color:"var(--primary)"}},ultimoPeso)),
         isRepro&&animal.subfase&&(()=>{
@@ -1943,43 +1958,62 @@ function App(){
     const handleSyncAllDone=()=>{ /* Ya no forzamos recarga de Google Sheets para no borrar la caché de trabajo rápido */ };
 
     const handleOptimisticSave=(e)=>{
-      const d = e.detail;
-      setHistorial(prev=>{
-        const next = [...prev, [
-          d.fecha || new Date().toISOString(), // 0 (A)
-          d.tatuaje || "",                     // 1 (B)
-          d.accion || "",                      // 2 (C)
-          d.fase || "",                        // 3 (D)
-          "",                                  // 4 (E)
-          d.notas || "",                       // 5 (F)
-          "",                                  // 6 (G)
-          d.madre || "",                       // 7 (H)
-          "",                                  // 8 (I)
-          "",                                  // 9 (J)
-          d.chapeta || "",                     // 10 (K)
-          d.peso || "",                        // 11 (L)
-          d.subpuesto || "",                   // 12 (M)
-          d.inseminador || "",                 // 13 (N)
-          d.sexo || "",                        // 14 (O)
-          d.fechaNacimiento || "",             // 15 (P)
-          d.usuario || ""                      // 16 (Q) <--- NUEVO USUARIO
-        ]];
-        /* 👇 INICIO NUEVO: GUARDAR EN CACHÉ LOCAL INMEDIATAMENTE 👇 */
-        try {
-          const cacheStr = localStorage.getItem(CACHE_KEY);
-          if (cacheStr) {
-             const cache = JSON.parse(cacheStr);
-             cache.registros = next;
-             localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
-          }
-        } catch(err) {}
-        /* 👆 FIN NUEVO 👆 */
-        const result = procesarInventario(next);
-        setInventario(result.activos);
-        setTodosAnimales(result.todos);
-        return next;
-      });
-    };
+  const d = e.detail;
+  setHistorial(prev=>{
+    let next = [...prev];
+    
+    if (d.tipo === "EDITAR_FECHA") {
+       const idx = next.findIndex(r => r[1]?.toString()===d.tatuaje && r[2]===d.accion && extractDateKey(r[0])===extractDateKey(d.fechaOriginal));
+       if(idx >= 0){
+         next[idx] = [...next[idx]];
+         next[idx][0] = d.fechaNueva;
+       }
+    } else if (d.tipo === "EDITAR_FECHA_NACIMIENTO") {
+       next = next.map(r => {
+         if(r[1]?.toString() === d.tatuaje) {
+           const newRow = [...r];
+           newRow[15] = d.fechaNueva; // Columna P
+           return newRow;
+         }
+         return r;
+       });
+    } else {
+       next.push([
+         d.fecha || new Date().toISOString(), // 0 (A)
+         d.tatuaje || "",                     // 1 (B)
+         d.accion || "",                      // 2 (C)
+         d.fase || "",                        // 3 (D)
+         "",                                  // 4 (E)
+         d.notas || "",                       // 5 (F)
+         "",                                  // 6 (G)
+         d.madre || "",                       // 7 (H)
+         "",                                  // 8 (I)
+         "",                                  // 9 (J)
+         d.chapeta || "",                     // 10 (K)
+         d.peso || "",                        // 11 (L)
+         d.subpuesto || "",                   // 12 (M)
+         d.inseminador || "",                 // 13 (N)
+         d.sexo || "",                        // 14 (O)
+         d.fechaNacimiento || "",             // 15 (P)
+         d.usuario || ""                      // 16 (Q)
+       ]);
+    }
+
+    try {
+      const cacheStr = localStorage.getItem(CACHE_KEY);
+      if (cacheStr) {
+         const cache = JSON.parse(cacheStr);
+         cache.registros = next;
+         localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+      }
+    } catch(err) {}
+
+    const result = procesarInventario(next);
+    setInventario(result.activos);
+    setTodosAnimales(result.todos);
+    return next;
+  });
+};
 
     const handleOptimisticBatch=(e)=>{
       const {comun, animales} = e.detail;
