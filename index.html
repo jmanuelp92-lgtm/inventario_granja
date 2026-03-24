@@ -97,7 +97,7 @@ const ACCION_CONFIG={
   PARTO_HISTORICO:{icon:"📜",label:"Parto Histórico (Anterior)"},
 };
 
-const URL_SCRIPT="https://script.google.com/macros/s/AKfycbyqmzzBEpRJ8yn782Db2ZkR6DDghVNaytJVNQ0tcqhDt-Kd_Yf_2F6pxEjvEJPNTPm9bw/exec";
+const URL_SCRIPT="https://script.google.com/macros/s/AKfycbxoUyKzATVge_UPe0h_iNtX6SCHqxFl_2bC-86Zj9EnFFza3Fe3H7alBxtSQnqJnLgl0A/exec";
 
 /* ─── OFFLINE & OPTIMISTIC SYNC SYSTEM ─── */
 const CACHE_KEY = "granja_pro_cache";
@@ -1456,28 +1456,33 @@ function ResumenView({historial,onSelectAnimal,search}){
 }
 function PartosAnterioresView({ inventario, onSuccess }) {
   const [tatuaje, setTatuaje] = useState("");
-  const [showOptions, setShowOptions] = useState(false); // <--- NUEVO: Controla si se ve la lista
+  const [showOptions, setShowOptions] = useState(false);
   const [fechaEvento, setFechaEvento] = useState(new Date());
+  
+  // Contadores de la camada
   const [vivos, setVivos] = useState("");
+  const [hembrasNacidas, setHembrasNacidas] = useState(""); // <-- NUEVO CAMPO
+  const [machosNacidos, setMachosNacidos] = useState("");   // <-- NUEVO CAMPO
   const [nacidosMuertos, setNacidosMuertos] = useState("");
   const [momias, setMomias] = useState("");
   const [murieronNacer, setMurieronNacer] = useState("");
   const [pesoTotal, setPesoTotal] = useState("");
   const [notas, setNotas] = useState("");
+  
   const [saving, setSaving] = useState(false);
 
   // Filtramos para que solo salgan hembras activas
   const hembras = inventario.filter(a => a.sexo !== "M" && a.activo);
 
-  // --- NUEVO: Lógica para filtrar las opciones según lo que se escribe ---
   const opcionesFiltradas = hembras.filter(h => 
     h.id.toString().toUpperCase().includes(tatuaje.toUpperCase()) || 
     (h.chapeta && h.chapeta.toString().toUpperCase().includes(tatuaje.toUpperCase()))
-  ).slice(0, 15); // Mostramos solo los primeros 15 para no saturar la pantalla
+  ).slice(0, 15);
 
   const handleSubmit = async () => {
     if (!tatuaje) { alert("Selecciona una cerda"); return; }
-    // Validar que el ID escrito realmente exista en la granja
+    
+    // Buscar el animal exacto en el inventario
     const animal = hembras.find(a => a.id.toString().toUpperCase() === tatuaje.toUpperCase());
     if (!animal) { alert("El ID ingresado no corresponde a una cerda activa válida."); return; }
 
@@ -1487,21 +1492,31 @@ function PartosAnterioresView({ inventario, onSuccess }) {
     try {
       const totalMuertos = (parseInt(murieronNacer) || 0) + (parseInt(nacidosMuertos) || 0) + (parseInt(momias) || 0);
 
-      const finalNotas = "PARTO HISTÓRICO | Vivos: " + vivos + " | Muertos: " + totalMuertos + " | Detalle Muertes: " + (murieronNacer || 0) + " MN, " + (nacidosMuertos || 0) + " NM, " + (momias || 0) + " Momias | Peso Total: " + (pesoTotal || 0) + "kg | " + notas;
+      // Agregamos Hembras y Machos a la estructura de la nota
+      const finalNotas = "PARTO HISTÓRICO | Vivos: " + vivos + " | Muertos: " + totalMuertos + " | Detalle Muertes: " + (murieronNacer || 0) + " MN, " + (nacidosMuertos || 0) + " NM, " + (momias || 0) + " Momias | Hembras: " + (hembrasNacidas || 0) + " | Machos: " + (machosNacidos || 0) + " | Peso Total: " + (pesoTotal || 0) + "kg | " + notas;
 
       await enviarRegistro({
+        tipo: "REGISTRO", 
         fecha: toAppsScriptDate(formatDateStr(fechaEvento)),
-        tatuaje: animal.id, // Usamos el ID exacto encontrado
+        tatuaje: animal.id,
+        chapeta: animal.chapeta || "",
+        peso: pesoTotal || "",
+        sexo: animal.sexo || "H",
         accion: "PARTO_HISTORICO",
         fase: animal?.fase || "REPRODUCTIVA", 
         subpuesto: animal?.subpuesto || "",
-        notas: finalNotas
+        notas: finalNotas,
+        inseminador: "",
+        madre: animal.madre || "",
+        fechaNacimiento: animal.fechaNacimiento || ""
       });
 
       alert("Parto histórico guardado con éxito.");
       onSuccess();
     } catch (e) {
-      alert("Error al guardar el parto histórico.");
+      console.error(e);
+      // Ahora la alerta mostrará el motivo real del error (e.message) si vuelve a fallar
+      alert("Error al guardar el parto histórico: " + e.message); 
     } finally {
       setSaving(false);
     }
@@ -1515,14 +1530,12 @@ function PartosAnterioresView({ inventario, onSuccess }) {
     React.createElement("p", { style: { fontSize: 12, color: "var(--muted-fg)", marginBottom: 16 } }, "Se añadirá al historial y estadísticas de la cerda, pero no creará lechones activos ni afectará su estado actual."),
 
     React.createElement("label", { style: labelS }, "ID de la Cerda *"),
-    
-    /* 👇 NUEVO CAMPO DE BÚSQUEDA ESTILO GOOGLE 👇 */
     React.createElement("div", { style: { position: "relative" } },
       React.createElement("input", {
         value: tatuaje,
         onChange: e => { setTatuaje(e.target.value); setShowOptions(true); },
         onFocus: () => setShowOptions(true),
-        onBlur: () => setTimeout(() => setShowOptions(false), 200), // Retraso de 200ms para permitir hacer clic en la sugerencia
+        onBlur: () => setTimeout(() => setShowOptions(false), 200),
         placeholder: "🔍 Escribe el ID o Chapeta...",
         style: inputS,
         autoComplete: "off"
@@ -1539,19 +1552,26 @@ function PartosAnterioresView({ inventario, onSuccess }) {
         ) : React.createElement("div", { style: { padding: "10px 12px", fontSize: 14, color: "var(--muted-fg)", textAlign: "center" } }, "No se encontraron cerdas")
       )
     ),
-    /* 👆 FIN DEL NUEVO CAMPO 👆 */
 
     React.createElement("label", { style: labelS }, "📅 Fecha del Parto *"),
     React.createElement(DateInput, { value: fechaEvento, onChange: d => setFechaEvento(d) }),
 
+    React.createElement("label", { style: labelS }, "Lechones Vivos"),
+    React.createElement("input", { type: "number", value: vivos, onChange: e => setVivos(e.target.value), style: inputS }),
+
+    /* 👇 NUEVO BLOQUE DE HEMBRAS Y MACHOS 👇 */
     React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 } },
-      React.createElement("div", null, React.createElement("label", { style: { ...labelS, marginTop: 0 } }, "Vivos"), React.createElement("input", { type: "number", value: vivos, onChange: e => setVivos(e.target.value), style: inputS })),
-      React.createElement("div", null, React.createElement("label", { style: { ...labelS, marginTop: 0 } }, "Murieron al nacer"), React.createElement("input", { type: "number", value: murieronNacer, onChange: e => setMurieronNacer(e.target.value), style: inputS }))
+      React.createElement("div", null, React.createElement("label", { style: { ...labelS, marginTop: 0 } }, "♀ Hembras"), React.createElement("input", { type: "number", value: hembrasNacidas, onChange: e => setHembrasNacidas(e.target.value), style: inputS })),
+      React.createElement("div", null, React.createElement("label", { style: { ...labelS, marginTop: 0 } }, "♂ Machos"), React.createElement("input", { type: "number", value: machosNacidos, onChange: e => setMachosNacidos(e.target.value), style: inputS }))
     ),
+
     React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 } },
       React.createElement("div", null, React.createElement("label", { style: { ...labelS, marginTop: 0 } }, "Nacidos Muertos"), React.createElement("input", { type: "number", value: nacidosMuertos, onChange: e => setNacidosMuertos(e.target.value), style: inputS })),
       React.createElement("div", null, React.createElement("label", { style: { ...labelS, marginTop: 0 } }, "Momias"), React.createElement("input", { type: "number", value: momias, onChange: e => setMomias(e.target.value), style: inputS }))
     ),
+    
+    React.createElement("label", { style: { ...labelS, marginTop: 12 } }, "Murieron al nacer"),
+    React.createElement("input", { type: "number", value: murieronNacer, onChange: e => setMurieronNacer(e.target.value), style: inputS }),
 
     React.createElement("label", { style: labelS }, "Peso Total de la Camada (kg)"),
     React.createElement("input", { type: "number", value: pesoTotal, onChange: e => setPesoTotal(e.target.value), placeholder: "Ej. 14.5", style: inputS }),
