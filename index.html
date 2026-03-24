@@ -778,7 +778,7 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
 
   const sowStats=useMemo(()=>{
     const records=historial.filter(h=>h[1]?.toString()===animal.id);
-    const partos=records.filter(r=>r[2]==="PARTO" || r[2]==="PARTO_HISTORICO"),servicios=records.filter(r=>r[2]==="SERVICIO"),destetes=records.filter(r=>r[2]==="DESTETE"),bajas=records.filter(r=>r[2]==="BAJA_LACTANCIA");
+    const partos=records.filter(r=>{const a=String(r[2]||"").trim().toUpperCase(); return a==="PARTO"||a==="PARTO_HISTORICO"}),servicios=records.filter(r=>String(r[2]||"").trim().toUpperCase()==="SERVICIO"),destetes=records.filter(r=>String(r[2]||"").trim().toUpperCase()==="DESTETE"),bajas=records.filter(r=>String(r[2]||"").trim().toUpperCase()==="BAJA_LACTANCIA");
     let totalNV=0,totalNM=0,totalPN=0,totalH=0,totalM=0;const partoDetails=[];
     partos.forEach(p=>{const n=p[5]||"";const mV=n.match(/Vivos:\s*(\d+)/),mMu=n.match(/Muertos:\s*(\d+)/),mP=n.match(/Peso Total:\s*([\d.]+)/),mH=n.match(/Hembras:\s*(\d+)/),mMa=n.match(/Machos:\s*(\d+)/),mPa=n.match(/Padre:\s*([^\s|]+)/);
     const v=mV?parseInt(mV[1]):0,mu=mMu?parseInt(mMu[1]):0,pe=mP?parseFloat(mP[1]):0,h=mH?parseInt(mH[1]):0,ma=mMa?parseInt(mMa[1]):0,pa=mPa?mPa[1]:"";
@@ -793,7 +793,7 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
 
   const isSow=sowStats.partos>0||sowStats.servicios>0||["SALA_SERVICIO","GESTACION","REPRODUCTIVA","DESCANSO"].includes(animal.fase);
   const isInactive=!animal.activo;
-  const isRepro=animal.fase==="REPRODUCTIVA";
+  const isRepro=animal.fase==="REPRODUCTIVA" || animal.fase==="REEMPLAZO" || animal.fase==="SELECTA";
   const subf=animal.subfase||"";
   const showParto=!isInactive&&isRepro&&(subf.includes("GESTANTE")||subf.includes("PROXIMA"))&&animal.piglets===0;
   const showDestete=!isInactive&&animal.piglets>0;
@@ -2278,7 +2278,7 @@ function App(){
   const handlePigletsClick=()=>{setListTitle("Lechones");setListAnimals(filteredInv.filter(a=>a.piglets>0));setDashView("list")};
   const handleSelectAnimal=id=>{const a=todosAnimales.find(x=>x.id===id);if(a){setSelectedAnimal(a);setDashView("detail")}};
 
-  const getMadurez=useCallback(id=>{const partos=historial.filter(h=>h[1]?.toString()===id&&h[2]==="PARTO").length;if(partos===0)return"NULIPARAS";if(partos===1)return"PRIMIPARAS";if(partos===2)return"MULTIPARAS";return"MULTIPARAS +"+partos},[historial]);
+  const getMadurez=useCallback(id=>{const partos=historial.filter(h=>{const a=String(h[2]||"").trim().toUpperCase(); return h[1]?.toString()===id && (a==="PARTO" || a==="PARTO_HISTORICO");}).length;if(partos===0)return"NULÍPARAS";if(partos===1)return"PRIMÍPARAS";if(partos===2)return"MULTÍPARAS";return"MULTÍPARAS +"+partos},[historial]);
 
   const handleAction=(id,accion)=>{setPrefillId(id);setPrefillAccion(accion);const a=todosAnimales.find(x=>x.id===id)||null;setPrefillAnimal(a);setTab("registro")};
   
