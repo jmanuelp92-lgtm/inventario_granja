@@ -94,9 +94,10 @@ const ACCION_CONFIG={
   EMITIR_GUIA:{icon:"📄",label:"Emitir Guía"},
   QUITAR_GUIA:{icon:"❌",label:"Quitar Guía"},
   ATETE:{icon:"🍼",label:"Atete (Traslado Lechones)"},
+  PARTO_HISTORICO:{icon:"📜",label:"Parto Histórico (Anterior)"},
 };
 
-const URL_SCRIPT="https://script.google.com/macros/s/AKfycbxHJ85IB1H8QOJVKWDYpeuw1iV0cIJul3IvF-dXL1A9I7K2Ncq3ZeAR_M1MwQedy6NRiQ/exec";
+const URL_SCRIPT="https://script.google.com/macros/s/AKfycbyqmzzBEpRJ8yn782Db2ZkR6DDghVNaytJVNQ0tcqhDt-Kd_Yf_2F6pxEjvEJPNTPm9bw/exec";
 
 /* ─── OFFLINE & OPTIMISTIC SYNC SYSTEM ─── */
 const CACHE_KEY = "granja_pro_cache";
@@ -235,6 +236,7 @@ function calcularSubfase(id,regs){
     if(acc==="INGRESO"){const m=(r[5]||"").match(/Subfase:\s*(\w+)/);if(m)subfaseIngreso=m[1]}
     if(acc==="SERVICIO"){lServ=i;tServ++}
     if(acc==="PARTO"){lParto=i;tPartos++}
+    if(acc==="PARTO_HISTORICO"){tPartos++} 
     if(acc==="DESTETE")lDest=i;
     if(acc==="CONFIRMAR_GESTACION")lConf=i;
     if(acc==="RETORNO_VACIA")lRet=i;
@@ -471,6 +473,7 @@ function FarmHeader({searchValue,onSearch,onNavigate,activeTab, isOnline, queueC
     {id:"vacunas",label:"📅 Actividades"},
     {id:"reportes",label:"📋 Reportes"},
     {id:"resumen",label:"📊 Resumen"},
+    {id:"partos_hist",label:"📜 Partos Anteriores"}, // <--- AÑADE ESTA LÍNEA
     {id:"logout",label:"🚪 Cerrar Sesión"} 
   ];
   return React.createElement("header",{style:{position:"sticky",top:0,zIndex:40,boxShadow:"0 4px 12px rgba(0,0,0,.15)"},className:"gradient-farm"},
@@ -763,6 +766,9 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
   const[editDate,setEditDate]=useState(undefined);
   const[savingDate,setSavingDate]=useState(false);
   const[applyingVacuna,setApplyingVacuna]=useState(null);
+  const[isEditingMadre,setIsEditingMadre]=useState(false);
+  const[editMadreVal,setEditMadreVal]=useState("");
+  const[savingMadre,setSavingMadre]=useState(false);  
   const[isEditingNac,setIsEditingNac]=useState(false);
   const[editNacDate,setEditNacDate]=useState(undefined);
   const[savingNac,setSavingNac]=useState(false);
@@ -772,7 +778,7 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
 
   const sowStats=useMemo(()=>{
     const records=historial.filter(h=>h[1]?.toString()===animal.id);
-    const partos=records.filter(r=>r[2]==="PARTO"),servicios=records.filter(r=>r[2]==="SERVICIO"),destetes=records.filter(r=>r[2]==="DESTETE"),bajas=records.filter(r=>r[2]==="BAJA_LACTANCIA");
+    const partos=records.filter(r=>r[2]==="PARTO" || r[2]==="PARTO_HISTORICO"),servicios=records.filter(r=>r[2]==="SERVICIO"),destetes=records.filter(r=>r[2]==="DESTETE"),bajas=records.filter(r=>r[2]==="BAJA_LACTANCIA");
     let totalNV=0,totalNM=0,totalPN=0,totalH=0,totalM=0;const partoDetails=[];
     partos.forEach(p=>{const n=p[5]||"";const mV=n.match(/Vivos:\s*(\d+)/),mMu=n.match(/Muertos:\s*(\d+)/),mP=n.match(/Peso Total:\s*([\d.]+)/),mH=n.match(/Hembras:\s*(\d+)/),mMa=n.match(/Machos:\s*(\d+)/),mPa=n.match(/Padre:\s*([^\s|]+)/);
     const v=mV?parseInt(mV[1]):0,mu=mMu?parseInt(mMu[1]):0,pe=mP?parseFloat(mP[1]):0,h=mH?parseInt(mH[1]):0,ma=mMa?parseInt(mMa[1]):0,pa=mPa?mPa[1]:"";
@@ -883,7 +889,20 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
       React.createElement("div",{style:{marginTop:16,fontSize:14,lineHeight:2}},
         React.createElement("p",null,"📍 ",React.createElement("b",null,"Puesto:")," ",animal.subpuesto||"N/A"),
         React.createElement("p",null,"🏷️ ",React.createElement("b",null,"Chapeta:")," ",animal.chapeta||"N/A"),
-        React.createElement("p",null,"👩‍👦 ",React.createElement("b",null,"Madre:")," ",animal.madre||"N/A"),
+        React.createElement("div",{style:{marginBottom: 8}},
+  React.createElement("div",{style:{display:"flex", alignItems:"center", gap:8}},
+    React.createElement("p",{style:{margin:0}},"👩‍👦 ",React.createElement("b",null,"Madre:")," ",animal.madre||"N/A"),
+    !isEditingMadre && React.createElement("button",{onClick:()=>{setEditMadreVal(animal.madre||"");setIsEditingMadre(true);},style:{color:"var(--primary)",fontSize:12},title:"Editar madre"},"✏️")
+  ),
+  isEditingMadre && React.createElement("div",{style:{marginTop:8,padding:12,borderRadius:8,background:"var(--muted)",border:"1px solid var(--border)"}},
+    React.createElement("p",{style:{fontSize:12,fontWeight:600,marginBottom:8}},"👩‍👦 Cambiar ID de la madre:"),
+    React.createElement("input",{value:editMadreVal,onChange:e=>setEditMadreVal(e.target.value),placeholder:"ID de la madre",style:{width:"100%",padding:"8px",borderRadius:8,border:"1px solid var(--border)",outline:"none",fontFamily:"inherit"}}),
+    React.createElement("div",{style:{display:"flex",gap:8,marginTop:8}},
+      React.createElement("button",{onClick:()=>setIsEditingMadre(false),style:{padding:"6px 12px",borderRadius:6,background:"var(--bg)",color:"var(--card-fg)",fontSize:12,fontWeight:600,border:"1px solid var(--border)"}},"Cancelar"),
+      React.createElement("button",{disabled:savingMadre,onClick:async()=>{setSavingMadre(true);try{await enviarRegistro({tipo:"EDITAR_MADRE",tatuaje:animal.id,madreNueva:editMadreVal.trim()});setIsEditingMadre(false);if(onRefresh)onRefresh();}catch(err){alert("Error al actualizar la madre")}finally{setSavingMadre(false)}},style:{padding:"6px 12px",borderRadius:6,background:"var(--primary)",color:"var(--primary-fg)",fontSize:12,fontWeight:600,opacity:savingMadre?.5:1}},savingMadre?"Guardando...":"💾 Guardar")
+    )
+  )
+),
         React.createElement("p",null,"🚻 ",React.createElement("b",null,"Sexo:")," ",animal.sexo==="M"?"♂ Macho":animal.sexo==="H"?"♀ Hembra":(animal.sexo||"N/A")),
         React.createElement("div",{style:{marginBottom: 8}},
   React.createElement("div",{style:{display:"flex", alignItems:"center", gap:8}},
@@ -1435,6 +1454,114 @@ function ResumenView({historial,onSelectAnimal,search}){
     )
   );
 }
+function PartosAnterioresView({ inventario, onSuccess }) {
+  const [tatuaje, setTatuaje] = useState("");
+  const [showOptions, setShowOptions] = useState(false); // <--- NUEVO: Controla si se ve la lista
+  const [fechaEvento, setFechaEvento] = useState(new Date());
+  const [vivos, setVivos] = useState("");
+  const [nacidosMuertos, setNacidosMuertos] = useState("");
+  const [momias, setMomias] = useState("");
+  const [murieronNacer, setMurieronNacer] = useState("");
+  const [pesoTotal, setPesoTotal] = useState("");
+  const [notas, setNotas] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  // Filtramos para que solo salgan hembras activas
+  const hembras = inventario.filter(a => a.sexo !== "M" && a.activo);
+
+  // --- NUEVO: Lógica para filtrar las opciones según lo que se escribe ---
+  const opcionesFiltradas = hembras.filter(h => 
+    h.id.toString().toUpperCase().includes(tatuaje.toUpperCase()) || 
+    (h.chapeta && h.chapeta.toString().toUpperCase().includes(tatuaje.toUpperCase()))
+  ).slice(0, 15); // Mostramos solo los primeros 15 para no saturar la pantalla
+
+  const handleSubmit = async () => {
+    if (!tatuaje) { alert("Selecciona una cerda"); return; }
+    // Validar que el ID escrito realmente exista en la granja
+    const animal = hembras.find(a => a.id.toString().toUpperCase() === tatuaje.toUpperCase());
+    if (!animal) { alert("El ID ingresado no corresponde a una cerda activa válida."); return; }
+
+    if (!fechaEvento) { alert("Selecciona la fecha del parto"); return; }
+
+    setSaving(true);
+    try {
+      const totalMuertos = (parseInt(murieronNacer) || 0) + (parseInt(nacidosMuertos) || 0) + (parseInt(momias) || 0);
+
+      const finalNotas = "PARTO HISTÓRICO | Vivos: " + vivos + " | Muertos: " + totalMuertos + " | Detalle Muertes: " + (murieronNacer || 0) + " MN, " + (nacidosMuertos || 0) + " NM, " + (momias || 0) + " Momias | Peso Total: " + (pesoTotal || 0) + "kg | " + notas;
+
+      await enviarRegistro({
+        fecha: toAppsScriptDate(formatDateStr(fechaEvento)),
+        tatuaje: animal.id, // Usamos el ID exacto encontrado
+        accion: "PARTO_HISTORICO",
+        fase: animal?.fase || "REPRODUCTIVA", 
+        subpuesto: animal?.subpuesto || "",
+        notas: finalNotas
+      });
+
+      alert("Parto histórico guardado con éxito.");
+      onSuccess();
+    } catch (e) {
+      alert("Error al guardar el parto histórico.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inputS = { width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid var(--input)", background: "var(--bg)", color: "var(--fg)", fontSize: 14, outline: "none" };
+  const labelS = { display: "block", fontSize: 14, fontWeight: 600, marginTop: 16, marginBottom: 4 };
+
+  return React.createElement("div", { className: "animate-fade-in", style: { background: "var(--card)", borderRadius: 12, padding: 20, boxShadow: "0 2px 10px rgba(0,0,0,.08)", border: "1px solid var(--border)" } },
+    React.createElement("h3", { style: { fontSize: 18, fontWeight: 700, marginBottom: 8, color: "var(--accent)" } }, "📜 Registrar Parto Anterior"),
+    React.createElement("p", { style: { fontSize: 12, color: "var(--muted-fg)", marginBottom: 16 } }, "Se añadirá al historial y estadísticas de la cerda, pero no creará lechones activos ni afectará su estado actual."),
+
+    React.createElement("label", { style: labelS }, "ID de la Cerda *"),
+    
+    /* 👇 NUEVO CAMPO DE BÚSQUEDA ESTILO GOOGLE 👇 */
+    React.createElement("div", { style: { position: "relative" } },
+      React.createElement("input", {
+        value: tatuaje,
+        onChange: e => { setTatuaje(e.target.value); setShowOptions(true); },
+        onFocus: () => setShowOptions(true),
+        onBlur: () => setTimeout(() => setShowOptions(false), 200), // Retraso de 200ms para permitir hacer clic en la sugerencia
+        placeholder: "🔍 Escribe el ID o Chapeta...",
+        style: inputS,
+        autoComplete: "off"
+      }),
+      showOptions && tatuaje.length > 0 && React.createElement("div", { 
+        style: { position: "absolute", top: "100%", left: 0, right: 0, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, maxHeight: 200, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 15px rgba(0,0,0,0.1)", marginTop: 4 } 
+      },
+        opcionesFiltradas.length > 0 ? opcionesFiltradas.map(h => 
+          React.createElement("div", {
+            key: h.id,
+            onClick: () => { setTatuaje(h.id.toString()); setShowOptions(false); },
+            style: { padding: "10px 12px", borderBottom: "1px solid var(--border)", cursor: "pointer", fontSize: 14, color: "var(--fg)" }
+          }, "🐷 ID: ", React.createElement("b", null, h.id), h.chapeta ? " · 🏷️ " + h.chapeta : "")
+        ) : React.createElement("div", { style: { padding: "10px 12px", fontSize: 14, color: "var(--muted-fg)", textAlign: "center" } }, "No se encontraron cerdas")
+      )
+    ),
+    /* 👆 FIN DEL NUEVO CAMPO 👆 */
+
+    React.createElement("label", { style: labelS }, "📅 Fecha del Parto *"),
+    React.createElement(DateInput, { value: fechaEvento, onChange: d => setFechaEvento(d) }),
+
+    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 } },
+      React.createElement("div", null, React.createElement("label", { style: { ...labelS, marginTop: 0 } }, "Vivos"), React.createElement("input", { type: "number", value: vivos, onChange: e => setVivos(e.target.value), style: inputS })),
+      React.createElement("div", null, React.createElement("label", { style: { ...labelS, marginTop: 0 } }, "Murieron al nacer"), React.createElement("input", { type: "number", value: murieronNacer, onChange: e => setMurieronNacer(e.target.value), style: inputS }))
+    ),
+    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 } },
+      React.createElement("div", null, React.createElement("label", { style: { ...labelS, marginTop: 0 } }, "Nacidos Muertos"), React.createElement("input", { type: "number", value: nacidosMuertos, onChange: e => setNacidosMuertos(e.target.value), style: inputS })),
+      React.createElement("div", null, React.createElement("label", { style: { ...labelS, marginTop: 0 } }, "Momias"), React.createElement("input", { type: "number", value: momias, onChange: e => setMomias(e.target.value), style: inputS }))
+    ),
+
+    React.createElement("label", { style: labelS }, "Peso Total de la Camada (kg)"),
+    React.createElement("input", { type: "number", value: pesoTotal, onChange: e => setPesoTotal(e.target.value), placeholder: "Ej. 14.5", style: inputS }),
+
+    React.createElement("label", { style: labelS }, "Notas Adicionales"),
+    React.createElement("input", { value: notas, onChange: e => setNotas(e.target.value), placeholder: "Ej. Parto de su ciclo anterior...", style: inputS }),
+
+    React.createElement("button", { onClick: handleSubmit, disabled: saving, style: { width: "100%", marginTop: 24, padding: "14px 0", borderRadius: 8, background: "var(--accent)", color: "var(--accent-fg)", fontWeight: 700, fontSize: 16, border: "none" } }, (saving ? "Guardando..." : "Guardar Historial 💾"))
+  );
+}
 
 function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnimal,historial,onSuccess}){
   const allFases=[...new Set([...FASES_DEFAULT,...fasesExtra])];
@@ -1977,6 +2104,15 @@ function App(){
          }
          return r;
        });
+    } else if (d.tipo === "EDITAR_MADRE") {
+       next = next.map(r => {
+         if(r[1]?.toString() === d.tatuaje) {
+           const newRow = [...r];
+           newRow[7] = d.madreNueva; // Columna H
+           return newRow;
+         }
+         return r;
+       });
     } else {
        next.push([
          d.fecha || new Date().toISOString(), // 0 (A)
@@ -2192,7 +2328,8 @@ function App(){
       tab==="registro"&&React.createElement(RegistroForm,{inventario:inventario,fasesExtra:fasesExtra,prefillId:prefillId,prefillAccion:prefillAccion,prefillAnimal:prefillAnimal,historial:historial,onSuccess:()=>{handleTabChange("dashboard")}}),
       tab==="reportes"&&React.createElement(ReportsView,{historial:historial,search:search,onSelectAnimal:id=>{const a=todosAnimales.find(x=>x.id===id);if(a){setSelectedAnimal(a);setTab("dashboard");setDashView("detail")}}}),
       tab==="resumen"&&React.createElement(ResumenView,{historial:historial,search:search,onSelectAnimal:id=>{const a=todosAnimales.find(x=>x.id===id);if(a){setSelectedAnimal(a);setTab("dashboard");setDashView("detail")}}}),
-      tab==="vacunas"&&React.createElement(VacunasView,{inventario:inventario,historial:historial,search:search,onRefresh:()=>loadData(true),onSelectAnimal:id=>{const a=todosAnimales.find(x=>x.id===id);if(a){setSelectedAnimal(a);setTab("dashboard");setDashView("detail")}}})
+      tab==="vacunas"&&React.createElement(VacunasView,{inventario:inventario,historial:historial,search:search,onRefresh:()=>loadData(true),onSelectAnimal:id=>{const a=todosAnimales.find(x=>x.id===id);if(a){setSelectedAnimal(a);setTab("dashboard");setDashView("detail")}}}),
+      tab==="partos_hist"&&React.createElement(PartosAnterioresView,{inventario:inventario,onSuccess:()=>{handleTabChange("dashboard")}}),   
     ),
     React.createElement(BottomNav,{active:tab,onChange:handleTabChange}),
     
