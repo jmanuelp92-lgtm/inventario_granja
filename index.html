@@ -14,6 +14,7 @@
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -97,7 +98,7 @@ const ACCION_CONFIG={
   PARTO_HISTORICO:{icon:"📜",label:"Parto Histórico (Anterior)"},
 };
 
-const URL_SCRIPT="https://script.google.com/macros/s/AKfycbxMZKk1dcbKTRNMckOp0i6YDhVsL0xbMjg7asXejYznwH7gGGOqAVW38HodYW_bk5NYGg/exec";
+const URL_SCRIPT="https://script.google.com/macros/s/AKfycbxFInM6ABaD67v7COfrBPvklQF8yozFdzkj_6-g5SZ3aGIG3LsTV66FB2OYXXkl0ZK1bA/exec";
 
 /* ─── OFFLINE & OPTIMISTIC SYNC SYSTEM ─── */
 const CACHE_KEY = "granja_pro_cache";
@@ -544,7 +545,7 @@ function DashboardView({data,onPhaseClick,onSubpuestoClick,onPigletsClick}){
 
 function SubpuestoCards({phase,animals,onSelect,onSelectAll,onBack,onSubfaseClick}){
   const[viewMode,setViewMode]=useState(phase==="REPRODUCTIVA"?"subfases":"subpuestos");
-  const[macroFase,setMacroFase]=useState(null); // NUEVO: Controla si estamos dentro de una tarjeta principal
+  const[macroFase,setMacroFase]=useState(null); 
   
   const groups=useMemo(()=>{
     const map={};
@@ -574,7 +575,6 @@ function SubpuestoCards({phase,animals,onSelect,onSelectAll,onBack,onSubfaseClic
     React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8}},React.createElement("span",{style:{fontSize:10,color:"var(--muted-fg)"}},"animales"),React.createElement("span",{style:{color:"var(--muted-fg)"}},"›"))
   );
 
-  // Calcular totales para las 3 Tarjetas Maestras
   const macroStats = {GEST:{c:0,a:0,w:0}, MAT:{c:0,a:0,w:0}, REEMP:{c:0,a:0,w:0}};
   subfaseGroups.forEach(sf=>{
     if(sf.key.startsWith("GEST_")){macroStats.GEST.c+=sf.count;macroStats.GEST.a+=sf.alerts;macroStats.GEST.w+=sf.warnings;}
@@ -582,10 +582,57 @@ function SubpuestoCards({phase,animals,onSelect,onSelectAll,onBack,onSubfaseClic
     if(sf.key.startsWith("REEMP_")){macroStats.REEMP.c+=sf.count;macroStats.REEMP.a+=sf.alerts;macroStats.REEMP.w+=sf.warnings;}
   });
 
+  // 👇 NUEVA FUNCIÓN PARA EXPORTAR LA FASE COMPLETA A EXCEL 👇
+  const handleExportFase = () => {
+    try {
+      if (typeof XLSX === "undefined") {
+        alert("La librería de Excel no ha cargado. Verifica tu conexión a internet o recarga la página.");
+        return;
+      }
+      
+      let animalesAExportar = animals;
+      if (macroFase) {
+        animalesAExportar = animals.filter(a => (a.subfase||"").startsWith(macroFase + "_"));
+      }
+
+      const dataToExport = animalesAExportar.map(a => {
+        const sfInfo = a.subfase ? SUBFASES_REPRODUCTIVA.find(s => s.key === a.subfase) : null;
+        return {
+          "ID (Tatuaje)": a.id,
+          "Chapeta": a.chapeta || "N/A",
+          "Estado": a.activo ? "ACTIVO" : (a.ultimaAccion === "VENTA" ? "VENDIDO" : "MUERTO"),
+          "Fase": (a.fase || "").replace(/_/g, " "),
+          "Subfase": sfInfo ? sfInfo.label.replace(sfInfo.icon + " ", "") : (a.subfase || "N/A"),
+          "Ubicación (Puesto)": a.subpuesto || "N/A",
+          "Sexo": a.sexo === "M" ? "Macho" : a.sexo === "H" ? "Hembra" : (a.sexo || "N/A"),
+          "Fecha Nacimiento": a.fechaNacimiento ? dateKeyToLabel(extractDateKey(a.fechaNacimiento)) : "N/A",
+          "Madre": a.madre || "N/A",
+          "Último Peso (kg)": a.ultimoPeso || "Sin registro",
+          "Días en Fase": a.dias || 0,
+          "Lechones Predestete": a.piglets || 0,
+          "Tiene Guía": a.tieneGuia ? "SÍ" : "NO"
+        };
+      });
+
+      const ws = XLSX.utils.json_to_sheet(dataToExport);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Fase");
+      
+      const titleName = phase + (macroFase ? "_" + macroFase : "");
+      const safeTitle = titleName.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20);
+      const fileName = `GranjaPro_FASE_${safeTitle}_${formatDateStr(new Date())}.xlsx`;
+      
+      XLSX.writeFile(wb, fileName);
+    } catch(err) {
+      alert("Error al exportar. Revisa tu conexión a internet.");
+    }
+  };
+  // 👆 FIN DE FUNCIÓN EXPORTAR 👆
+
   return React.createElement("div",{className:"animate-fade-in"},
     React.createElement("button",{onClick:()=>{
-      if(isRepro && viewMode==="subfases" && macroFase) setMacroFase(null); // Botón atrás sale de la tarjeta
-      else onBack(); // Botón atrás sale al dashboard
+      if(isRepro && viewMode==="subfases" && macroFase) setMacroFase(null); 
+      else onBack(); 
     },style:{display:"flex",alignItems:"center",gap:4,fontSize:14,fontWeight:600,color:"var(--primary)",marginBottom:12}},"← Volver"),
     
     React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}},
@@ -602,7 +649,13 @@ function SubpuestoCards({phase,animals,onSelect,onSelectAll,onBack,onSubfaseClic
       React.createElement("button",{onClick:()=>setViewMode("subpuestos"),style:{flex:1,padding:"8px 0",borderRadius:8,fontSize:12,fontWeight:700,background:viewMode==="subpuestos"?"var(--primary)":"var(--muted)",color:viewMode==="subpuestos"?"var(--primary-fg)":"var(--muted-fg)"}},"📍 Por Puesto")
     ),
     
-    !macroFase&&React.createElement("button",{onClick:onSelectAll,style:{width:"100%",marginBottom:12,padding:12,borderRadius:12,background:"rgba(45,106,79,.1)",color:"var(--primary)",fontWeight:600,fontSize:14}},"Ver todos ("+animals.length+")"),
+    /* 👇 BOTONES "VER TODOS" Y "EXCEL FASE" AGRUPADOS 👇 */
+    !macroFase&&React.createElement("div",{style:{display:"flex",gap:8,marginBottom:12}},
+      React.createElement("button",{onClick:onSelectAll,style:{flex:1,padding:12,borderRadius:12,background:"rgba(45,106,79,.1)",color:"var(--primary)",fontWeight:600,fontSize:14}},"Ver todos ("+animals.length+")"),
+      React.createElement("button",{onClick:handleExportFase,style:{padding:"12px 16px",borderRadius:12,background:"var(--muted)",color:"var(--card-fg)",fontWeight:700,fontSize:14,border:"1px solid var(--border)",boxShadow:"0 2px 4px rgba(0,0,0,0.05)"}},"📥 Excel Fase")
+    ),
+    macroFase&&React.createElement("button",{onClick:handleExportFase,style:{width:"100%",marginBottom:12,padding:12,borderRadius:12,background:"var(--muted)",color:"var(--card-fg)",fontWeight:700,fontSize:14,border:"1px solid var(--border)",boxShadow:"0 2px 4px rgba(0,0,0,0.05)"}},"📥 Descargar Excel de esta Categoría"),
+    /* 👆 FIN DEL BLOQUE DE BOTONES 👆 */
     
     isRepro&&viewMode==="subfases"?React.createElement(React.Fragment,null,
       !macroFase ? React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:12}},
@@ -687,8 +740,49 @@ function AnimalList({title,animals,onSelect,onBack}){
     setIsMoving(false);
   };
 
+  // 👇 NUEVO: LÓGICA PARA EXPORTAR A EXCEL 👇
+  const handleExport = () => {
+    try {
+      if (typeof XLSX === "undefined") {
+        alert("La librería de Excel no ha cargado. Verifica tu conexión a internet o recarga la página.");
+        return;
+      }
+      
+      const dataToExport = sortedAnimals.map(a => {
+        const sfInfo = a.subfase ? SUBFASES_REPRODUCTIVA.find(s => s.key === a.subfase) : null;
+        return {
+          "ID (Tatuaje)": a.id,
+          "Chapeta": a.chapeta || "N/A",
+          "Estado": a.activo ? "ACTIVO" : (a.ultimaAccion === "VENTA" ? "VENDIDO" : "MUERTO"),
+          "Fase": (a.fase || "").replace(/_/g, " "),
+          "Subfase": sfInfo ? sfInfo.label.replace(sfInfo.icon + " ", "") : (a.subfase || "N/A"),
+          "Ubicación (Puesto)": a.subpuesto || "N/A",
+          "Sexo": a.sexo === "M" ? "Macho" : a.sexo === "H" ? "Hembra" : (a.sexo || "N/A"),
+          "Fecha Nacimiento": a.fechaNacimiento ? dateKeyToLabel(extractDateKey(a.fechaNacimiento)) : "N/A",
+          "Madre": a.madre || "N/A",
+          "Último Peso (kg)": a.ultimoPeso || "Sin registro",
+          "Días en Fase": a.dias || 0,
+          "Lechones Predestete": a.piglets || 0,
+          "Tiene Guía": a.tieneGuia ? "SÍ" : "NO"
+        };
+      });
+
+      const ws = XLSX.utils.json_to_sheet(dataToExport);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Animales");
+      
+      // Nombre del archivo limpio
+      const safeTitle = title.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20);
+      const fileName = `GranjaPro_${safeTitle}_${formatDateStr(new Date())}.xlsx`;
+      
+      XLSX.writeFile(wb, fileName);
+    } catch(err) {
+      alert("Error al exportar. Revisa tu conexión a internet o recarga la página.");
+    }
+  };
+
   return React.createElement("div",{className:"animate-fade-in"},
-    
+    // Modal Traslado
     showMoveModal && React.createElement("div",{style:{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.5)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:20}},
       React.createElement("div",{style:{background:"var(--card)",padding:20,borderRadius:12,width:"100%",maxWidth:320,boxShadow:"0 4px 20px rgba(0,0,0,.15)"}},
         React.createElement("h3",{style:{fontSize:16,marginBottom:8,fontWeight:700}},"🔄 Traslado Masivo"),
@@ -725,7 +819,9 @@ function AnimalList({title,animals,onSelect,onBack}){
       counts.vend>0&&React.createElement("span",{style:{fontSize:11,fontWeight:700,color:"#d97706",background:"rgba(217,119,6,.1)",padding:"4px 8px",borderRadius:6,border:"1px solid rgba(217,119,6,.2)"}},"💰 Vendidas: "+counts.vend),
       counts.muer>0&&React.createElement("span",{style:{fontSize:11,fontWeight:700,color:"var(--destructive)",background:"rgba(220,38,38,.1)",padding:"4px 8px",borderRadius:6,border:"1px solid rgba(220,38,38,.2)"}},"🔴 Muertas: "+counts.muer),
       
-      counts.act>0&&React.createElement("button",{onClick:handleOpenModal,style:{fontSize:11,fontWeight:700,color:"#fff",background:"var(--primary)",padding:"6px 12px",borderRadius:6,border:"none",cursor:"pointer",marginLeft:"auto",boxShadow:"0 2px 4px rgba(0,0,0,0.1)"}},"🔄 Mover Todos")
+      /* 👇 BOTONES DE MOVER Y EXPORTAR 👇 */
+      counts.act>0&&React.createElement("button",{onClick:handleOpenModal,style:{fontSize:11,fontWeight:700,color:"#fff",background:"var(--primary)",padding:"6px 12px",borderRadius:6,border:"none",cursor:"pointer",marginLeft:"auto",boxShadow:"0 2px 4px rgba(0,0,0,0.1)"}},"🔄 Mover Todos"),
+      React.createElement("button",{onClick:handleExport,style:{fontSize:11,fontWeight:700,color:"var(--card-fg)",background:"var(--muted)",padding:"6px 12px",borderRadius:6,border:"1px solid var(--border)",cursor:"pointer",marginLeft:counts.act===0?"auto":0,boxShadow:"0 2px 4px rgba(0,0,0,0.05)"}},"📥 Excel")
     ),
 
     sortedAnimals.length===0?React.createElement("p",{style:{textAlign:"center",color:"var(--muted-fg)",padding:"32px 0"}},"Sin animales en esta búsqueda/fase."):
@@ -1044,16 +1140,23 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
         const accionH=(h[2]||"").toString().trim();
         const isEditing=editingIdx===i;
         const fechaLabel=dateKeyToLabel(extractDateKey(h[0]))||"-";
-        return React.createElement("div",{key:i,style:{fontSize:12,borderLeft:"2px solid var(--border)",paddingLeft:12,paddingTop:4,paddingBottom:4,marginBottom:4}},
-          React.createElement("div",{style:{display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}},
-            React.createElement("span",{style:{color:"var(--muted-fg)"}},"📅 "+fechaLabel)," — ",React.createElement("b",null,h[2]),
-            React.createElement("button",{onClick:()=>{if(isEditing){setEditingIdx(null)}else{const dk=extractDateKey(h[0]);setEditDate(dk?new Date(dk+"T12:00:00"):undefined);setEditingIdx(i)}},style:{marginLeft:4,color:"var(--primary)",fontSize:12},title:"Editar fecha"},"✏️")
+        const config=ACCION_CONFIG[accionH]||ACCION_CONFIG.OBSERVACION;
+        return React.createElement("div",{key:i,style:{background:"var(--muted)",borderRadius:8,padding:12,marginBottom:8,border:"1px solid var(--border)",position:"relative"}},
+          React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}},
+            React.createElement("div",{style:{display:"flex",alignItems:"center",gap:6}},
+              React.createElement("span",{style:{fontSize:18,background:"var(--card)",padding:6,borderRadius:"50%",boxShadow:"0 1px 3px rgba(0,0,0,0.1)",lineHeight:1}},config.icon),
+              React.createElement("span",{style:{fontWeight:800,fontSize:14,color:"var(--primary)",textTransform:"uppercase"}},accionH)
+            ),
+            React.createElement("div",{style:{display:"flex",alignItems:"center",gap:6}},
+              React.createElement("span",{style:{fontSize:11,fontWeight:700,color:"var(--muted-fg)",background:"var(--card)",padding:"4px 8px",borderRadius:12,border:"1px solid var(--border)"}},"📅 "+fechaLabel),
+              React.createElement("button",{onClick:()=>{if(isEditing){setEditingIdx(null)}else{const dk=extractDateKey(h[0]);setEditDate(dk?new Date(dk+"T12:00:00"):undefined);setEditingIdx(i)}},style:{color:"var(--primary)",fontSize:16,padding:2},title:"Editar fecha"},"✏️")
+            )
           ),
-          isEditing&&React.createElement("div",{style:{marginTop:8,padding:12,borderRadius:8,background:"var(--muted)",border:"1px solid var(--border)"}},
+          isEditing&&React.createElement("div",{style:{marginTop:8,marginBottom:8,padding:12,borderRadius:8,background:"var(--card)",border:"1px dashed var(--border)"}},
             React.createElement("p",{style:{fontSize:12,fontWeight:600,marginBottom:8}},"📅 Cambiar fecha de este registro:"),
             React.createElement(DateInput,{value:editDate,onChange:d=>setEditDate(d)}),
             React.createElement("div",{style:{display:"flex",gap:8,marginTop:8}},
-              React.createElement("button",{onClick:()=>setEditingIdx(null),style:{padding:"6px 12px",borderRadius:6,background:"var(--muted)",color:"var(--card-fg)",fontSize:12,fontWeight:600,border:"1px solid var(--border)"}},"Cancelar"),
+              React.createElement("button",{onClick:()=>setEditingIdx(null),style:{padding:"8px 12px",borderRadius:6,background:"var(--muted)",color:"var(--card-fg)",fontSize:12,fontWeight:600,border:"1px solid var(--border)"}},"Cancelar"),
               React.createElement("button",{disabled:!editDate||savingDate,onClick:async()=>{
                 if(!editDate)return;
                 setSavingDate(true);
@@ -1065,10 +1168,12 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
                   setEditingIdx(null);
                   if(onRefresh)onRefresh();
                 }catch(err){alert("Error al actualizar la fecha")}finally{setSavingDate(false)}
-              },style:{padding:"6px 12px",borderRadius:6,background:"var(--primary)",color:"var(--primary-fg)",fontSize:12,fontWeight:600,opacity:(!editDate||savingDate)?.5:1}},savingDate?"Guardando...":"💾 Guardar")
+              },style:{flex:1,padding:"8px 12px",borderRadius:6,background:"var(--primary)",color:"var(--primary-fg)",fontSize:12,fontWeight:600,opacity:(!editDate||savingDate)?.5:1}},savingDate?"Guardando...":"💾 Guardar")
             )
           ),
-          React.createElement("p",{style:{color:"var(--muted-fg)",marginTop:2}},h[5])
+          React.createElement("div",{style:{fontSize:13,color:"var(--card-fg)",lineHeight:1.5,background:"var(--card)",padding:12,borderRadius:8,border:"1px solid rgba(0,0,0,0.04)"}},
+            h[5] ? h[5].split(' | ').map((line, idx) => React.createElement("div", {key: idx, style:{marginBottom:4, display:"flex", gap:6}}, React.createElement("span", {style:{color:"var(--primary)"}}, "▪"), React.createElement("span", null, line))) : React.createElement("span",{style:{color:"var(--muted-fg)",fontStyle:"italic"}},"Sin notas adicionales")
+          )
         );
       })
     )
