@@ -98,7 +98,7 @@ const ACCION_CONFIG={
   PARTO_HISTORICO:{icon:"📜",label:"Parto Histórico (Anterior)"},
 };
 
-const URL_SCRIPT="https://script.google.com/macros/s/AKfycbxFInM6ABaD67v7COfrBPvklQF8yozFdzkj_6-g5SZ3aGIG3LsTV66FB2OYXXkl0ZK1bA/exec";
+const URL_SCRIPT="https://script.google.com/macros/s/AKfycbygksyS_0hlqrD3o5lZujdlUn8B1bpCSpbLwjgkORZKlsLnielgI66Uds1sBeFiCxdTHA/exec";
 
 /* ─── OFFLINE & OPTIMISTIC SYNC SYSTEM ─── */
 const CACHE_KEY = "granja_pro_cache";
@@ -1886,12 +1886,38 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
       }
       
       if(accion==="SERVICIO" && dosis) finalNotas = "Dosis: " + dosis + (notas ? " | " + notas : "");
-
+      // 👇 NUEVA LÓGICA: CALCULAR SUBFASE AUTOMÁTICA 👇
+      let subfaseGuardar = nuevaSubfase; // Por defecto usa la del select (Ingreso o Cambio manual)
+      const esReemplazo = (animal?.fase === "REEMPLAZO" || animal?.fase === "SELECTA" || (animal?.subfase || "").includes("REEMP"));
+      
+      if (accion === "SERVICIO") subfaseGuardar = esReemplazo ? "REEMP_SERVIDAS" : "GEST_SERVIDAS";
+      else if (accion === "CONFIRMAR_GESTACION") subfaseGuardar = esReemplazo ? "REEMP_GESTANTE" : "GEST_GESTANTE";
+      else if (accion === "RETORNO_VACIA") subfaseGuardar = esReemplazo ? "REEMP_VACIA" : "GEST_VACIA";
+      else if (accion === "PARTO") subfaseGuardar = "MAT_LACTANTES";
+      else if (accion === "DESTETE") subfaseGuardar = esReemplazo ? "REEMP_VACIA" : "GEST_VACIA";
+      else if (accion !== "INGRESO" && accion !== "CAMBIAR_SUBFASE") {
+          subfaseGuardar = animal?.subfase || ""; // Mantiene la que tenía si es una acción genérica (ej. Enfermedad)
+      }
+      
+      // Si la fase no es reproductiva, limpiamos la subfase (EXCEPTO EN DESTETE)
+      if (fase !== "REPRODUCTIVA" && fase !== "REEMPLAZO" && fase !== "SELECTA" && accion !== "DESTETE") {
+          subfaseGuardar = "";
+      }  
+      
       const finalFechaNac = fechaNac ? toAppsScriptDate(formatDateStr(fechaNac)) : "";
-      const payload = {tatuaje,chapeta,peso,sexo,accion,fase,subpuesto,notas:finalNotas,inseminador,fecha:toAppsScriptDate(fechaStr), fechaNacimiento: finalFechaNac};
+      
+      // 👇 AQUI ESTABA EL ERROR: AGREGAMOS subfase: subfaseGuardar AL PAYLOAD 👇
+      const payload = {
+          tatuaje, chapeta, peso, sexo, accion, fase, subpuesto, 
+          notas: finalNotas, inseminador, 
+          fecha: toAppsScriptDate(fechaStr), 
+          fechaNacimiento: finalFechaNac,
+          subfase: subfaseGuardar // <--- AHORA SÍ VIAJA AL EXCEL
+      };
+      
       await enviarRegistro(payload);
       
-      setSaving(false);onSuccess();
+      setSaving(false); onSuccess();
     }catch(err){alert("Error al guardar: "+(err.message||"Intenta de nuevo."));setSaving(false)}
   };
 
@@ -2257,7 +2283,8 @@ function App(){
          d.inseminador || "",                 // 13 (N)
          d.sexo || "",                        // 14 (O)
          d.fechaNacimiento || "",             // 15 (P)
-         d.usuario || ""                      // 16 (Q)
+         d.usuario || "",                      // 16 (Q)
+         d.subfase || ""                      // 17 (R)
        ]);
     }
 
@@ -2299,7 +2326,8 @@ function App(){
              "",
              a.sexo || "",
              a.fechaNacimiento || "",
-             comun.usuario || ""            // <--- NUEVO USUARIO
+             comun.usuario || "",            // <--- NUEVO USUARIO
+             a.subfase || comun.subfase || "" // 17 (R)
            ]);
         });
         /* 👇 INICIO NUEVO: GUARDAR EN CACHÉ LOCAL INMEDIATAMENTE 👇 */
