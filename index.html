@@ -53,7 +53,7 @@ button{background:none;border:none;cursor:pointer;font-family:inherit}
 const {useState,useEffect,useCallback,useMemo}=React;
 
 /* ─── CONSTANTS ─── */
-const FASES_DEFAULT=["REEMPLAZO","REPRODUCTIVA","PRECEBO","LEVANTE","ENGORDE","DESCANSO"];
+const FASES_DEFAULT=["REEMPLAZO","REPRODUCTIVA","PREINICIO","INICIO","PRECEBO","LEVANTE","ENGORDE","SELECTA","DESCANSO"];
 
 const SUBFASES_REPRODUCTIVA=[
   /* --- GESTACIÓN --- */
@@ -200,9 +200,12 @@ function obtenerColorSubfase(dias,subfase){
   return"green";
 }
 function obtenerColor(dias,fase){
+  if(fase.includes("PREINICIO")){if(dias>21)return"red";if(dias>15)return"yellow"}
+  if(fase.includes("INICIO")){if(dias>28)return"red";if(dias>21)return"yellow"}
   if(fase.includes("PRECEBO")){if(dias>49)return"red";if(dias>42)return"yellow"}
   if(fase.includes("LEVANTE")){if(dias>60)return"red";if(dias>50)return"yellow"}
   if(fase.includes("ENGORDE")){if(dias>90)return"red";if(dias>75)return"yellow"}
+  if(fase.includes("SELECTA")){if(dias>60)return"red";if(dias>50)return"yellow"}
   return"green";
 }
 
@@ -277,7 +280,15 @@ function procesarInventario(regs){
     
     if(r[14] && r[14].toString().trim() !== "") estados[id].sexo = r[14].toString().trim();
     if(r[15] && r[15].toString().trim() !== "") estados[id].fechaNacimiento = r[15].toString().trim();
-    if(r[11] !== undefined && r[11] !== null && String(r[11]).trim() !== "") estados[id].ultimoPeso = String(r[11]).trim();
+    
+    // 👇 AQUI EMPIEZA LA LÓGICA INTELIGENTE DE PESO 👇
+    const pesoRaw = String(r[11] || "").trim();
+    if (pesoRaw !== "" && pesoRaw !== "0") {
+        let pVal = parseFloat(pesoRaw);
+        if (pVal > 1000) pVal = pVal / 1000; // Convierte de gramos a kilos
+        estados[id].ultimoPeso = pVal;
+    }
+    // 👆 AQUI TERMINA LA LÓGICA INTELIGENTE 👆
 
     estados[id].ultimaAccion=acc;
     if(acc==="VENTA"||acc==="MUERTE"){estados[id].activo=false;estados[id].fechaFase=fecha}
@@ -298,6 +309,7 @@ function procesarInventario(regs){
       if(acc==="QUITAR_GUIA"){estados[id].tieneGuia=false}
     }
   });
+  
 
   const todos=Object.values(estados).map(e=>{
     // --- NUEVO: Pasar automáticamente de DESCANSO a REPRODUCTIVA a los 7 días ---
@@ -936,13 +948,85 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
   const ultimoPeso = useMemo(() => {
     const records = historial.filter(h => h[1]?.toString() === animal.id);
     for (let i = records.length - 1; i >= 0; i--) {
-      const h = records[i];
-      if (h[11] !== undefined && h[11] !== null && String(h[11]).trim() !== "") {
-        return String(h[11]).trim() + " kg";
+      const pRaw = String(records[i][11] || "").trim();
+      if (pRaw !== "" && pRaw !== "0") {
+        let pVal = parseFloat(pRaw);
+        // 👇 LÓGICA INTELIGENTE: De gramos a kilos 👇
+        if (pVal > 1000) pVal = pVal / 1000;
+        return pVal + " kg";
       }
     }
     return "Sin registro";
   }, [historial, animal.id]);
+
+  // 👇 NUEVA LÓGICA: Extraer todos los pesos registrados 👇
+  // 👇 NUEVA LÓGICA: Motor de GDP y Crecimiento 👇
+ // 👇 NUEVA LÓGICA: Motor de GDP y Crecimiento 👇
+  const statsCrecimiento = useMemo(() => {
+    // 1. Extraer y ordenar los registros cronológicamente (del más viejo al más nuevo)
+    const records = historial.filter(h => h[1]?.toString() === animal.id)
+                             .sort((a,b) => new Date(a[0]).getTime() - new Date(b[0]).getTime());
+
+    const pesos = [];
+    records.forEach(h => {
+      const pStr = String(h[11] || "").trim();
+      let pVal = parseFloat(pStr);
+      
+      if (!isNaN(pVal) && pVal > 0) {
+        // 👇 LÓGICA INTELIGENTE: De gramos a kilos 👇
+        if (pVal > 1000) {
+          pVal = pVal / 1000;
+        }
+        
+        pesos.push({
+          fechaRaw: new Date(h[0]),
+          fecha: dateKeyToLabel(extractDateKey(h[0])) || "-",
+          accion: h[2] || "Registro",
+          fase: (h[3] || "N/A").replace(/_/g," "),
+          peso: pVal
+        });
+      }
+    });
+
+    let generalGDP = 0;
+    const gdpPorFase = {};
+    
+    // 2. Si hay más de un peso, calculamos las ganancias (GDP)
+    if (pesos.length > 1) {
+      const first = pesos[0];
+      const last = pesos[pesos.length - 1];
+      const diffDaysTotal = Math.max(1, (last.fechaRaw.getTime() - first.fechaRaw.getTime()) / 86400000);
+      generalGDP = (last.peso - first.peso) / diffDaysTotal; // GDP General
+
+      // Calcular GDP individual y agrupar por fase
+      for (let i = 1; i < pesos.length; i++) {
+        const prev = pesos[i-1];
+        const curr = pesos[i];
+        const diffDays = Math.max(1, (curr.fechaRaw.getTime() - prev.fechaRaw.getTime()) / 86400000);
+        const diffPeso = curr.peso - prev.peso;
+        
+        curr.gdp = diffPeso / diffDays; // GDP desde el peso anterior
+        curr.dias = diffDays;
+
+        const f = curr.fase;
+        if (!gdpPorFase[f]) gdpPorFase[f] = { pesoG: 0, diasTotal: 0 };
+        gdpPorFase[f].pesoG += diffPeso;
+        gdpPorFase[f].diasTotal += diffDays;
+      }
+    }
+
+    const fasesStats = Object.keys(gdpPorFase).map(f => ({
+      fase: f,
+      gdp: gdpPorFase[f].diasTotal > 0 ? (gdpPorFase[f].pesoG / gdpPorFase[f].diasTotal) : 0
+    }));
+
+    return {
+      lista: pesos.reverse(), // Volteamos para mostrar el más reciente arriba
+      general: generalGDP,
+      fases: fasesStats
+    };
+  }, [historial, animal.id]);
+  // 👆 FIN NUEVA LÓGICA 👆
 
   const handleApplyVacuna=async()=>{
     if(!showDateModal)return;
@@ -1120,7 +1204,47 @@ function AnimalDetail({animal,historial,allAnimals,onBack,onAction,onRefresh}){
       sowStats.partoDetails.length>0&&React.createElement("div",{style:{marginTop:16}},React.createElement("p",{style:{fontSize:10,fontWeight:700,color:"var(--muted-fg)",textTransform:"uppercase",letterSpacing:1,marginBottom:8}},"Historial de Partos"),
         sowStats.partoDetails.map((p,i)=>React.createElement("div",{key:i,style:{display:"flex",justifyContent:"space-between",alignItems:"center",background:"var(--muted)",borderRadius:8,padding:"8px 12px",marginBottom:4,fontSize:12,flexWrap:"wrap",gap:4}},React.createElement("span",{style:{color:"var(--muted-fg)"}},"📅 "+p.fecha),React.createElement("div",{style:{display:"flex",gap:8,flexWrap:"wrap"}},React.createElement("span",{style:{color:"var(--success)",fontWeight:600}},"🐷 "+p.vivos+"V"),p.muertos>0&&React.createElement("span",{style:{color:"var(--destructive)",fontWeight:600}},"💀 "+p.muertos+"M"),p.hembras>0&&React.createElement("span",{style:{color:"#ec4899",fontWeight:600}},"♀"+p.hembras),p.machos>0&&React.createElement("span",{style:{color:"#3b82f6",fontWeight:600}},"♂"+p.machos),p.padre&&React.createElement("span",{style:{color:"var(--muted-fg)",fontWeight:600}},"🐗 "+p.padre),p.peso>0&&React.createElement("span",{style:{fontWeight:600}},"⚖️ "+p.peso+"kg")))))
     ),
+    /* 👇 NUEVO BLOQUE: DASHBOARD DE CRECIMIENTO Y PESOS 👇 */
+    
+    // TARJETA 1: Dashboard de Crecimiento (Solo se muestra si hay más de 1 peso para comparar)
+    statsCrecimiento.lista.length > 1 && React.createElement("div",{style:{background:"var(--card)",borderRadius:12,padding:20,marginBottom:12,boxShadow:"0 2px 10px rgba(0,0,0,.08)",border:"1px solid var(--border)"}},
+      React.createElement("h4",{style:{fontWeight:700,marginBottom:12,display:"flex",alignItems:"center",gap:8}}, "📈 Rendimiento y GDP"),
+      React.createElement("div", {style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}},
+        React.createElement("div", {style:{background:"var(--muted)",padding:"12px 8px",borderRadius:8,textAlign:"center",borderBottom:"3px solid var(--primary)"}},
+          React.createElement("p", {style:{fontSize:20,fontWeight:800,color:"var(--primary)"}}, statsCrecimiento.general.toFixed(2) + " kg/d"),
+          React.createElement("p", {style:{fontSize:9,fontWeight:700,color:"var(--muted-fg)",textTransform:"uppercase",marginTop:4}}, "GDP General")
+        ),
+        statsCrecimiento.fases.map((f, i) => React.createElement("div", {key:i,style:{background:"rgba(212,160,10,.1)",padding:"12px 8px",borderRadius:8,textAlign:"center",borderBottom:"3px solid var(--warning)"}},
+          React.createElement("p", {style:{fontSize:18,fontWeight:700,color:"var(--card-fg)"}}, f.gdp.toFixed(2) + " kg/d"),
+          React.createElement("p", {style:{fontSize:9,fontWeight:700,color:"var(--muted-fg)",textTransform:"uppercase",marginTop:4}}, "GDP " + f.fase)
+        ))
+      )
+    ),
 
+    // TARJETA 2: Historial de Pesos (Con GDP individual)
+    statsCrecimiento.lista.length > 0 && React.createElement("div",{style:{background:"var(--card)",borderRadius:12,padding:20,boxShadow:"0 2px 10px rgba(0,0,0,.08)",border:"1px solid var(--border)"}},
+      React.createElement("div", {style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}},
+        React.createElement("h4",{style:{fontWeight:700,margin:0,display:"flex",alignItems:"center",gap:8}},"⚖️ Historial de Pesos"),
+        statsCrecimiento.lista.length > 1 && React.createElement("span", {style:{fontSize:11,fontWeight:700,color:"var(--primary)",background:"rgba(45,106,79,.1)",padding:"4px 8px",borderRadius:6}}, "Gral: " + statsCrecimiento.general.toFixed(2) + " kg/d")
+      ),
+      React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:8}},
+        statsCrecimiento.lista.map((hp, i) => React.createElement("div",{key:i,style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 12px",background:"var(--muted)",borderRadius:8,border:"1px solid var(--border)"}},
+          React.createElement("div",null,
+            React.createElement("span",{style:{fontSize:12,fontWeight:700,color:"var(--card-fg)",display:"block",textTransform:"uppercase"}},hp.accion),
+            React.createElement("span",{style:{fontSize:11,color:"var(--muted-fg)",display:"flex",alignItems:"center",gap:4,marginTop:2}}, 
+              "📅 " + hp.fecha, 
+              hp.gdp !== undefined && React.createElement("span", {style:{color:"var(--success)",fontWeight:700,background:"rgba(45,138,86,.1)",padding:"2px 6px",borderRadius:4}}, "📈 " + hp.gdp.toFixed(2) + " kg/d")
+            )
+          ),
+          React.createElement("div",{style:{display:"flex",alignItems:"baseline",gap:4}},
+            React.createElement("span",{style:{fontSize:20,fontWeight:800,color:"var(--primary)"}},hp.peso),
+            React.createElement("span",{style:{fontSize:12,fontWeight:700,color:"var(--muted-fg)"}},"kg")
+          )
+        ))
+      )
+    ),
+    /* 👆 FIN NUEVO BLOQUE 👆 */
+    
     /* Vaccine Calendar / Actividades */
     !isInactive&&(()=>{
       const records=historial.filter(h=>h[1]?.toString()===animal.id);
@@ -1790,7 +1914,7 @@ function EventosHistoricosView({ inventario, onSuccess }) {
         fecha: toAppsScriptDate(formatDateStr(fechaEvento)),
         tatuaje: animal.id,
         chapeta: animal.chapeta || "",
-        peso: (tipoEvento === "PARTO" ? pesoTotal : tipoEvento === "DESTETE" ? pesoDestete : ""),
+        peso: "", // El peso aquí es de la camada, viaja en las notas, no en la madre.
         sexo: animal.sexo || "H",
         accion: accionStr,
         fase: animal?.fase || "REPRODUCTIVA", 
@@ -1963,8 +2087,52 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
   const[nuevaSubfase,setNuevaSubfase]=useState(prefillAnimal?.subfase||"REEMP_VACIA");
   const inputS={width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid var(--input)",background:"var(--bg)",color:"var(--fg)",fontSize:14,outline:"none"};
   const labelS={display:"block",fontSize:14,fontWeight:600,marginTop:16,marginBottom:4};
+  // 👇 NUEVA LÓGICA: MOTOR DE FASE AUTOMÁTICA POR PESO 👇
+  const [pesoAutoFase, setPesoAutoFase] = useState("");
+  const [mostrarOpcionCuartoPeso, setMostrarOpcionCuartoPeso] = useState(false);
 
-  const handleAccionChange=val=>{setAccion(val);
+  useEffect(() => {
+    // Solo se activa si escriben un peso mayor a 0 y hay un tatuaje
+    if (peso && parseFloat(peso) > 0 && tatuaje) {
+      const animalInfo = inventario.find(a => a.id === tatuaje);
+      
+      // Evitamos cambiarle la fase a las madres reproductoras adultas
+      if (animalInfo && (animalInfo.fase === "REPRODUCTIVA" || animalInfo.fase === "DESCANSO")) {
+         setPesoAutoFase(""); setMostrarOpcionCuartoPeso(false); return; 
+      }
+
+      const records = (historial || []).filter(h => h[1]?.toString() === tatuaje);
+      // Contamos cuántos pesos REALES tiene registrados en su vida
+      const pesosPrevios = records.filter(h => {
+          const p = parseFloat(h[11]);
+          return !isNaN(p) && p > 0;
+      }).length;
+
+      // El motor toma la decisión
+      if (pesosPrevios === 0) { 
+          setFase("PREINICIO"); setPesoAutoFase("1er Peso → Movido a PREINICIO"); setMostrarOpcionCuartoPeso(false); 
+      }
+      else if (pesosPrevios === 1) { 
+          setFase("INICIO"); setPesoAutoFase("2do Peso → Movido a INICIO"); setMostrarOpcionCuartoPeso(false); 
+      }
+      else if (pesosPrevios === 2) { 
+          setFase("LEVANTE"); setPesoAutoFase("3er Peso → Movido a LEVANTE"); setMostrarOpcionCuartoPeso(false); 
+      }
+      else if (pesosPrevios >= 3) { 
+          setMostrarOpcionCuartoPeso(true);
+          if(fase !== "ENGORDE" && fase !== "SELECTA") setFase("ENGORDE"); // Por defecto
+          setPesoAutoFase("4to Peso → ¿Cuál es su destino final?"); 
+      }
+    } else {
+      setPesoAutoFase(""); setMostrarOpcionCuartoPeso(false);
+    }
+  }, [peso, tatuaje, historial, inventario]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 👆 FIN DEL MOTOR DE FASE 👆
+
+
+  const handleAccionChange=val=>{
+    setAccion(val);
+    setPeso(""); // 👇 NUEVO: Limpia el peso para evitar que se quede guardado por error
     if(val==="EMITIR_GUIA"||val==="QUITAR_GUIA") setFase(prefillAnimal?.fase||allFases[0]);
     if(val==="SERVICIO"||val==="PARTO"||val==="CONFIRMAR_GESTACION"||val==="RETORNO_VACIA"||val==="CAMBIAR_SUBFASE"||val==="BAJA_LACTANCIA")setFase("REPRODUCTIVA");
     if(val==="DESTETE"){setFase("DESCANSO");setDestLechones("PRECEBO");const a=inventario.find(a=>a.id===tatuaje);if(a){setDestetados(String(a.piglets));setLechones(Array.from({length:a.piglets},(_,i)=>({tat:tatuaje+"-"+(i+1),chap:"",corral:"",peso:"",sexo:"H",ok:true})))}}
@@ -2145,9 +2313,18 @@ function RegistroForm({inventario,fasesExtra,prefillId,prefillAccion,prefillAnim
     }),
     React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}},
       React.createElement("div",null,React.createElement("label",{style:labelS},"Chapeta"),React.createElement("input",{value:chapeta,onChange:e=>setChapeta(e.target.value),placeholder:"N°",style:inputS})),
-      React.createElement("div",null,React.createElement("label",{style:labelS},"Peso (kg)"),React.createElement("input",{type:"number",value:peso,onChange:e=>setPeso(e.target.value),placeholder:"0.0",style:inputS}))
+     React.createElement("div",null,React.createElement("label",{style:labelS},"Peso (kg)"),React.createElement("input",{type:"number",value:peso,onChange:e=>setPeso(e.target.value),placeholder:"0.0",style:inputS, autoComplete:"off"}))
     ),
-
+    // 👇 UI DEL MOTOR DE FASE AUTOMÁTICA 👇
+    pesoAutoFase && React.createElement("div", {style:{marginTop: 8, padding: 12, borderRadius: 8, background: "rgba(45,106,79,.1)", border: "1px dashed var(--primary)"}},
+      React.createElement("p", {style:{fontSize: 13, fontWeight: 700, color: "var(--primary)", margin: 0}}, "✨ " + pesoAutoFase),
+      mostrarOpcionCuartoPeso && React.createElement("div", {style:{display: "flex", gap: 8, marginTop: 8}},
+        React.createElement("button", {type: "button", onClick: ()=>setFase("ENGORDE"), style:{flex: 1, padding: "8px", borderRadius: 8, border: "none", fontWeight: 700, cursor: "pointer", background: fase === "ENGORDE" ? "var(--primary)" : "var(--muted)", color: fase === "ENGORDE" ? "#fff" : "var(--card-fg)"}}, "🥩 ENGORDE"),
+        React.createElement("button", {type: "button", onClick: ()=>setFase("SELECTA"), style:{flex: 1, padding: "8px", borderRadius: 8, border: "none", fontWeight: 700, cursor: "pointer", background: fase === "SELECTA" ? "#7c3aed" : "var(--muted)", color: fase === "SELECTA" ? "#fff" : "var(--card-fg)"}}, "👑 SELECTA")
+      )
+    ),
+    // 👆 FIN UI DEL MOTOR 👆
+    
     accion==="INGRESO"&&React.createElement(React.Fragment,null,
       React.createElement("label",{style:labelS},"Sexo"),
       React.createElement("select",{value:sexo,onChange:e=>setSexo(e.target.value),style:inputS},
