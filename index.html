@@ -461,7 +461,8 @@ function calcFechaProgramada(vacunaItem,fechaNacimiento,vacunasAplicadas, fechaF
 }
 
 function getFilteredVacunas(animal) {
-  const isEngorde = animal.fase.includes("PREINICIO") || animal.fase.includes("INICIO") || animal.fase.includes("PRECEBO") || animal.fase.includes("LEVANTE") || animal.fase.includes("ENGORDE") || animal.fase.includes("SELECTA");
+  // 👇 AQUÍ ESTABA EL ERROR: Quitamos "SELECTA" de la lista de engorde
+  const isEngorde = animal.fase.includes("PREINICIO") || animal.fase.includes("INICIO") || animal.fase.includes("PRECEBO") || animal.fase.includes("LEVANTE") || animal.fase.includes("ENGORDE");
   
   return VACUNA_SCHEDULE.filter(v => {
       // Bloqueo estricto: Si la vacuna es solo para machos y es hembra, la oculta
@@ -474,7 +475,7 @@ function getFilteredVacunas(animal) {
       if (isEngorde) {
           return ["CML", "DESPARASITACION", "INNOSURE_1", "INNOSURE_2"].includes(v.key);
       }
-      return true;
+      return true; // <-- SELECTA ahora pasará por aquí y mostrará TODAS las vacunas
   });
 }
 
@@ -799,8 +800,44 @@ function AnimalList({title,animals,onSelect,onBack}){
     setIsVacunando(false);
   };
 
-  const handleExport = () => { /* ... lógica excel existente ... */ };
+  const handleExport = () => { 
+    try {
+      if (typeof XLSX === "undefined") {
+        alert("La librería de Excel no ha cargado. Verifica tu conexión a internet o recarga la página.");
+        return;
+      }
 
+      const dataToExport = sortedAnimals.map(a => {
+        const sfInfo = a.subfase ? SUBFASES_REPRODUCTIVA.find(s => s.key === a.subfase) : null;
+        return {
+          "ID (Tatuaje)": a.id,
+          "Chapeta": a.chapeta || "N/A",
+          "Estado": a.activo ? "ACTIVO" : (a.ultimaAccion === "VENTA" ? "VENDIDO" : "MUERTO"),
+          "Fase": (a.fase || "").replace(/_/g, " "),
+          "Subfase": sfInfo ? sfInfo.label.replace(sfInfo.icon + " ", "") : (a.subfase || "N/A"),
+          "Ubicación (Puesto)": a.subpuesto || "N/A",
+          "Sexo": a.sexo === "M" ? "Macho" : a.sexo === "H" ? "Hembra" : (a.sexo || "N/A"),
+          "Fecha Nacimiento": a.fechaNacimiento ? dateKeyToLabel(extractDateKey(a.fechaNacimiento)) : "N/A",
+          "Madre": a.madre || "N/A",
+          "Último Peso (kg)": a.ultimoPeso || "Sin registro",
+          "Días en Fase": a.dias || 0,
+          "Tiene Guía": a.tieneGuia ? "SÍ" : "NO"
+        };
+      });
+
+      const ws = XLSX.utils.json_to_sheet(dataToExport);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Lista");
+      
+      const safeTitle = (title || "Lista").replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20);
+      const fileName = `GranjaPro_${safeTitle}_${formatDateStr(new Date())}.xlsx`;
+      
+      XLSX.writeFile(wb, fileName);
+    } catch(err) {
+      alert("Error al exportar. Revisa tu conexión a internet.");
+    }
+  };
+  
   return React.createElement("div",{className:"animate-fade-in"},
     showMoveModal && React.createElement("div",{style:{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.5)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:20}},
       React.createElement("div",{style:{background:"var(--card)",padding:20,borderRadius:12,width:"100%",maxWidth:320,boxShadow:"0 4px 20px rgba(0,0,0,.15)"}},
