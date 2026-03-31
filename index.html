@@ -499,14 +499,17 @@ function DateInput({value,onChange,placeholder}){
 
 function FarmHeader({searchValue,onSearch,onNavigate,activeTab, isOnline, queueCount, syncing, onInstall, showInstall, onLogout}){
   const[menuOpen,setMenuOpen]=useState(false);
+  
+  // 1. AÑADIMOS EL NUEVO BOTÓN A LA LISTA DEL MENÚ
   const menuItems=[
     {id:"vacunas",label:"📅 Actividades"},
     {id:"reportes",label:"📋 Reportes"},
     {id:"resumen",label:"📊 Resumen"},
-    {id:"partos_hist",label:"📜 Eventos Historicos"}, // <--- AÑADE ESTA LÍNEA
-
+    {id:"partos_hist",label:"📜 Eventos Historicos"},
+    {id:"soporte",label:"🛠️ Peticiones al Dev"}, // <--- NUEVO BOTÓN AQUÍ
     {id:"logout",label:"🚪 Cerrar Sesión"} 
   ];
+  
   return React.createElement("header",{style:{position:"sticky",top:0,zIndex:40,boxShadow:"0 4px 12px rgba(0,0,0,.15)"},className:"gradient-farm"},
     React.createElement("div",{style:{maxWidth:480,margin:"0 auto",padding:"16px 16px 12px"}},
       React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
@@ -520,7 +523,18 @@ function FarmHeader({searchValue,onSearch,onNavigate,activeTab, isOnline, queueC
         )
       ),
       menuOpen&&React.createElement("div",{className:"animate-fade-in",style:{marginTop:8,background:"var(--card)",borderRadius:12,boxShadow:"0 4px 20px rgba(0,0,0,.15)",border:"1px solid var(--border)",overflow:"hidden"}},
-        menuItems.map(item=>React.createElement("button",{key:item.id,onClick:()=>{if(item.id==="logout"){onLogout()}else{onNavigate(item.id)}setMenuOpen(false)},style:{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 16px",fontSize:14,fontWeight:600,color:activeTab===item.id?"var(--primary)":(item.id==="logout"?"var(--destructive)":"var(--card-fg)"),background:activeTab===item.id?"rgba(45,106,79,.1)":"transparent",borderBottom:"1px solid var(--border)"}},item.label))
+        
+        // 2. MODIFICAMOS EL ONCLICK PARA QUE ABRA EL FORMULARIO
+        menuItems.map(item=>React.createElement("button",{key:item.id,onClick:()=>{
+          if(item.id==="logout"){
+            onLogout();
+          } else if(item.id==="soporte"){
+            window.open("https://forms.gle/FJMUddEMyevXUxEE6", "_blank"); // <--- ENLACE AL GOOGLE FORMS
+          } else {
+            onNavigate(item.id);
+          }
+          setMenuOpen(false);
+        },style:{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 16px",fontSize:14,fontWeight:600,color:activeTab===item.id?"var(--primary)":(item.id==="logout"?"var(--destructive)":"var(--card-fg)"),background:activeTab===item.id?"rgba(45,106,79,.1)":"transparent",borderBottom:"1px solid var(--border)"}},item.label))
       ),
       React.createElement("div",{style:{marginTop:12,position:"relative"}},
         React.createElement("span",{style:{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",color:"var(--muted-fg)"}},"🔍"),
@@ -529,6 +543,8 @@ function FarmHeader({searchValue,onSearch,onNavigate,activeTab, isOnline, queueC
     )
   );
 }
+
+//hasta aqui//
 
 function BottomNav({active,onChange}){
   const tabs=[{id:"dashboard",icon:"🏠",label:"Inicio"},{id:"registro",icon:"➕",label:"Registro"}];
