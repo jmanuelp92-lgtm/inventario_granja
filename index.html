@@ -507,7 +507,8 @@ function FarmHeader({searchValue,onSearch,onNavigate,activeTab, isOnline, queueC
     {id:"reportes",label:"📋 Reportes"},
     {id:"resumen",label:"📊 Resumen"},
     {id:"partos_hist",label:"📜 Eventos Historicos"},
-    {id:"soporte",label:"🛠️ Peticiones al Dev"}, // <--- NUEVO BOTÓN AQUÍ
+    {id:"ingreso_masivo",label:"📥 Ingreso Masivo Excel"}, // <--- NUEVO BOTÓN AQUÍ
+    {id:"soporte",label:"🛠️ Peticiones al Dev"}, 
     {id:"logout",label:"🚪 Cerrar Sesión"} 
   ];
   
@@ -2569,7 +2570,151 @@ function LoginView({ onLogin }) {
     )
   );
 }
+function IngresoMasivoView({ onSuccess }) {
+  const [dataPreview, setDataPreview] = useState([]);
+  const [saving, setSaving] = useState(false);
 
+  const descargarModelo = () => {
+    if (typeof XLSX === "undefined") {
+      alert("La librería Excel no ha cargado. Verifica tu conexión a internet.");
+      return;
+    }
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet([{
+      "ID_Tatuaje": "M1001",
+      "Chapeta": "CH-01",
+      "Fecha_Ingreso": formatDateStr(new Date()),
+      "Fase": "REPRODUCTIVA",
+      "Subfase": "REEMP_VACIA",
+      "Peso_Kg": "120",
+      "Sexo": "H",
+      "ID_Madre": "",
+      "Fecha_Nacimiento": "",
+      "Puesto": "Corral 1"
+    }]);
+    XLSX.utils.book_append_sheet(wb, ws, "Ingreso");
+    XLSX.writeFile(wb, "Modelo_Ingreso_Masivo.xlsx");
+  };
+
+  const handleFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        // Utilizamos raw: false para que Excel formatee las fechas correctamente a texto
+        const data = XLSX.utils.sheet_to_json(ws, { raw: false, dateNF: 'yyyy-mm-dd' });
+        if (data.length === 0) { alert("El archivo está vacío."); return; }
+        setDataPreview(data);
+      } catch (err) {
+        alert("Error al leer el archivo. Asegúrate de que es un Excel válido.");
+      }
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = null; 
+  };
+
+  const handleConfirmar = async () => {
+    if (dataPreview.length === 0) return;
+    setSaving(true);
+    try {
+      let count = 0;
+      // Enviamos animal por animal a la cola de sincronización para respetar todos los campos
+      for (const r of dataPreview) {
+         const tatuaje = String(r["ID_Tatuaje"] || r["ID"] || r["Tatuaje"] || "").trim();
+         if (!tatuaje) continue;
+         
+         let fechaNac = "";
+         if (r["Fecha_Nacimiento"]) {
+            const fN = extractDateKey(r["Fecha_Nacimiento"]);
+            if(fN) fechaNac = toAppsScriptDate(formatDateStr(new Date(fN+"T12:00:00")));
+         }
+
+         let fechaIngreso = toAppsScriptDate(formatDateStr(new Date()));
+         if (r["Fecha_Ingreso"]) {
+            const fI = extractDateKey(r["Fecha_Ingreso"]);
+            if(fI) fechaIngreso = toAppsScriptDate(formatDateStr(new Date(fI+"T12:00:00")));
+         }
+
+         const payload = {
+           accion: "INGRESO",
+           fecha: fechaIngreso,
+           tatuaje: tatuaje,
+           chapeta: String(r["Chapeta"] || "").trim(),
+           fase: String(r["Fase"] || "REPRODUCTIVA").toUpperCase().replace(/ /g,"_"),
+           subfase: String(r["Subfase"] || "").toUpperCase(),
+           peso: String(r["Peso_Kg"] || r["Peso"] || "").trim(),
+           sexo: String(r["Sexo"] || "H").toUpperCase().charAt(0) === 'M' ? 'M' : 'H',
+           madre: String(r["ID_Madre"] || r["Madre"] || "").trim(),
+           fechaNacimiento: fechaNac,
+           subpuesto: String(r["Puesto"] || "").trim(),
+           notas: "Ingreso Masivo por Excel"
+         };
+
+         // Usamos enviarRegistro para que la base de datos lo trate como un ingreso manual completo
+         await enviarRegistro(payload);
+         count++;
+      }
+
+      if (count === 0) { 
+          alert("No se encontraron animales con ID válido en el Excel."); 
+      } else {
+          alert("✅ Se cargaron " + count + " animales exitosamente con todos sus datos.");
+          setDataPreview([]);
+          if (onSuccess) onSuccess();
+      }
+    } catch (err) {
+      alert("Error al procesar la subida: " + err.message);
+    }
+    setSaving(false);
+  };
+
+  return React.createElement("div", {className: "animate-fade-in", style: {background: "var(--card)", borderRadius: 12, padding: 20, boxShadow: "0 2px 10px rgba(0,0,0,.08)", border: "1px solid var(--border)"}},
+    React.createElement("h3", {style: {fontSize: 18, fontWeight: 700, marginBottom: 8}}, "📥 Ingreso Masivo desde Excel"),
+    React.createElement("p", {style: {fontSize: 12, color: "var(--muted-fg)", marginBottom: 16}}, "Descarga el modelo, llena los datos de los animales nuevos y sube el archivo."),
+    
+    React.createElement("div", {style: {display: "flex", gap: 12, marginBottom: 20}},
+      React.createElement("button", {onClick: descargarModelo, style: {flex: 1, padding: "12px", borderRadius: 8, background: "var(--muted)", color: "var(--card-fg)", fontWeight: 700, border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8}}, "📄 Bajar Modelo"),
+      React.createElement("label", {style: {flex: 1, padding: "12px", borderRadius: 8, background: "var(--primary)", color: "#fff", fontWeight: 700, textAlign: "center", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8}},
+        "📤 Subir Excel",
+        React.createElement("input", {type: "file", accept: ".xlsx, .xls", onChange: handleFile, style: {display: "none"}})
+      )
+    ),
+
+    dataPreview.length > 0 && React.createElement("div", {style: {marginTop: 20}},
+      React.createElement("div", {style: {display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12}},
+        React.createElement("h4", {style: {fontSize: 14, fontWeight: 700}}, "Vista Previa (" + dataPreview.length + " animales)"),
+        React.createElement("button", {onClick: () => setDataPreview([]), style: {fontSize: 12, color: "var(--destructive)", fontWeight: 700, border: "none", background: "none", cursor: "pointer"}}, "Cancelar")
+      ),
+      React.createElement("div", {style: {overflowX: "auto", border: "1px solid var(--border)", borderRadius: 8, marginBottom: 16}},
+        React.createElement("table", {style: {width: "100%", borderCollapse: "collapse", fontSize: 11, textAlign: "left"}},
+          React.createElement("thead", {style: {background: "var(--muted)"}},
+            React.createElement("tr", null, 
+              React.createElement("th", {style: {padding: "8px", borderBottom: "1px solid var(--border)"}}, "ID"),
+              React.createElement("th", {style: {padding: "8px", borderBottom: "1px solid var(--border)"}}, "Madre"),
+              React.createElement("th", {style: {padding: "8px", borderBottom: "1px solid var(--border)"}}, "F. Nacimiento"),
+              React.createElement("th", {style: {padding: "8px", borderBottom: "1px solid var(--border)"}}, "Puesto")
+            )
+          ),
+          React.createElement("tbody", null,
+            dataPreview.slice(0, 5).map((r, i) => React.createElement("tr", {key: i, style: {borderBottom: "1px solid var(--border)"}},
+              React.createElement("td", {style: {padding: "8px"}}, r["ID_Tatuaje"] || r["ID"] || r["Tatuaje"] || "N/A"),
+              React.createElement("td", {style: {padding: "8px"}}, r["ID_Madre"] || r["Madre"] || "-"),
+              React.createElement("td", {style: {padding: "8px"}}, r["Fecha_Nacimiento"] || "-"),
+              React.createElement("td", {style: {padding: "8px"}}, r["Puesto"] || "-")
+            )),
+            dataPreview.length > 5 && React.createElement("tr", null, React.createElement("td", {colSpan: 4, style: {padding: "8px", textAlign: "center", color: "var(--muted-fg)", fontStyle: "italic"}}, "... y " + (dataPreview.length - 5) + " más"))
+          )
+        )
+      ),
+      React.createElement("button", {onClick: handleConfirmar, disabled: saving, style: {width: "100%", padding: "14px 0", borderRadius: 8, background: "var(--success)", color: "#fff", fontWeight: 700, fontSize: 16, border: "none", cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1}}, saving ? "Procesando..." : "✅ Confirmar y Subir")
+    )
+  );
+}
 /* ─── APP ─── */
 function App(){
   const [currentUser, setCurrentUser] = useState(localStorage.getItem("granja_pro_user"));
@@ -2900,7 +3045,8 @@ function App(){
       tab==="reportes"&&React.createElement(ReportsView,{historial:historial,search:search,onSelectAnimal:id=>{const a=todosAnimales.find(x=>x.id===id);if(a){setSelectedAnimal(a);setTab("dashboard");setDashView("detail")}}}),
       tab==="resumen"&&React.createElement(ResumenView,{historial:historial,search:search,onSelectAnimal:id=>{const a=todosAnimales.find(x=>x.id===id);if(a){setSelectedAnimal(a);setTab("dashboard");setDashView("detail")}}}),
       tab==="vacunas"&&React.createElement(VacunasView,{inventario:inventario,historial:historial,search:search,onRefresh:()=>loadData(true),onSelectAnimal:id=>{const a=todosAnimales.find(x=>x.id===id);if(a){setSelectedAnimal(a);setTab("dashboard");setDashView("detail")}}}),
-      tab==="partos_hist"&&React.createElement(EventosHistoricosView,{inventario:inventario,onSuccess:()=>{handleTabChange("dashboard")}}),   
+      tab==="partos_hist"&&React.createElement(EventosHistoricosView,{inventario:inventario,onSuccess:()=>{handleTabChange("dashboard")}}),
+      tab==="ingreso_masivo"&&React.createElement(IngresoMasivoView,{onSuccess:()=>{handleTabChange("dashboard")}}),   
     ),
     React.createElement(BottomNav,{active:tab,onChange:handleTabChange}),
     
